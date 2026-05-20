@@ -1,4 +1,4 @@
-path: /content/datasets/glove_detection
+path: ../datasets/glove_detection
 train: images/train
 val: images/val
 test: images/test
