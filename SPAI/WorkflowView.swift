@@ -2,8 +2,6 @@
 //  WorkflowView.swift
 //  SPAI
 //
-//  Created by AV Student on 4/27/26.
-//
 
 import SwiftUI
 
@@ -18,32 +16,34 @@ struct WorkflowView: View {
 
     var body: some View {
         ZStack {
-            AppBackground()
+            LinearGradient(
+                colors: [SPAIColor.neutralLight, Color.white, SPAIColor.neutralMid.opacity(0.5)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
-            HStack(spacing: 24) {
+            HStack(spacing: SPAISpacing.l) {
                 leftPanel
-
                 LiveFeedMockView()
-
                 rightPanel
             }
-            .padding(32)
+            .padding(SPAISpacing.xl)
         }
         .navigationTitle("Sterile Prep Scan")
     }
 
     private var leftPanel: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
             Text("Workflow")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(SPAIColor.neutralDark)
 
             Text("AI-guided sterile processing checklist")
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(SPAIColor.neutralDark.opacity(0.6))
 
-            VStack(spacing: 12) {
+            VStack(spacing: SPAISpacing.s) {
                 ForEach(steps) { step in
                     WorkflowStepCard(step: step)
                 }
@@ -59,30 +59,25 @@ struct WorkflowView: View {
                     Text("Mark Step Complete")
                 }
                 .font(.headline)
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
-                .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .padding(.vertical, 16)
+                .background(SPAIColor.primary)
+                .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
+                .shadow(color: SPAIColor.primary.opacity(0.3), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
         }
         .frame(width: 310)
-        .padding(22)
-        .background(.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 30))
-        .overlay {
-            RoundedRectangle(cornerRadius: 30)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
-        }
+        .padding(SPAISpacing.l)
+        .spaiGlass(.light)
     }
 
     private var rightPanel: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
             Text("AI Status")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(SPAIColor.neutralDark)
 
             DetectionAlertCard(
                 title: "Glove Detection",
@@ -107,27 +102,23 @@ struct WorkflowView: View {
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: SPAISpacing.s) {
                 Text("Current Recommendation")
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SPAIColor.neutralDark)
 
                 Text("Continue PPE check. Confirm gloves, hand hygiene, and tray readiness before moving forward.")
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.65))
+                    .foregroundStyle(SPAIColor.neutralDark.opacity(0.65))
             }
-            .padding()
-            .background(.white.opacity(0.07))
-            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .padding(SPAISpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SPAIColor.neutralLight.opacity(0.6))
+            .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
         }
         .frame(width: 340)
-        .padding(22)
-        .background(.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 30))
-        .overlay {
-            RoundedRectangle(cornerRadius: 30)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
-        }
+        .padding(SPAISpacing.l)
+        .spaiGlass(.light)
     }
 }
 

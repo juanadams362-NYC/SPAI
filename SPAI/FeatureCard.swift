@@ -2,8 +2,6 @@
 //  FeatureCard.swift
 //  SPAI
 //
-//  Created by AV Student on 4/27/26.
-//
 
 import SwiftUI
 
@@ -13,12 +11,18 @@ struct FeatureCard: View {
     let icon: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            ZStack {
+                RoundedRectangle(cornerRadius: SPAIRadius.small)
+                    .fill(SPAIColor.primary.opacity(0.2))
+                    .frame(width: 52, height: 52)
 
-            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(SPAIColor.accent)
+            }
+
+            VStack(alignment: .leading, spacing: SPAISpacing.xs + 2) {
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -27,18 +31,14 @@ struct FeatureCard: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.65))
                     .lineLimit(2)
+                    .multilineTextAlignment(.leading)
             }
 
             Spacer()
         }
-        .frame(maxWidth: .infinity, minHeight: 170)
-        .padding(22)
-        .background(.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 26))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
-        }
+        .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+        .padding(SPAISpacing.l)
+        .spaiGlass(.dark)
     }
 }
 
@@ -49,5 +49,5 @@ struct FeatureCard: View {
         icon: "viewfinder"
     )
     .padding()
-    .background(.black)
+    .background(SPAIColor.neutralDark)
 }
