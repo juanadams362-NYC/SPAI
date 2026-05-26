@@ -2,31 +2,25 @@
 Detector — wraps the YOLO model so the rest of the app doesn't care
 how detection actually works.
 
-Right now this is a STUB that returns fake detections. Tomorrow when v2
-is trained, we'll swap the load_model() and run_inference() bodies to
-use real ultralytics.YOLO calls. The rest of the app doesn't change.
-
-This separation is intentional: routes/detect.py imports from here and
-has no idea whether the model is fake or real.
+Auto-switches between stub and real mode based on whether best.pt exists.
+routes/detect.py imports from here and has no idea whether the model is
+fake or real — same JSON shape either way.
 """
+import io
+import time
 from pathlib import Path
 from typing import Any
 
-# Path to the trained model weights. Doesn't exist yet — gets created
-# tomorrow when v2 training finishes. The stub handles the missing file
-# gracefully so the API runs without crashing.
 MODEL_PATH = Path(__file__).parent.parent.parent.parent / "model-training" / "runs" / "v2" / "weights" / "best.pt"
 
 CLASS_NAMES = ["glove", "hand"]
 
+# Only report detections at or above this confidence. Filters out noise.
+CONFIDENCE_THRESHOLD = 0.25
+
 
 class Detector:
-    """Singleton-ish wrapper around the YOLO model.
-
-    Loaded once at server startup (in main.py), then reused for every
-    request. Loading the model takes seconds; doing it per-request
-    would tank performance.
-    """
+    """Wraps the YOLO model. Loaded once at startup, reused per request."""
 
     def __init__(self) -> None:
         self.model: Any = None
@@ -36,19 +30,16 @@ class Detector:
     def load(self) -> None:
         """Load the model from disk. Called once at app startup."""
         if self.model_path.exists():
-            # Real loading path — kicks in once v2 is trained.
             from ultralytics import YOLO
             self.model = YOLO(str(self.model_path))
             self.model_loaded = True
             print(f"[detector] loaded model from {self.model_path}")
         else:
-            # Stub path — model file doesn't exist yet.
             self.model = None
             self.model_loaded = False
             print(f"[detector] no model at {self.model_path} — running in stub mode")
 
     def status(self) -> dict:
-        """Report whether the model is ready."""
         return {
             "model_loaded": self.model_loaded,
             "model_path": str(self.model_path),
@@ -57,11 +48,6 @@ class Detector:
         }
 
     def detect(self, image_bytes: bytes) -> dict:
-        """Run detection on raw image bytes. Returns a list of detections.
-
-        In stub mode, returns fake detections so the frontend can develop
-        against this without waiting for v2. In real mode, runs YOLO.
-        """
         if not self.model_loaded:
             return self._stub_detect(image_bytes)
         return self._real_detect(image_bytes)
@@ -88,12 +74,41 @@ class Detector:
         }
 
     def _real_detect(self, image_bytes: bytes) -> dict:
-        """Real YOLO inference. Wired up tomorrow once v2 is trained.
+        """Real YOLO inference on the uploaded image bytes."""
+        from PIL import Image
 
-        Placeholder for now — will use PIL to decode bytes, pass to YOLO,
-        format results into the same shape as _stub_detect.
-        """
-        raise NotImplementedError("Real inference path — implemented post-v2 training")
+        # 1. Decode raw bytes into a PIL image. RGB to drop any alpha channel.
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+        # 2. Run inference. verbose=False keeps the console quiet.
+        start = time.time()
+        results = self.model(image, conf=CONFIDENCE_THRESHOLD, verbose=False)
+        elapsed_ms = int((time.time() - start) * 1000)
+
+        # 3. Parse results. YOLO returns a list (one entry per image);
+        #    we sent one image, so take results[0].
+        detections = []
+        result = results[0]
+        for box in result.boxes:
+            class_id = int(box.cls[0])
+            confidence = float(box.conf[0])
+            # xyxy = [x1, y1, x2, y2] in pixel coordinates.
+            coords = box.xyxy[0].tolist()
+            x1, y1, x2, y2 = [int(c) for c in coords]
+
+            detections.append({
+                "class_id": class_id,
+                "class_name": CLASS_NAMES[class_id] if class_id < len(CLASS_NAMES) else str(class_id),
+                "confidence": round(confidence, 3),
+                "box": [x1, y1, x2, y2],
+            })
+
+        # 4. Same shape as _stub_detect — only mode and contents differ.
+        return {
+            "detections": detections,
+            "inference_time_ms": elapsed_ms,
+            "mode": "real",
+        }
 
 
 # Module-level singleton. Imported by main.py at startup and by detect.py per-request.
