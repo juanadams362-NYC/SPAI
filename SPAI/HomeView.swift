@@ -2,8 +2,6 @@
 //  HomeView.swift
 //  SPAI
 //
-//  Created by AV Student on 4/27/26.
-//
 
 import SwiftUI
 
@@ -13,36 +11,39 @@ struct HomeView: View {
             ZStack {
                 AppBackground()
 
-                VStack(alignment: .leading, spacing: 32) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: SPAISpacing.xl) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 12) {
                             Text("SPN AI")
-                                .font(.system(size: 64, weight: .bold, design: .rounded))
+                                .font(.system(size: 72, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
+                                .tracking(-1.5)
 
-                            Text("Sterile Processing Navigation powered by AI vision.")
+                            Text("Sterile Processing Navigation\npowered by AI vision.")
                                 .font(.title3)
-                                .foregroundStyle(.white.opacity(0.72))
+                                .foregroundStyle(.white.opacity(0.7))
                         }
 
                         Spacer()
 
-                        StatusPill(text: "Prototype", systemImage: "sparkles", color: .blue)
+                        StatusPill(
+                            text: "Prototype",
+                            systemImage: "sparkles",
+                            color: SPAIColor.primary
+                        )
                     }
 
-                    HStack(spacing: 20) {
+                    HStack(spacing: SPAISpacing.m) {
                         FeatureCard(
                             title: "Guided Workflow",
                             subtitle: "Step-by-step sterile prep support",
                             icon: "checklist.checked"
                         )
-
                         FeatureCard(
                             title: "AI Detection",
                             subtitle: "PPE, tools, hands, and risk alerts",
                             icon: "viewfinder"
                         )
-
                         FeatureCard(
                             title: "AR Overlay",
                             subtitle: "Vision Pro-style spatial guidance",
@@ -50,25 +51,27 @@ struct HomeView: View {
                         )
                     }
 
+                    Spacer()
+
                     NavigationLink {
                         WorkflowView()
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 14) {
                             Image(systemName: "play.fill")
                             Text("Start Sterile Prep Scan")
+                                .fontWeight(.semibold)
                         }
-                        .font(.headline)
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 18)
-                        .background(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 20)
+                        .background(SPAIColor.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
+                        .shadow(color: SPAIColor.primary.opacity(0.4), radius: 20, y: 8)
                     }
                     .buttonStyle(.plain)
-
-                    Spacer()
                 }
-                .padding(48)
+                .padding(SPAISpacing.xxl)
             }
         }
     }
