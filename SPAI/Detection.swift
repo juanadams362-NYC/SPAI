@@ -28,24 +28,23 @@ extension Detection {
         Detection(
             label: "glove",
             confidence: 0.94,
-            position: SIMD3<Float>(-0.3, 1.4, -1.0),    // left, eye-height, 1m forward
+            position: SIMD3<Float>(-0.25, 1.5, -0.8),   // slightly left, eye height, closer
             size: SIMD3<Float>(0.18, 0.12, 0.05),
             status: DetectionStatus.safe
         ),
         Detection(
-            label: "Hand",
+            label: "hand",
             confidence: 0.80,
-            position: SIMD3<Float>(0.3, 1.4, -1.0),   // right, eye-height
+            position: SIMD3<Float>(0.25, 1.5, -0.8),    // slightly right, eye height
             size: SIMD3<Float>(0.16, 0.14, 0.05),
             status: DetectionStatus.safe
         ),
         Detection(
             label: "Contamination Risk",
             confidence: 0.76,
-            position: SIMD3<Float>(0.0, 1.1, -1.2),
+            position: SIMD3<Float>(0.0, 1.3, -0.8),      // centered, lower
             size: SIMD3<Float>(0.22, 0.15, 0.05),
             status: DetectionStatus.warning
         ),
     ]
-    
 }
