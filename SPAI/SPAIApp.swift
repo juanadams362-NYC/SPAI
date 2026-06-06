@@ -14,16 +14,18 @@ struct SPAIApp: App {
     @State private var appModel = AppModel()
 
     var body: some Scene {
-        WindowGroup {
+        // Giving the window an explicit id lets us dismiss it by name
+        // when the user enters the immersive workflow.
+        WindowGroup(id: "home") {
             HomeView()
                 .environment(appModel)
         }
+        .windowStyle(.plain)
 
-        // Uses AppModel's id constant so the scene and the open call
-        // can never drift out of sync.
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
             ImmersiveView()
                 .environment(appModel)
         }
+        .immersionStyle(selection: .constant(.mixed), in: .mixed)
     }
 }

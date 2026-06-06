@@ -9,9 +9,9 @@ struct HomeView: View {
     // Shared app state injected from SPAIApp.
     @Environment(AppModel.self) private var appModel
 
-    // System actions for entering and leaving immersive spaces.
+    // System actions for entering immersive spaces and managing windows.
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
-    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         NavigationStack {
@@ -60,9 +60,8 @@ struct HomeView: View {
 
                     Spacer()
 
-                    // Tapping this opens the immersive workflow space instead of
-                    // pushing a flat view. The state guard prevents a double-tap
-                    // from firing two opens during the transition.
+                    // Opens the immersive workflow and dismisses this window so
+                    // only the spatial content remains — the room becomes the interface.
                     Button {
                         Task {
                             guard appModel.immersiveSpaceState == .closed else { return }
@@ -71,6 +70,7 @@ struct HomeView: View {
                             switch await openImmersiveSpace(id: appModel.immersiveSpaceID) {
                             case .opened:
                                 appModel.immersiveSpaceState = .open
+                                dismissWindow(id: "home")
                             case .error, .userCancelled:
                                 appModel.immersiveSpaceState = .closed
                             @unknown default:
