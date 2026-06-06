@@ -6,6 +6,13 @@
 import SwiftUI
 
 struct HomeView: View {
+    // Shared app state injected from SPAIApp.
+    @Environment(AppModel.self) private var appModel
+
+    // System actions for entering and leaving immersive spaces.
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -14,12 +21,12 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: SPAISpacing.xl) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("SPN AI")
+                            Text("SPAI")
                                 .font(.system(size: 72, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
                                 .tracking(-1.5)
 
-                            Text("Sterile Processing Navigation\npowered by AI vision.")
+                            Text("Sterile Processing AI\npowered by AI vision.")
                                 .font(.title3)
                                 .foregroundStyle(.white.opacity(0.7))
                         }
@@ -53,12 +60,27 @@ struct HomeView: View {
 
                     Spacer()
 
-                    NavigationLink {
-                        WorkflowView()
+                    // Tapping this opens the immersive workflow space instead of
+                    // pushing a flat view. The state guard prevents a double-tap
+                    // from firing two opens during the transition.
+                    Button {
+                        Task {
+                            guard appModel.immersiveSpaceState == .closed else { return }
+                            appModel.immersiveSpaceState = .inTransition
+
+                            switch await openImmersiveSpace(id: appModel.immersiveSpaceID) {
+                            case .opened:
+                                appModel.immersiveSpaceState = .open
+                            case .error, .userCancelled:
+                                appModel.immersiveSpaceState = .closed
+                            @unknown default:
+                                appModel.immersiveSpaceState = .closed
+                            }
+                        }
                     } label: {
                         HStack(spacing: 14) {
                             Image(systemName: "play.fill")
-                            Text("Start Sterile Prep Scan")
+                            Text("Enter Sterile Prep Workflow")
                                 .fontWeight(.semibold)
                         }
                         .font(.title3)
@@ -79,4 +101,5 @@ struct HomeView: View {
 
 #Preview {
     HomeView()
+        .environment(AppModel())
 }
