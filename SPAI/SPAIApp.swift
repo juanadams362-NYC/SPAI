@@ -8,14 +8,29 @@
 import SwiftUI
 
 @main
-struct SPNAIApp: App {
-    var body: some Scene {
-        WindowGroup {
-            HomeView()
-        }
+struct SPAIApp: App {
+    // One shared AppModel for the whole app, injected into every scene.
+    @State private var appModel = AppModel()
 
-        ImmersiveSpace(id: "SPNAIImmersiveSpace") {
-            ImmersiveView()
+    var body: some Scene {
+        WindowGroup(id: "home") {
+            // First launch shows the walkthrough; after it's completed,
+            // the app goes to the home screen. Same window, swapped content.
+            Group {
+                if appModel.hasCompletedOnboarding {
+                    HomeView()
+                } else {
+                    OnboardingView()
+                }
+            }
+            .environment(appModel)
         }
+        .windowStyle(.plain)
+
+        ImmersiveSpace(id: appModel.immersiveSpaceID) {
+            ImmersiveView()
+                .environment(appModel)
+        }
+        .immersionStyle(selection: .constant(.mixed), in: .mixed)
     }
 }

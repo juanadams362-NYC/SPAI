@@ -2,8 +2,6 @@
 //  DetectionAlertCard.swift
 //  SPAI
 //
-//  Created by AV Student on 4/27/26.
-//
 
 import SwiftUI
 
@@ -14,47 +12,49 @@ struct DetectionAlertCard: View {
     let confidence: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: SPAISpacing.s + 4) {
             HStack(spacing: 12) {
                 Image(systemName: status.icon)
                     .foregroundStyle(status.color)
+                    .font(.system(size: 16, weight: .semibold))
 
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SPAIColor.neutralDark)
 
                 Spacer()
 
                 Text(status.rawValue)
                     .font(.caption)
-                    .fontWeight(.bold)
+                    .fontWeight(.semibold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(status.color.opacity(0.35))
+                    .padding(.vertical, 5)
+                    .background(status.color)
                     .clipShape(Capsule())
             }
 
             Text(message)
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.68))
+                .foregroundStyle(SPAIColor.neutralDark.opacity(0.65))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 ProgressView(value: confidence)
                     .tint(status.color)
 
                 Text("Confidence: \(Int(confidence * 100))%")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(SPAIColor.neutralDark.opacity(0.5))
             }
         }
-        .padding()
-        .background(.white.opacity(0.075))
-        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .padding(SPAISpacing.m)
+        .background(.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
         .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(.white.opacity(0.1), lineWidth: 1)
+            RoundedRectangle(cornerRadius: SPAIRadius.medium)
+                .stroke(.white.opacity(0.4), lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
 }
 
@@ -66,5 +66,5 @@ struct DetectionAlertCard: View {
         confidence: 0.94
     )
     .padding()
-    .background(.black)
+    .background(SPAIColor.neutralLight)
 }
