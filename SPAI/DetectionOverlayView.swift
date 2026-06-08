@@ -2,11 +2,10 @@
 //  DetectionOverlayView.swift
 //  SPAI
 //
-//  Created by Juan Adams on 5/21/26.
-//
-//  Renders 3D detection labels floating in the immersive space.
-//  One frosted glass card per detection, positioned in world space.
-//  Lives inside the ImmersiveSpace, layered over passthrough.
+//  Renders the spatial workflow panels floating in the immersive space.
+//  Each detection and guidance panel is a SwiftUI view turned into a
+//  RealityKit attachment, positioned in 3D world space and billboarded
+//  to face the user. Styled with the app tokens + animated LED borders.
 //
 
 import SwiftUI
@@ -14,68 +13,121 @@ import RealityKit
 
 struct DetectionOverlayView: View {
     let detections: [Detection]
-    
+
     var body: some View {
-        // RealityView is the bridge SwiftUI and 3D content.
-        // The 'attachments' closure declares SwiftUI views that can be placed in 3D spaces as RealityKit entities.
         RealityView { content, attachments in
+            // Place each detection panel in world space.
             for detection in detections {
-                // Find the SwiftUI attachment for the detection by id.
-                if let label = attachments.entity(for: detection.id){
-                    // Place the label in the 3D world space.
-                    label.position = detection.position
-                    // Make sure it always faces the user (billboard behavior).
-                    label.components.set(BillboardComponent())
-                    content.add(label)
+                if let panel = attachments.entity(for: detection.id) {
+                    panel.position = detection.position
+                    panel.components.set(BillboardComponent())
+                    content.add(panel)
                 }
             }
+
+            // Place the guidance panel — the "what do I do now" panel —
+            // centered and slightly closer so it reads as the primary guide.
+            if let guidance = attachments.entity(for: "guidance") {
+                guidance.position = SIMD3<Float>(0, 1.7, -0.9)
+                guidance.components.set(BillboardComponent())
+                content.add(guidance)
+            }
         } attachments: {
-            // Declare one SwiiftUI view per detection. RealityKit will convert each into a 3D entity I can position in space.
+            // One panel per detection.
             ForEach(detections) { detection in
-                Attachment(id: detection.id){
-                    DetectionLabel(detection: detection)
+                Attachment(id: detection.id) {
+                    DetectionPanel(detection: detection)
                 }
+            }
+
+            // The always-present guidance panel.
+            Attachment(id: "guidance") {
+                GuidancePanel()
             }
         }
     }
 }
 
-/// Floating glass card
-private struct DetectionLabel: View {
+/// A detection panel — bigger and clearer than the old tiny label.
+private struct DetectionPanel: View {
     let detection: Detection
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Top row: status dot + label
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+            HStack(spacing: 8) {
                 Circle()
                     .fill(detection.status.color)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 10, height: 10)
                     .shadow(color: detection.status.color, radius: 4)
-                
+
                 Text(detection.label)
-                    .font(.system(size: 14, weight: .semibold, design: .default))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Text(detection.status.rawValue)
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(detection.status.color.opacity(0.8))
+                    .clipShape(Capsule())
+            }
+
+            Text("\(Int(detection.confidence * 100))% confidence")
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .padding(SPAISpacing.m)
+        .frame(width: 240, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+        .ledBorder()
+    }
+}
+
+/// The guidance panel — tells the user exactly where they are and what's next,
+/// so they're never confused about what to do.
+private struct GuidancePanel: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            Text("NEXT REQUIRED ACTION")
+                .font(.system(size: 12, weight: .bold))
+                .tracking(1.5)
+                .foregroundStyle(.white.opacity(0.5))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Current Step")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.5))
+                Text("Decontamination")
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(.white)
             }
-            
-            // Confidence reading
-                Text("\(Int(detection.confidence * 100))% confidence")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.65))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Next Step")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.5))
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.right")
+                    Text("Inspection")
+                }
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(SPAIColor.accent)
+            }
+
+            Text("Start current step to begin processing.")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(SPAISpacing.s + 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SPAIColor.primary.opacity(0.15), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            // Frosted glass. RealityKit honors .regularMaterial in 3D.
-            .regularMaterial,
-            in: RoundedRectangle(cornerRadius: 12)
-        )
-        .overlay(
-            // Subtle colored border that matches the status.
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(detection.status.color.opacity(0.5), lineWidth: 1)
-        )
-        // Faint outer glow tinted by status color.
-        .shadow(color: detection.status.color.opacity(0.3), radius: 8)
+        .padding(SPAISpacing.l)
+        .frame(width: 320, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+        .ledBorder(lineWidth: 2.5)
     }
 }
