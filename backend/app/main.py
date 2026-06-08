@@ -11,6 +11,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.inference.detector import detector
 from app.routes import health, model, detect
+from app.logging_config import setup_logging, get_logger
+
+# Configure logging before anything else so startup messages are captured.
+setup_logging()
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -21,8 +26,16 @@ async def lifespan(app: FastAPI):
     would be 1000x slower.
     On shutdown: nothing to clean up for now.
     """
+    logger.info("Starting SPAI backend — loading model...")
     detector.load()
+    status = detector.status()
+    logger.info(
+        "Model load complete: mode=%s, path=%s",
+        status["mode"],
+        status["model_path"],
+    )
     yield
+    logger.info("Shutting down SPAI backend.")
 
 
 app = FastAPI(
@@ -40,8 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register the route modules. Each one defined a router; I attach them
-# all to the main app.
+# Register the route modules. Each one defines a router; attach them all.
 app.include_router(health.router)
 app.include_router(model.router)
 app.include_router(detect.router)
