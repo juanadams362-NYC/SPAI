@@ -9,16 +9,21 @@ import SwiftUI
 
 @main
 struct SPAIApp: App {
-    // One shared AppModel for the whole app, injected into every scene
-    // so the window and the immersive space read the same state.
+    // One shared AppModel for the whole app, injected into every scene.
     @State private var appModel = AppModel()
 
     var body: some Scene {
-        // Giving the window an explicit id lets us dismiss it by name
-        // when the user enters the immersive workflow.
         WindowGroup(id: "home") {
-            HomeView()
-                .environment(appModel)
+            // First launch shows the walkthrough; after it's completed,
+            // the app goes to the home screen. Same window, swapped content.
+            Group {
+                if appModel.hasCompletedOnboarding {
+                    HomeView()
+                } else {
+                    OnboardingView()
+                }
+            }
+            .environment(appModel)
         }
         .windowStyle(.plain)
 
