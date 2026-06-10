@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.inference.detector import detector
 from app.routes import health, model, detect, compliance, batch, settings
 from app.logging_config import setup_logging, get_logger
+from app.metrics import metrics
 
 # Configure logging before anything else so startup messages are captured.
 setup_logging()
@@ -52,6 +53,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def count_requests(request, call_next):
+    """Count every request and any 5xx error for the health dashboard."""
+    metrics.record_request()
+    response = await call_next(request)
+    if response.status_code >= 500:
+        metrics.record_error()
+    return response
+
 
 # Register the route modules. Each one defines a router; attach them all.
 app.include_router(health.router)
