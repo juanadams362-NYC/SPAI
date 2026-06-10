@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.inference.detector import detector
-from app.routes import health, model, detect
+from app.routes import health, model, detect, compliance
 from app.logging_config import setup_logging, get_logger
 
 # Configure logging before anything else so startup messages are captured.
@@ -57,6 +57,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(model.router)
 app.include_router(detect.router)
+app.include_router(compliance.router)
 
 
 @app.get("/")
