@@ -2,9 +2,10 @@
 //  ImmersiveView.swift
 //  SPAI
 //
-//  The spatial workspace. Lays out the HUD panels around the user,
-//  each billboarding to face them. Action buttons toggle panel
-//  visibility so the user can declutter. Includes an exit control.
+//  The spatial workspace. Panels built once in `make`, billboarded,
+//  draggable via ManipulationComponent. `update` only reads state.
+//  Floating glove/hand/contamination markers removed — that info now
+//  lives in the merged DetectionPanel. Exit moved to the status bar.
 //
 
 import SwiftUI
@@ -13,9 +14,6 @@ import RealityKitContent
 
 struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
-    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
-
-    let detections: [Detection] = Detection.sampleDetections
 
     var body: some View {
         RealityView { content, attachments in
@@ -23,123 +21,74 @@ struct ImmersiveView: View {
                 content.add(env)
             }
 
-            // Initial placement happens in the update closure below so it
-            // can react to visibility changes.
-            for detection in detections {
-                if let panel = attachments.entity(for: detection.id) {
-                    panel.position = detection.position
-                    panel.components.set(BillboardComponent())
-                    content.add(panel)
-                }
-            }
-        } update: { content, attachments in
-            // Re-evaluated when state changes (e.g. a panel toggled).
-            // Show or hide each HUD panel based on its visibility flag.
-            syncPanel("statusBar",  at: SIMD3<Float>(0, 2.2, -1.6), content, attachments)
-            syncPanel("workflow",   at: SIMD3<Float>(0, 1.0, -1.4), content, attachments)
-            syncPanel("compliance", at: SIMD3<Float>(-1.1, 1.6, -1.3), content, attachments)
-            syncPanel("eventLog",   at: SIMD3<Float>(1.1, 1.6, -1.3), content, attachments)
-            syncPanel("actions",    at: SIMD3<Float>(1.5, 1.0, -1.1), content, attachments)
-            syncPanel("exit",       at: SIMD3<Float>(0, 0.4, -1.2), content, attachments)
+            // One-time setup, pulled in tighter around the user.
+            place("statusBar", at: [0, 1.95, -1.5],   content, attachments)
+            place("detection", at: [-0.85, 1.45, -1.35], content, attachments)
+            place("eventLog",  at: [0.85, 1.45, -1.35],  content, attachments)
+            place("workflow",  at: [0, 1.0, -1.3],     content, attachments)
+            place("actions",   at: [0.85, 1.0, -1.2],  content, attachments)
+        } update: { _, attachments in
+            // Read-only: react to visibility toggles.
+            setEnabled("statusBar", attachments)
+            setEnabled("detection", attachments)
+            setEnabled("eventLog",  attachments)
+            setEnabled("workflow",  attachments)
         } attachments: {
-            Attachment(id: "statusBar")  { StatusBarPanel() }
-            Attachment(id: "workflow")   { WorkflowProgressPanel() }
-            Attachment(id: "compliance") { CompliancePanel() }
-            Attachment(id: "eventLog")   { EventLogPanel() }
+            Attachment(id: "statusBar") { StatusBarPanel() }
+            Attachment(id: "detection") { DetectionPanel() }
+            Attachment(id: "eventLog")  { EventLogPanel() }
+            Attachment(id: "workflow")  { WorkflowProgressPanel() }
             Attachment(id: "actions") {
-                            ActionPanel(actions: [
-                                QuickAction(label: "Show All", icon: "rectangle.3.group.fill", tint: SPAIColor.secondary) {
-                                    appModel.showAllPanels()
-                                },
-                                QuickAction(label: "Workflow", icon: "checklist", tint: SPAIColor.primary) {
-                                    appModel.toggleVisibility("workflow")
-                                },
-                                QuickAction(label: "Compliance", icon: "checkmark.shield.fill", tint: SPAIColor.safe) {
-                                    appModel.toggleVisibility("compliance")
-                                },
-                                QuickAction(label: "Event Log", icon: "waveform.path.ecg", tint: SPAIColor.accent) {
-                                    appModel.toggleVisibility("eventLog")
-                                }
-                            ])
-                        }
-            Attachment(id: "exit") { exitButton }
-
-            ForEach(detections) { detection in
-                Attachment(id: detection.id) {
-                    DetectionPanel(detection: detection)
-                }
+                ActionPanel(actions: [
+                    QuickAction(label: "Show All", icon: "rectangle.3.group.fill", tint: SPAIColor.secondary) {
+                        appModel.showAllPanels()
+                    },
+                    QuickAction(label: "Workflow", icon: "checklist", tint: SPAIColor.primary) {
+                        appModel.toggleVisibility("workflow")
+                    },
+                    QuickAction(label: "Detection", icon: "viewfinder", tint: SPAIColor.accent) {
+                        appModel.toggleVisibility("detection")
+                    },
+                    QuickAction(label: "Event Log", icon: "waveform.path.ecg", tint: SPAIColor.primary) {
+                        appModel.toggleVisibility("eventLog")
+                    }
+                ])
             }
         }
         .onAppear { appModel.immersiveSpaceState = .open }
         .onDisappear { appModel.immersiveSpaceState = .closed }
     }
 
-    /// Adds or removes a panel from the scene based on its visibility flag.
-    /// The action cluster and exit are always shown so the user can't trap themselves.
-    private func syncPanel(
-        _ id: String,
+    /// One-time setup: place a panel, face it at the user, optionally make it grabbable.
+    /// `id` is `some Hashable` so it accepts String ids (panels) and UUID ids alike.
+    private func place(
+        _ id: some Hashable,
         at position: SIMD3<Float>,
+        grabbable: Bool = true,
         _ content: RealityViewContent,
         _ attachments: RealityViewAttachments
     ) {
         guard let panel = attachments.entity(for: id) else { return }
+        panel.position = position
+        panel.components.set(BillboardComponent())
 
-        // Actions and exit are always visible; everything else respects the flag.
-        let alwaysVisible = (id == "actions" || id == "exit")
-        let shouldShow = alwaysVisible || appModel.isVisible(id)
-
-        if shouldShow {
-            panel.position = position
-            panel.components.set(BillboardComponent())
-            if panel.parent == nil { content.add(panel) }
-        } else {
-            if panel.parent != nil { panel.removeFromParent() }
+        if grabbable {
+            panel.components.set(HoverEffectComponent())
+            ManipulationComponent.configureEntity(
+                panel,
+                collisionShapes: [ .generateBox(width: 0.9, height: 0.5, depth: 0.1) ]
+            )
+            if var m = panel.components[ManipulationComponent.self] {
+                m.releaseBehavior = .stay
+                panel.components.set(m)
+            }
         }
+        content.add(panel)
     }
 
-    private var exitButton: some View {
-        Button {
-            Task {
-                appModel.immersiveSpaceState = .inTransition
-                await dismissImmersiveSpace()
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "xmark.circle.fill")
-                Text("Exit Workflow").fontWeight(.semibold)
-            }
-            .font(.title3)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 16)
-            .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct DetectionPanel: View {
-    let detection: Detection
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.s) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(detection.status.color)
-                    .frame(width: 10, height: 10)
-                    .shadow(color: detection.status.color, radius: 4)
-                Text(detection.label)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            Text("\(Int(detection.confidence * 100))% confidence")
-                .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.6))
-        }
-        .padding(SPAISpacing.m)
-        .frame(width: 200, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
-        .ledBorder(cornerRadius: SPAIRadius.medium)
+    /// update-safe: only reads state and toggles visibility.
+    private func setEnabled(_ id: String, _ attachments: RealityViewAttachments) {
+        attachments.entity(for: id)?.isEnabled = appModel.isVisible(id)
     }
 }
 
