@@ -1,62 +1,38 @@
 //
-//  SterileStep.swift
-//  SPAI
-//
-//  Created by Juan Adams on 6/7/26.
-//
-
-
-//
 //  WorkflowProgressPanel.swift
 //  SPAI
 //
-//  The horizontal 5-step sterile-processing tracker from the Figma.
-//  Shows current step, lets the user start it, and advances through
-//  the workflow. Real interactive controls, not a static display.
+//  The horizontal 5-step sterile-processing tracker. Reads its step
+//  state from AppModel now (single source of truth) instead of local
+//  @State, so the event log and FSM can stay in sync with it.
 //
 
 import SwiftUI
 
-/// The five sterile-processing steps, in order.
-enum SterileStep: Int, CaseIterable, Identifiable {
-    case decontamination
-    case inspection
-    case trayAssembly
-    case packaging
-    case sealValidation
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .decontamination: return "Decontamination"
-        case .inspection:      return "Inspection"
-        case .trayAssembly:    return "Tray Assembly"
-        case .packaging:       return "Packaging"
-        case .sealValidation:  return "Seal Validation"
-        }
-    }
-}
-
 struct WorkflowProgressPanel: View {
-    // Index of the current step the user is on.
-    @State private var currentStepIndex: Int = 0
-    // Whether the current step has been started (vs. just selected).
-    @State private var stepStarted = false
+    @Environment(AppModel.self) private var appModel
 
-    private var currentStep: SterileStep {
-        SterileStep.allCases[currentStepIndex]
+    private var currentStep: SterileStep { appModel.currentStep }
+    private var currentStepIndex: Int { appModel.currentStepIndex }
+    private var stepStarted: Bool { appModel.stepStarted }
+
+    // A failed step can only be sent back if we're past Decontamination.
+    private var canSendBack: Bool {
+        stepStarted && currentStepIndex > 0
+    }
+
+    // Trainees get a Redo affordance to repeat the current step.
+    private var canRedo: Bool {
+        appModel.role == .trainee && stepStarted
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             header
 
-            // The horizontal step track.
             HStack(spacing: 0) {
                 ForEach(SterileStep.allCases) { step in
                     stepNode(step)
-                    // Connector line between nodes (skip after the last one).
                     if step != SterileStep.allCases.last {
                         connector(after: step)
                     }
@@ -126,7 +102,6 @@ struct WorkflowProgressPanel: View {
     // MARK: - Connector
 
     private func connector(after step: SterileStep) -> some View {
-        // Filled if the step before it is complete.
         Rectangle()
             .fill(step.rawValue < currentStepIndex ? SPAIColor.safe : .white.opacity(0.15))
             .frame(height: 2)
@@ -136,7 +111,7 @@ struct WorkflowProgressPanel: View {
     // MARK: - Controls
 
     private var controls: some View {
-        HStack {
+        HStack(spacing: SPAISpacing.m) {
             Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.7))
@@ -144,41 +119,48 @@ struct WorkflowProgressPanel: View {
             Spacer()
 
             if !stepStarted {
-                // Start the current step.
-                Button {
-                    stepStarted = true
-                } label: {
-                    Label("Start Step", systemImage: "play.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, SPAISpacing.l)
-                        .padding(.vertical, SPAISpacing.s + 2)
-                        .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
+                    appModel.startStep()
                 }
-                .buttonStyle(.plain)
             } else {
-                // Complete the step and advance to the next.
-                Button {
-                    if currentStepIndex < SterileStep.allCases.count - 1 {
-                        currentStepIndex += 1
-                        stepStarted = false
+                if canRedo {
+                    actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
+                        appModel.redoStep()
                     }
-                } label: {
-                    Label("Complete Step", systemImage: "checkmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, SPAISpacing.l)
-                        .padding(.vertical, SPAISpacing.s + 2)
-                        .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
-                .buttonStyle(.plain)
+                if canSendBack {
+                    actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
+                        appModel.failStep()
+                    }
+                }
+                actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
+                    appModel.completeStep()
+                }
             }
         }
+    }
+
+    private func actionButton(
+        _ label: String,
+        icon: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(label, systemImage: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, SPAISpacing.l)
+                .padding(.vertical, SPAISpacing.s + 2)
+                .background(tint, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        }
+        .buttonStyle(.plain)
     }
 }
 
 #Preview {
     WorkflowProgressPanel()
+        .environment(AppModel())
         .padding(60)
         .background(.black)
 }

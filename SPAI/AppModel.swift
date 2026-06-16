@@ -30,6 +30,28 @@ enum TechRole: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// The five sterile-processing steps, in order. Lives here now so the
+/// workflow panel, event log, and FSM all read the same step state.
+enum SterileStep: Int, CaseIterable, Identifiable {
+    case decontamination
+    case inspection
+    case trayAssembly
+    case packaging
+    case sealValidation
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .decontamination: return "Decontamination"
+        case .inspection:      return "Inspection"
+        case .trayAssembly:    return "Tray Assembly"
+        case .packaging:       return "Packaging"
+        case .sealValidation:  return "Seal Validation"
+        }
+    }
+}
+
 @MainActor
 @Observable
 class AppModel {
@@ -46,7 +68,6 @@ class AppModel {
     private let onboardingKey = "hasCompletedOnboarding"
 
     // Backed by UserDefaults so onboarding only shows on first ever launch.
-    // Reading pulls from disk; writing saves to disk immediately.
     var hasCompletedOnboarding: Bool {
         didSet {
             UserDefaults.standard.set(hasCompletedOnboarding, forKey: onboardingKey)
@@ -79,8 +100,41 @@ class AppModel {
         panelVisibility.removeAll()
     }
 
+    // MARK: - Workflow state (single source of truth)
+
+    /// Index of the step the user is currently on.
+    var currentStepIndex: Int = 0
+    /// Whether the current step has been started vs. just selected.
+    var stepStarted: Bool = false
+
+    var currentStep: SterileStep {
+        SterileStep.allCases[currentStepIndex]
+    }
+
+    /// Begin the current step.
+    func startStep() {
+        stepStarted = true
+    }
+
+    /// Complete the current step and advance to the next legal step.
+    func completeStep() {
+        guard currentStepIndex < SterileStep.allCases.count - 1 else { return }
+        currentStepIndex += 1
+        stepStarted = false
+    }
+
+    /// Fail the current step — sends the tray back to decontamination.
+    func failStep() {
+        currentStepIndex = 0
+        stepStarted = false
+    }
+
+    /// Trainee-only: redo the current step from scratch.
+    func redoStep() {
+        stepStarted = false
+    }
+
     init() {
-        // Load the saved onboarding state at startup (defaults to false).
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
     }
 }

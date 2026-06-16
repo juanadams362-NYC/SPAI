@@ -2,45 +2,29 @@
 //  StatusBarPanel.swift
 //  SPAI
 //
-//  Created by Juan Adams on 6/7/26.
-//
-
-
-//
-//  StatusBarPanel.swift
-//  SPAI
-//
-//  The top HUD status bar: identity, session time, role, and session
-//  controls. Anchors the immersive workspace and sets the visual tone.
-//  Mirrors the Figma layout using the app's existing design tokens.
+//  Top HUD status bar: Sterile Node logo, identity, session time, role,
+//  and the two session actions — Ask SPAI and End Session.
 //
 
 import SwiftUI
 internal import Combine
 
 struct StatusBarPanel: View {
-    // Session timer state. Counts up while the workflow is active.
-    @State private var sessionSeconds: Int = 0
-    @State private var isPaused = false
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.openWindow) private var openWindow
 
-    // Drives the session timer once per second.
+    @State private var sessionSeconds: Int = 0
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: SPAISpacing.l) {
             identityBlock
-
             divider
-
             sessionTimeBlock
-
             divider
-
             roleBlock
-
             Spacer()
-
             controlButtons
         }
         .padding(.horizontal, SPAISpacing.l)
@@ -48,22 +32,16 @@ struct StatusBarPanel: View {
         .frame(width: 900)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
-        .onReceive(timer) { _ in
-            // Only advance the clock when the session isn't paused.
-            if !isPaused { sessionSeconds += 1 }
-        }
+        .onReceive(timer) { _ in sessionSeconds += 1 }
     }
 
-    // MARK: - Left: identity
+    // MARK: - Left: identity (now with the Sterile Node mark)
 
     private var identityBlock: some View {
         HStack(spacing: SPAISpacing.s + 4) {
-            // Initials badge.
-            Text("SP")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+            SterileNodeMark(size: 38)
                 .frame(width: 48, height: 48)
-                .background(SPAIColor.primary.opacity(0.35), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                .background(SPAIColor.primary.opacity(0.16), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("SPAI")
@@ -95,84 +73,136 @@ struct StatusBarPanel: View {
     // MARK: - Center: role
 
     private var roleBlock: some View {
-            Menu {
-                // Each role is a selectable menu item that updates AppModel.
-                ForEach(TechRole.allCases) { role in
-                    Button {
-                        appModel.role = role
-                    } label: {
-                        if appModel.role == role {
-                            Label(role.rawValue, systemImage: "checkmark")
-                        } else {
-                            Text(role.rawValue)
-                        }
+        Menu {
+            ForEach(TechRole.allCases) { role in
+                Button {
+                    appModel.role = role
+                } label: {
+                    if appModel.role == role {
+                        Label(role.rawValue, systemImage: "checkmark")
+                    } else {
+                        Text(role.rawValue)
                     }
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(SPAIColor.accent)
-                        .frame(width: 8, height: 8)
-                    Text(appModel.role.rawValue)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.4))
-                }
             }
-            .buttonStyle(.plain)
+        } label: {
+            HStack(spacing: 8) {
+                Circle().fill(SPAIColor.accent).frame(width: 8, height: 8)
+                Text(appModel.role.rawValue)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
         }
+        .buttonStyle(.plain)
+    }
 
-    // MARK: - Right: controls
+    // MARK: - Right: session actions
 
     private var controlButtons: some View {
         HStack(spacing: SPAISpacing.s + 4) {
             Button {
-                isPaused.toggle()
+                // TODO: invoke SPAI assistant (dynamic-island presence)
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: isPaused ? "play.fill" : "pause.fill")
-                    Text(isPaused ? "Resume" : "Pause")
-                }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, SPAISpacing.m)
-                .padding(.vertical, SPAISpacing.s + 2)
-                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
             }
             .buttonStyle(.plain)
 
             Button {
-                // Export hook — wired to the backend/report export later.
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.down")
-                    Text("Export")
+                Task {
+                    appModel.immersiveSpaceState = .inTransition
+                    await dismissImmersiveSpace()
+                    openWindow(id: "home")
                 }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, SPAISpacing.m)
-                .padding(.vertical, SPAISpacing.s + 2)
-                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            } label: {
+                barButtonLabel("End Session", icon: "xmark.circle.fill", tint: SPAIColor.critical)
             }
             .buttonStyle(.plain)
         }
+    }
+
+    private func barButtonLabel(_ text: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).foregroundStyle(tint)
+            Text(text).foregroundStyle(.white)
+        }
+        .font(.system(size: 14, weight: .semibold))
+        .padding(.horizontal, SPAISpacing.m)
+        .padding(.vertical, SPAISpacing.s + 2)
+        .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
     }
 
     // MARK: - Helpers
 
     private var divider: some View {
-        Rectangle()
-            .fill(.white.opacity(0.12))
-            .frame(width: 1, height: 36)
+        Rectangle().fill(.white.opacity(0.12)).frame(width: 1, height: 36)
     }
 
-    /// Turns the running second count into MM:SS.
     private var formattedTime: String {
         let minutes = sessionSeconds / 60
         let seconds = sessionSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - Sterile Node logo mark
+
+/// Abstract brand mark: a hexagon (clean field / containment) with a
+/// reticle cross and focus dot (vision + AI). Drawn in the accent palette.
+struct SterileNodeMark: View {
+    var size: CGFloat = 38
+
+    private var gradient: LinearGradient {
+        LinearGradient(colors: [SPAIColor.primary, SPAIColor.secondary, SPAIColor.accent],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    var body: some View {
+        ZStack {
+            SPAIHexagon()
+                .stroke(gradient, style: StrokeStyle(lineWidth: size * 0.07, lineJoin: .round))
+                .frame(width: size * 0.84, height: size * 0.94)
+
+            Path { p in
+                p.move(to: CGPoint(x: size/2, y: size*0.32))
+                p.addLine(to: CGPoint(x: size/2, y: size*0.68))
+                p.move(to: CGPoint(x: size*0.32, y: size/2))
+                p.addLine(to: CGPoint(x: size*0.68, y: size/2))
+            }
+            .stroke(SPAIColor.primary, style: StrokeStyle(lineWidth: size*0.05, lineCap: .round))
+
+            Circle()
+                .stroke(SPAIColor.accent, lineWidth: size*0.05)
+                .frame(width: size*0.34, height: size*0.34)
+
+            Circle()
+                .fill(SPAIColor.accent)
+                .frame(width: size*0.13, height: size*0.13)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// Pointy-top hexagon used by the logo mark.
+struct SPAIHexagon: Shape {
+    func path(in rect: CGRect) -> Path {
+        let cx = rect.midX, cy = rect.midY
+        let rx = rect.width/2, ry = rect.height/2
+        let pts = [
+            CGPoint(x: cx,      y: cy - ry),
+            CGPoint(x: cx + rx, y: cy - ry*0.5),
+            CGPoint(x: cx + rx, y: cy + ry*0.5),
+            CGPoint(x: cx,      y: cy + ry),
+            CGPoint(x: cx - rx, y: cy + ry*0.5),
+            CGPoint(x: cx - rx, y: cy - ry*0.5)
+        ]
+        var p = Path()
+        p.move(to: pts[0])
+        pts.dropFirst().forEach { p.addLine(to: $0) }
+        p.closeSubpath()
+        return p
     }
 }
 

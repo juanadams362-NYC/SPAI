@@ -27,6 +27,7 @@ class Detector:
         self.model: Any = None
         self.model_loaded: bool = False
         self.model_path: Path = MODEL_PATH
+        self.confidence_threshold: float = CONFIDENCE_THRESHOLD
 
     def load(self) -> None:
         """Load the model from disk. Called once at app startup."""
@@ -46,6 +47,7 @@ class Detector:
             "model_path": str(self.model_path),
             "classes": CLASS_NAMES,
             "mode": "real" if self.model_loaded else "stub",
+            "confidence_threshold": self.confidence_threshold,
         }
 
     def detect(self, image_bytes: bytes) -> dict:
@@ -83,7 +85,7 @@ class Detector:
 
         # 2. Run inference. verbose=False keeps the console quiet.
         start = time.time()
-        results = self.model(image, conf=CONFIDENCE_THRESHOLD, verbose=False)
+        results = self.model(image, conf=self.confidence_threshold, verbose=False)
         elapsed_ms = int((time.time() - start) * 1000)
 
         # 3. Parse results. YOLO returns a list (one entry per image);
