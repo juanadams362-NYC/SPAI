@@ -1,55 +1,20 @@
 //
-//  WorkflowProgresssPanel.swift
-//  SPAI
-//
-//  Created by Juan Adams on 6/7/26.
-//
-
-
-//
 //  WorkflowProgressPanel.swift
 //  SPAI
 //
-//  The horizontal 5-step sterile-processing tracker. Real workflow
-//  controls: start, complete, fail/send-back, and (for trainees) redo.
-//  Fail sends the tray back to Decontamination — the core SPD rule that
-//  any contamination event means full reprocessing.
+//  The horizontal 5-step sterile-processing tracker. Reads its step
+//  state from AppModel now (single source of truth) instead of local
+//  @State, so the event log and FSM can stay in sync with it.
 //
 
 import SwiftUI
 
-/// The five sterile-processing steps, in order.
-enum SterileStep: Int, CaseIterable, Identifiable {
-    case decontamination
-    case inspection
-    case trayAssembly
-    case packaging
-    case sealValidation
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .decontamination: return "Decontamination"
-        case .inspection:      return "Inspection"
-        case .trayAssembly:    return "Tray Assembly"
-        case .packaging:       return "Packaging"
-        case .sealValidation:  return "Seal Validation"
-        }
-    }
-}
-
 struct WorkflowProgressPanel: View {
     @Environment(AppModel.self) private var appModel
 
-    // Index of the current step the user is on.
-    @State private var currentStepIndex: Int = 0
-    // Whether the current step has been started (vs. just selected).
-    @State private var stepStarted = false
-
-    private var currentStep: SterileStep {
-        SterileStep.allCases[currentStepIndex]
-    }
+    private var currentStep: SterileStep { appModel.currentStep }
+    private var currentStepIndex: Int { appModel.currentStepIndex }
+    private var stepStarted: Bool { appModel.stepStarted }
 
     // A failed step can only be sent back if we're past Decontamination.
     private var canSendBack: Bool {
@@ -65,7 +30,6 @@ struct WorkflowProgressPanel: View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             header
 
-            // The horizontal step track.
             HStack(spacing: 0) {
                 ForEach(SterileStep.allCases) { step in
                     stepNode(step)
@@ -156,36 +120,26 @@ struct WorkflowProgressPanel: View {
 
             if !stepStarted {
                 actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
-                    stepStarted = true
+                    appModel.startStep()
                 }
             } else {
-                // Redo (trainees only) — repeat the current step from scratch.
                 if canRedo {
                     actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
-                        stepStarted = false
+                        appModel.redoStep()
                     }
                 }
-
-                // Fail / Send Back — contamination means the tray reprocesses from Decontamination.
                 if canSendBack {
                     actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
-                        currentStepIndex = 0
-                        stepStarted = false
+                        appModel.failStep()
                     }
                 }
-
-                // Complete — advance to the next step.
                 actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
-                    if currentStepIndex < SterileStep.allCases.count - 1 {
-                        currentStepIndex += 1
-                        stepStarted = false
-                    }
+                    appModel.completeStep()
                 }
             }
         }
     }
 
-    /// A consistent pill button used across the controls row.
     private func actionButton(
         _ label: String,
         icon: String,

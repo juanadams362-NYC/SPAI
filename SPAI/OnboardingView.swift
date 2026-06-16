@@ -180,7 +180,7 @@ struct OnboardingView: View {
                     withAnimation { page += 1 }
                 } else {
                     // Finish onboarding — the app moves on to HomeView.
-                    appModel.hasCompletedOnboarding = true
+                    //appModel.hasCompletedOnboarding = true
                 }
             }
             .fontWeight(.semibold)
