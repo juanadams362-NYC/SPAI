@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 States and events for the sterile-processing compliance FSM.
 

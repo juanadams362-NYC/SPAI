@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 The sterile-processing compliance state machine.
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional
 """Settings endpoint — read and update runtime detector settings."""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -11,7 +13,7 @@ logger = get_logger(__name__)
 
 class SettingsUpdate(BaseModel):
     """Fields that can be changed at runtime. All optional."""
-    confidence_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    confidence_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 
 @router.get("")
