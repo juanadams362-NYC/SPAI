@@ -52,6 +52,36 @@ enum SterileStep: Int, CaseIterable, Identifiable {
     }
 }
 
+/// One logged event in the activity feed. Owned by AppModel so the whole
+/// app writes to and reads from one shared history (the seed of the
+/// compliance audit trail).
+struct LogEvent: Identifiable {
+    let id = UUID()
+    let timestamp: String
+    let message: String
+    let kind: Kind
+
+    enum Kind {
+        case info, success, warning
+
+        var color: Color {
+            switch self {
+            case .info:    return SPAIColor.accent
+            case .success: return SPAIColor.safe
+            case .warning: return SPAIColor.warning
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .info:    return "info.circle.fill"
+            case .success: return "checkmark.circle.fill"
+            case .warning: return "exclamationmark.triangle.fill"
+            }
+        }
+    }
+}
+
 @MainActor
 @Observable
 class AppModel {
@@ -100,6 +130,18 @@ class AppModel {
         panelVisibility.removeAll()
     }
 
+    // MARK: - Event log (shared activity history)
+
+    /// Newest event first. The workflow methods below append to this, and
+    /// EventLogPanel reads from it.
+    var eventLog: [LogEvent] = []
+
+    /// Append a timestamped event to the front of the log.
+    private func log(_ message: String, kind: LogEvent.Kind) {
+        let time = Date().formatted(date: .omitted, time: .standard)
+        eventLog.insert(LogEvent(timestamp: time, message: message, kind: kind), at: 0)
+    }
+
     // MARK: - Workflow state (single source of truth)
 
     /// Index of the step the user is currently on.
@@ -114,27 +156,40 @@ class AppModel {
     /// Begin the current step.
     func startStep() {
         stepStarted = true
+        log("Started \(currentStep.title)", kind: .info)
     }
 
     /// Complete the current step and advance to the next legal step.
     func completeStep() {
-        guard currentStepIndex < SterileStep.allCases.count - 1 else { return }
+        let completed = currentStep
+        guard currentStepIndex < SterileStep.allCases.count - 1 else {
+            // Last step completed — workflow finished.
+            stepStarted = false
+            log("Completed \(completed.title) — workflow complete", kind: .success)
+            return
+        }
         currentStepIndex += 1
         stepStarted = false
+        log("Completed \(completed.title)", kind: .success)
     }
 
     /// Fail the current step — sends the tray back to decontamination.
     func failStep() {
+        let failed = currentStep
         currentStepIndex = 0
         stepStarted = false
+        log("Failed \(failed.title) — tray sent back to Decontamination", kind: .warning)
     }
 
     /// Trainee-only: redo the current step from scratch.
     func redoStep() {
+        let step = currentStep
         stepStarted = false
+        log("Redo \(step.title)", kind: .info)
     }
 
     init() {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
+        log("Session started", kind: .info)
     }
 }

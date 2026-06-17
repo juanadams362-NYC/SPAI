@@ -1,57 +1,18 @@
 //
-//  LogEvent.swift
-//  SPAI
-//
-//  Created by Juan Adams on 6/7/26.
-//
-
-
-//
 //  EventLogPanel.swift
 //  SPAI
 //
 //  A live scrolling activity feed of workflow + compliance events.
-//  Newest event on top. Later this is fed by the FSM / backend; for now
-//  it carries sample entries and a demo "add event" action.
+//  Newest event on top. Reads from AppModel.eventLog so it shows real
+//  events as they happen.
 //
 
 import SwiftUI
 
-/// One logged event in the activity feed.
-struct LogEvent: Identifiable {
-    let id = UUID()
-    let timestamp: String
-    let message: String
-    let kind: Kind
-
-    enum Kind {
-        case info, success, warning
-
-        var color: Color {
-            switch self {
-            case .info:    return SPAIColor.accent
-            case .success: return SPAIColor.safe
-            case .warning: return SPAIColor.warning
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .info:    return "info.circle.fill"
-            case .success: return "checkmark.circle.fill"
-            case .warning: return "exclamationmark.triangle.fill"
-            }
-        }
-    }
-}
-
 struct EventLogPanel: View {
-    // Seeded with a few sample events; newest first.
-    @State private var events: [LogEvent] = [
-        LogEvent(timestamp: "22:47:39", message: "Session started", kind: .info),
-        LogEvent(timestamp: "22:47:41", message: "Decontamination step ready", kind: .info),
-        LogEvent(timestamp: "22:47:52", message: "Gloves detected — PPE check passing", kind: .success)
-    ]
+    @Environment(AppModel.self) private var appModel
+
+    private var events: [LogEvent] { appModel.eventLog }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
@@ -110,16 +71,11 @@ struct EventLogPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
     }
-
-    /// Public helper so other parts of the app can push events here later.
-    func addEvent(_ message: String, kind: LogEvent.Kind) {
-        let time = Date().formatted(date: .omitted, time: .standard)
-        events.insert(LogEvent(timestamp: time, message: message, kind: kind), at: 0)
-    }
 }
 
 #Preview {
     EventLogPanel()
+        .environment(AppModel())
         .padding(60)
         .background(.black)
 }
