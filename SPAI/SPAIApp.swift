@@ -9,21 +9,27 @@ import SwiftUI
 
 @main
 struct SPAIApp: App {
-    // One shared AppModel for the whole app, injected into every scene.
     @State private var appModel = AppModel()
+
+    // Testing toggle: when on, onboarding shows every launch.
+    @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
 
     var body: some Scene {
         WindowGroup(id: "home") {
-            // First launch shows the walkthrough; after it's completed,
-            // the app goes to the home screen. Same window, swapped content.
             Group {
-                if appModel.hasCompletedOnboarding {
-                    HomeView()
-                } else {
+                if alwaysShowOnboarding || !appModel.hasCompletedOnboarding {
                     OnboardingView()
+                } else {
+                    HomeView()
                 }
             }
             .environment(appModel)
+        }
+        .windowStyle(.plain)
+
+        WindowGroup(id: "settings") {
+            SettingsView()
+                .environment(appModel)
         }
         .windowStyle(.plain)
 

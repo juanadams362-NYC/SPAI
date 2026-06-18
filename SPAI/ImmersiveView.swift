@@ -2,10 +2,10 @@
 //  ImmersiveView.swift
 //  SPAI
 //
-//  The spatial workspace. Panels built once in `make`, billboarded,
-//  draggable via ManipulationComponent. `update` only reads state.
-//  Floating glove/hand/contamination markers removed — that info now
-//  lives in the merged DetectionPanel. Exit moved to the status bar.
+//  The spatial workspace. Panels placed once, billboarded, fixed in a
+//  grounded arc around the user with the center kept clear. StationManager
+//  drives which step the user is on (a + b). Per-station environments (c)
+//  are a future sprint.
 //
 
 import SwiftUI
@@ -15,29 +15,45 @@ import RealityKitContent
 struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
 
+    @State private var detectionService = DetectionService()
+    @State private var stationManager = StationManager()
+
     var body: some View {
         RealityView { content, attachments in
             if let env = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
                 content.add(env)
             }
 
-            // One-time setup, pulled in tighter around the user.
-            place("statusBar", at: [0, 1.95, -1.5],   content, attachments)
-            place("detection", at: [-0.85, 1.45, -1.35], content, attachments)
-            place("eventLog",  at: [0.85, 1.45, -1.35],  content, attachments)
-            place("workflow",  at: [0, 1.0, -1.3],     content, attachments)
-            place("actions",   at: [0.85, 1.0, -1.2],  content, attachments)
+            // Grounded arc. Eye level ~1.5m. Center kept clear.
+            // Status bar across the top.
+            place("statusBar", at: [0, 1.75, -1.4],      content, attachments)
+            // Flanking panels at eye level, angled in.
+            place("detection", at: [-0.75, 1.45, -1.25], content, attachments)
+            place("eventLog",  at: [0.75, 1.45, -1.25],  content, attachments)
+            // Workflow just below eye line, centered but low so center stays open.
+            place("workflow",  at: [0, 1.15, -1.3],       content, attachments)
+            // Quick actions tucked lower-right.
+            place("actions",   at: [0.7, 1.05, -1.15],    content, attachments)
+
+            // Sim-only test panels, lower-left so they don't crowd the work area.
+            #if targetEnvironment(simulator)
+            place("upload",   at: [-0.7, 1.05, -1.15],   content, attachments)
+            place("stations", at: [-0.7, 0.7, -1.05],    content, attachments)
+            #endif
         } update: { _, attachments in
-            // Read-only: react to visibility toggles.
             setEnabled("statusBar", attachments)
             setEnabled("detection", attachments)
             setEnabled("eventLog",  attachments)
             setEnabled("workflow",  attachments)
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
-            Attachment(id: "detection") { DetectionPanel() }
+            Attachment(id: "detection") { DetectionPanel(service: detectionService) }
             Attachment(id: "eventLog")  { EventLogPanel() }
             Attachment(id: "workflow")  { WorkflowProgressPanel() }
+            #if targetEnvironment(simulator)
+            Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
+            Attachment(id: "stations") { StationPickerPanel(manager: stationManager) }
+            #endif
             Attachment(id: "actions") {
                 ActionPanel(actions: [
                     QuickAction(label: "Show All", icon: "rectangle.3.group.fill", tint: SPAIColor.secondary) {
@@ -55,38 +71,32 @@ struct ImmersiveView: View {
                 ])
             }
         }
-        .onAppear { appModel.immersiveSpaceState = .open }
+        .onAppear {
+            appModel.immersiveSpaceState = .open
+            stationManager.onEnter = { station in
+                appModel.currentStepIndex = station.step.rawValue
+                appModel.stepStarted = false
+                appModel.logStationEntry(station.name, step: station.step)
+            }
+            #if !targetEnvironment(simulator)
+            Task { await stationManager.startImageTracking() }
+            #endif
+        }
         .onDisappear { appModel.immersiveSpaceState = .closed }
     }
 
-    /// One-time setup: place a panel, face it at the user, optionally make it grabbable.
-    /// `id` is `some Hashable` so it accepts String ids (panels) and UUID ids alike.
     private func place(
         _ id: some Hashable,
         at position: SIMD3<Float>,
-        grabbable: Bool = true,
         _ content: RealityViewContent,
         _ attachments: RealityViewAttachments
     ) {
         guard let panel = attachments.entity(for: id) else { return }
         panel.position = position
         panel.components.set(BillboardComponent())
-
-        if grabbable {
-            panel.components.set(HoverEffectComponent())
-            ManipulationComponent.configureEntity(
-                panel,
-                collisionShapes: [ .generateBox(width: 0.9, height: 0.5, depth: 0.1) ]
-            )
-            if var m = panel.components[ManipulationComponent.self] {
-                m.releaseBehavior = .stay
-                panel.components.set(m)
-            }
-        }
         content.add(panel)
     }
 
-    /// update-safe: only reads state and toggles visibility.
     private func setEnabled(_ id: String, _ attachments: RealityViewAttachments) {
         attachments.entity(for: id)?.isEnabled = appModel.isVisible(id)
     }
