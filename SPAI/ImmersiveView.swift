@@ -15,7 +15,7 @@ import RealityKitContent
 struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
 
-    @State private var detectionService = DetectionService()
+    @Environment(DetectionService.self) private var detectionService
     @State private var stationManager = StationManager()
 
     var body: some View {
@@ -67,6 +67,9 @@ struct ImmersiveView: View {
                     },
                     QuickAction(label: "Event Log", icon: "waveform.path.ecg", tint: SPAIColor.primary) {
                         appModel.toggleVisibility("eventLog")
+                    },
+                    QuickAction(label: "Reset", icon: "arrow.clockwise", tint: SPAIColor.critical) {
+                        appModel.resetWorkflow()
                     }
                 ])
             }

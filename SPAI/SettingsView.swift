@@ -12,7 +12,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
 
-    @AppStorage("backendURL") private var backendURL = "http://localhost:8000"
+    @AppStorage("backendURL") private var backendURL =  "http://127.0.0.1:8000"
     @AppStorage("confidenceThreshold") private var confidenceThreshold = 0.25
     @AppStorage("streamingFPS") private var streamingFPS = 5.0
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
@@ -28,7 +28,7 @@ struct SettingsView: View {
                 .foregroundStyle(.white.opacity(0.6))
 
             settingBlock(title: "Backend URL") {
-                TextField("http://localhost:8000", text: $backendURL)
+                TextField( "http://127.0.0.1:8000", text: $backendURL)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 14, design: .monospaced))
             }

@@ -29,7 +29,7 @@ struct StatusBarPanel: View {
         }
         .padding(.horizontal, SPAISpacing.l)
         .padding(.vertical, SPAISpacing.m)
-        .frame(width: 900)
+        .frame(width: 1100)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .onReceive(timer) { _ in sessionSeconds += 1 }
@@ -123,15 +123,18 @@ struct StatusBarPanel: View {
     }
 
     private func barButtonLabel(_ text: String, icon: String, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon).foregroundStyle(tint)
-            Text(text).foregroundStyle(.white)
+            HStack(spacing: 8) {
+                Image(systemName: icon).foregroundStyle(tint)
+                Text(text)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .padding(.horizontal, SPAISpacing.m)
+            .padding(.vertical, SPAISpacing.s + 2)
+            .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
-        .font(.system(size: 14, weight: .semibold))
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s + 2)
-        .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-    }
 
     private var divider: some View {
         Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 36)

@@ -2,17 +2,13 @@
 //  AppModel.swift
 //  SPAI
 //
-//  Created by AV Student on 4/27/26.
-//
 
 import SwiftUI
 
 enum PanelMode: String, CaseIterable, Identifiable {
     case fixed
     case followLazy
-
     var id: String { rawValue }
-
     var label: String {
         switch self {
         case .fixed:      return "Pinned"
@@ -26,7 +22,6 @@ enum TechRole: String, CaseIterable, Identifiable {
     case supervisor = "Supervisor"
     case trainee    = "Trainee"
     case observer   = "Observer"
-
     var id: String { rawValue }
 }
 
@@ -49,7 +44,6 @@ enum SterileStep: Int, CaseIterable, Identifiable {
         }
     }
 
-    /// The backend FSM's string name for this step.
     var backendName: String {
         switch self {
         case .decontamination: return "decontamination"
@@ -69,7 +63,6 @@ struct LogEvent: Identifiable {
 
     enum Kind {
         case info, success, warning
-
         var color: Color {
             switch self {
             case .info:    return SPAIColor.accent
@@ -77,7 +70,6 @@ struct LogEvent: Identifiable {
             case .warning: return SPAIColor.warning
             }
         }
-
         var icon: String {
             switch self {
             case .info:    return "info.circle.fill"
@@ -117,8 +109,6 @@ class AppModel {
 
     // MARK: - Panel appearance
     var panelVisibility: [String: Bool] = [:]
-    /// Global panel opacity 0.5...1.0, driven by the Settings slider.
-    /// Panels read this live so dragging the slider previews instantly.
     var panelOpacity: Double = 0.85
     func isVisible(_ panelID: String) -> Bool { panelVisibility[panelID] ?? true }
     func toggleVisibility(_ panelID: String) { panelVisibility[panelID] = !isVisible(panelID) }
@@ -132,8 +122,7 @@ class AppModel {
         let time = Date().formatted(date: .omitted, time: .standard)
         eventLog.insert(LogEvent(timestamp: time, message: message, kind: kind), at: 0)
     }
-    
-    /// Log that the user walked to a station (called by StationManager.onEnter).
+
     func logStationEntry(_ name: String, step: SterileStep) {
         log("Entered \(name) station", kind: .info)
     }
@@ -142,10 +131,11 @@ class AppModel {
 
     var currentStepIndex: Int = 0
     var stepStarted: Bool = false
+    /// True when the backend FSM is halted for contamination.
+    var isHalted: Bool = false
 
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
 
-    /// Start the current step — validated by the backend FSM.
     func startStep() {
         let step = currentStep
         stepStarted = true
@@ -153,23 +143,20 @@ class AppModel {
         Task {
             let result = try? await client.sendComplianceEvent("start_step", step: step.backendName)
             if let result, !result.accepted {
-                log("Backend rejected start: \(result.message)", kind: .warning)
+                await MainActor.run { log("Backend rejected start: \(result.message)", kind: .warning) }
             }
         }
     }
 
-    /// Complete the current step — validated by the backend FSM before advancing.
     func completeStep() {
         let completed = currentStep
         Task {
             let result = try? await client.sendComplianceEvent("complete_step", step: completed.backendName)
             await MainActor.run {
                 if let result, !result.accepted {
-                    // Backend says no — don't advance, surface why.
                     log("Backend rejected complete: \(result.message)", kind: .warning)
                     return
                 }
-                // Accepted (or backend unreachable) — advance locally.
                 if currentStepIndex < SterileStep.allCases.count - 1 {
                     currentStepIndex += 1
                     log("Completed \(completed.title)", kind: .success)
@@ -181,15 +168,30 @@ class AppModel {
         }
     }
 
-    /// Fail the current step — contamination event to the FSM, tray back to decon.
+    /// Fail the current step — send the tray back to decontamination and
+    /// reset the backend FSM so it's not left halted. This is a restart,
+    /// not a contamination freeze, so the workflow stays usable.
     func failStep() {
         let failed = currentStep
         currentStepIndex = 0
         stepStarted = false
+        isHalted = false
         log("Failed \(failed.title) — tray sent back to Decontamination", kind: .warning)
-        Task {
-            _ = try? await client.sendComplianceEvent("contamination")
-        }
+        Task { _ = try? await client.resetCompliance() }
+    }
+
+    /// Trigger a contamination halt (e.g. from a detection event).
+    func raiseContamination() {
+        isHalted = true
+        log("Contamination detected — workflow halted", kind: .warning)
+        Task { _ = try? await client.sendComplianceEvent("contamination") }
+    }
+
+    /// Acknowledge the halt so work can resume.
+    func acknowledgeContamination() {
+        isHalted = false
+        log("Contamination acknowledged — workflow resumed", kind: .info)
+        Task { _ = try? await client.sendComplianceEvent("acknowledge") }
     }
 
     func redoStep() {
@@ -198,17 +200,19 @@ class AppModel {
         log("Redo \(step.title)", kind: .info)
     }
 
-    /// Reset both local state and the backend FSM.
+    /// Reset both local state and the backend FSM. Clears any stuck halt.
     func resetWorkflow() {
         currentStepIndex = 0
         stepStarted = false
+        isHalted = false
         eventLog.removeAll()
-        log("Session started", kind: .info)
+        log("Session reset", kind: .info)
         Task { _ = try? await client.resetCompliance() }
     }
 
     init() {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
+        Task { _ = try? await client.resetCompliance() }   // start clean
         log("Session started", kind: .info)
     }
 }

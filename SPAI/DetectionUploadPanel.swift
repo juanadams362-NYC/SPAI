@@ -2,28 +2,17 @@
 //  DetectionUploadPanel.swift
 //  SPAI
 //
-//  Created by Juan Adams on 6/17/26.
-//
-
-
-//
-//  DetectionUploadPanel.swift
-//  SPAI
-//
-//  Simulator-only control: pick an image from the library and send it to
-//  the backend /detect endpoint, so the detection pipeline can be tested
-//  without the Vision Pro camera or a developer license. On hardware the
-//  live camera feed replaces this.
+//  Sim-only launcher. The picker can't live in the immersive space
+//  (PhotosPicker presents a sheet, which visionOS won't show inside an
+//  ImmersiveSpace), so this just opens the upload window and shows the
+//  latest result here.
 //
 
 import SwiftUI
-import PhotosUI
-import UIKit
 
 struct DetectionUploadPanel: View {
     let service: DetectionService
-
-    @State private var selectedItem: PhotosPickerItem?
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
@@ -32,10 +21,11 @@ struct DetectionUploadPanel: View {
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.5))
 
-            PhotosPicker(selection: $selectedItem, matching: .images) {
+            Button { openWindow(id: "upload") } label: {
                 Label("Upload test image", systemImage: "photo.badge.plus")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
                     .padding(.horizontal, SPAISpacing.l)
                     .padding(.vertical, SPAISpacing.s + 2)
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
@@ -61,14 +51,5 @@ struct DetectionUploadPanel: View {
         .frame(width: 260)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
-        .onChange(of: selectedItem) { _, newItem in
-            guard let newItem else { return }
-            Task {
-                if let data = try? await newItem.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    await service.detect(image: image)
-                }
-            }
-        }
     }
 }
