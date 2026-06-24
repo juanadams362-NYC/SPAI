@@ -78,10 +78,18 @@ class Detector:
 
     def _real_detect(self, image_bytes: bytes) -> dict:
         """Real YOLO inference on the uploaded image bytes."""
-        from PIL import Image
+        from PIL import Image, ImageOps
 
-        # 1. Decode raw bytes into a PIL image. RGB to drop any alpha channel.
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        # 1. Decode raw bytes into a PIL image.
+        #    exif_transpose() applies any EXIF orientation flag so the image is
+        #    upright — this is what Ultralytics does automatically when it loads
+        #    from a file path, but PIL does NOT do it on Image.open(). Without
+        #    this, phone/web images with orientation metadata get fed to the
+        #    model rotated, and detection fails on otherwise-clear images.
+        #    convert("RGB") drops any alpha channel.
+        image = Image.open(io.BytesIO(image_bytes))
+        image = ImageOps.exif_transpose(image) or image
+        image = image.convert("RGB")
 
         # 2. Run inference. verbose=False keeps the console quiet.
         start = time.time()
