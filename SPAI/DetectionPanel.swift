@@ -22,6 +22,16 @@ struct DetectionPanel: View {
     private var ppePassing: Bool { service.ppePassing }
     private var riskHigh: Bool { contaminationRisk >= 0.5 }
 
+    // The border reacts to how risky things are right now.
+    // High risk (bare hand) → critical red. Some risk → warning amber.
+    // All clear → calm blue.
+    private var borderState: BorderState {
+        if !service.hasResult { return .normal }
+        if contaminationRisk >= 0.5 { return .critical }
+        if contaminationRisk > 0.10 { return .warning }
+        return .normal
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             header
@@ -34,7 +44,8 @@ struct DetectionPanel: View {
         .padding(SPAISpacing.l)
         .frame(width: 300, alignment: .leading)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .animation(.easeInOut(duration: 0.4), value: riskHigh)
     }
 
     private var header: some View {
