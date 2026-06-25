@@ -46,6 +46,14 @@ struct DetectionPanel: View {
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.4), value: riskHigh)
+        // Play the alert ONCE when contamination crosses into critical.
+        // Comparing old vs new means it only fires on the safe→critical
+        // edge, not every update and not while it stays critical.
+        .onChange(of: contaminationRisk) { oldValue, newValue in
+            if oldValue < 0.5 && newValue >= 0.5 {
+                SoundManager.shared.playContaminationAlert()
+            }
+        }
     }
 
     private var header: some View {
