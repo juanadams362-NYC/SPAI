@@ -7,6 +7,10 @@
 //  drives which step the user is on (a + b). Per-station environments (c)
 //  are a future sprint.
 //
+//  On hardware, the main camera feeds live frames into DetectionService
+//  (SCRUM-80) — the same detection path the sim's upload flow uses. Camera
+//  access only works inside an ImmersiveSpace, which is exactly here.
+//
 
 import SwiftUI
 import RealityKit
@@ -17,6 +21,10 @@ struct ImmersiveView: View {
 
     @Environment(DetectionService.self) private var detectionService
     @State private var stationManager = StationManager()
+
+    // Live camera feed. Hardware-only — on the sim this object just sits idle
+    // (its start() denies cleanly without the entitlement / a real camera).
+    @State private var cameraService = CameraFrameService()
 
     var body: some View {
         RealityView { content, attachments in
@@ -85,7 +93,25 @@ struct ImmersiveView: View {
             Task { await stationManager.startImageTracking() }
             #endif
         }
-        .onDisappear { appModel.immersiveSpaceState = .closed }
+        // Hardware-only: start the live camera feed and route frames into the
+        // existing detection pipeline. Each throttled frame is converted to a
+        // UIImage and sent through the SAME detectionService.detect() the
+        // upload flow uses — so panels, alerts, and borders all react identically.
+        #if !targetEnvironment(simulator)
+        .task {
+            cameraService.onFrameForDetection = { readOnlyBuffer in
+                guard let image = UIImage.from(readOnlyBuffer: readOnlyBuffer) else { return }
+                Task { await detectionService.detect(image: image) }
+            }
+            await cameraService.start()
+        }
+        #endif
+        .onDisappear {
+            appModel.immersiveSpaceState = .closed
+            #if !targetEnvironment(simulator)
+            cameraService.stop()
+            #endif
+        }
     }
 
     private func place(
