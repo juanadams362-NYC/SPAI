@@ -43,7 +43,10 @@ struct WorkflowProgressPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 760)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        // Use the shared panel background so this matches DetectionPanel and
+        // the rest of the panels instead of a raw material (which looked
+        // inconsistent — different blur/opacity from everything else).
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         // Animate whenever the step or started-state changes — nodes,
         // connectors, and the count all glide instead of snapping.
