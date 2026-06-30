@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional
 """Compliance endpoint — exposes the FSM so the app can drive the workflow."""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,7 +19,7 @@ _engine = ComplianceEngine()
 class EventRequest(BaseModel):
     """Body for posting an event to the FSM."""
     event: ComplianceEvent
-    step: WorkflowStep | None = None
+    step: Optional[WorkflowStep] = None
 
 
 def _state_payload() -> dict:

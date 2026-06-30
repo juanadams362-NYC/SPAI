@@ -3,7 +3,7 @@
 //  SPAI
 //
 //  Top HUD status bar: Sterile Node logo, identity, session time, role,
-//  and the two session actions — Ask SPAI and End Session.
+//  and the session actions — Ask SPAI, Settings, End Session.
 //
 
 import SwiftUI
@@ -29,19 +29,17 @@ struct StatusBarPanel: View {
         }
         .padding(.horizontal, SPAISpacing.l)
         .padding(.vertical, SPAISpacing.m)
-        .frame(width: 900)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .frame(width: 1100)
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .onReceive(timer) { _ in sessionSeconds += 1 }
     }
-
-    // MARK: - Left: identity (now with the Sterile Node mark)
 
     private var identityBlock: some View {
         HStack(spacing: SPAISpacing.s + 4) {
             SterileNodeMark(size: 38)
                 .frame(width: 48, height: 48)
-                .background(SPAIColor.primary.opacity(0.16), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                .background(SPAIColor.primary.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("SPAI")
@@ -49,28 +47,24 @@ struct StatusBarPanel: View {
                     .foregroundStyle(.white)
                 Text("SPD — OR Suite 3")
                     .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.7))
             }
         }
     }
-
-    // MARK: - Center-left: session time
 
     private var sessionTimeBlock: some View {
         HStack(spacing: 8) {
             Text("SESSION TIME")
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.7))
             Text(formattedTime)
                 .font(.system(size: 16, weight: .bold, design: .monospaced))
                 .foregroundStyle(.white)
         }
         .padding(.horizontal, SPAISpacing.m)
         .padding(.vertical, SPAISpacing.s)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
     }
-
-    // MARK: - Center: role
 
     private var roleBlock: some View {
         Menu {
@@ -90,16 +84,14 @@ struct StatusBarPanel: View {
                 Circle().fill(SPAIColor.accent).frame(width: 8, height: 8)
                 Text(appModel.role.rawValue)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.white.opacity(0.95))
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.6))
             }
         }
         .buttonStyle(.plain)
     }
-
-    // MARK: - Right: session actions
 
     private var controlButtons: some View {
         HStack(spacing: SPAISpacing.s + 4) {
@@ -107,6 +99,13 @@ struct StatusBarPanel: View {
                 // TODO: invoke SPAI assistant (dynamic-island presence)
             } label: {
                 barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                openWindow(id: "settings")
+            } label: {
+                barButtonLabel("Settings", icon: "gearshape.fill", tint: SPAIColor.secondary)
             }
             .buttonStyle(.plain)
 
@@ -124,20 +123,21 @@ struct StatusBarPanel: View {
     }
 
     private func barButtonLabel(_ text: String, icon: String, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon).foregroundStyle(tint)
-            Text(text).foregroundStyle(.white)
+            HStack(spacing: 8) {
+                Image(systemName: icon).foregroundStyle(tint)
+                Text(text)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .padding(.horizontal, SPAISpacing.m)
+            .padding(.vertical, SPAISpacing.s + 2)
+            .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
-        .font(.system(size: 14, weight: .semibold))
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s + 2)
-        .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-    }
-
-    // MARK: - Helpers
 
     private var divider: some View {
-        Rectangle().fill(.white.opacity(0.12)).frame(width: 1, height: 36)
+        Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 36)
     }
 
     private var formattedTime: String {
@@ -149,8 +149,6 @@ struct StatusBarPanel: View {
 
 // MARK: - Sterile Node logo mark
 
-/// Abstract brand mark: a hexagon (clean field / containment) with a
-/// reticle cross and focus dot (vision + AI). Drawn in the accent palette.
 struct SterileNodeMark: View {
     var size: CGFloat = 38
 
@@ -185,7 +183,6 @@ struct SterileNodeMark: View {
     }
 }
 
-/// Pointy-top hexagon used by the logo mark.
 struct SPAIHexagon: Shape {
     func path(in rect: CGRect) -> Path {
         let cx = rect.midX, cy = rect.midY

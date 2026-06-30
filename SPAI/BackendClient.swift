@@ -94,9 +94,11 @@ struct ComplianceEventResult: Codable {
 final class BackendClient {
     let baseURL: URL
 
-    init(baseURL: URL = URL(string: "http://localhost:8000")!) {
-        self.baseURL = baseURL
-    }
+    init() {
+            let stored = UserDefaults.standard.string(forKey: "backendURL")
+            self.baseURL = stored.flatMap { URL(string: $0) }
+                ?? URL(string: "http://127.0.0.1:8000")!
+        }
 
     // MARK: Detection
 

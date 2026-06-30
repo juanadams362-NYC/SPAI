@@ -43,8 +43,15 @@ struct WorkflowProgressPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 760)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        // Use the shared panel background so this matches DetectionPanel and
+        // the rest of the panels instead of a raw material (which looked
+        // inconsistent — different blur/opacity from everything else).
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        // Animate whenever the step or started-state changes — nodes,
+        // connectors, and the count all glide instead of snapping.
+        .animation(.spring(response: 0.45, dampingFraction: 0.7), value: currentStepIndex)
+        .animation(.easeInOut(duration: 0.3), value: stepStarted)
     }
 
     // MARK: - Header
@@ -59,6 +66,7 @@ struct WorkflowProgressPanel: View {
             Text("\(currentStepIndex)/\(SterileStep.allCases.count)")
                 .font(.system(size: 13, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
+                .contentTransition(.numericText())   // the count rolls up
         }
     }
 
@@ -73,15 +81,23 @@ struct WorkflowProgressPanel: View {
                 Circle()
                     .fill(nodeFill(isCurrent: isCurrent, isComplete: isComplete))
                     .frame(width: 44, height: 44)
+                    // Current step gently pulses bigger; completed/upcoming sit normal.
+                    .scaleEffect(isCurrent ? 1.12 : 1.0)
+                    .shadow(
+                        color: isCurrent ? SPAIColor.primary.opacity(0.6) : .clear,
+                        radius: isCurrent ? 8 : 0
+                    )
 
                 if isComplete {
                     Image(systemName: "checkmark")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.white)
+                        .transition(.scale.combined(with: .opacity))
                 } else if isCurrent {
                     Image(systemName: stepStarted ? "circle.fill" : "play.fill")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
 

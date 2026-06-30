@@ -66,4 +66,17 @@ extension View {
     func spaiGlass(_ mode: SPAIGlass.Mode = .dark, radius: CGFloat = SPAIRadius.large) -> some View {
         modifier(SPAIGlass(mode: mode, radius: radius))
     }
+
+    func spaiPanelBackground(opacity: Double, cornerRadius: CGFloat = SPAIRadius.large) -> some View {
+        self.background(
+            ZStack {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.regularMaterial)
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.black.opacity(opacity * 0.6))
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
+        )
+    }
 }

@@ -1,19 +1,12 @@
-"""
-Detector — wraps the YOLO model so the rest of the app doesn't care
-how detection actually works.
 
-Auto-switches between stub and real mode based on whether best.pt exists.
-routes/detect.py imports from here and has no idea whether the model is
-fake or real — same JSON shape either way.
-"""
 
 import io
 import time
 from pathlib import Path
 from typing import Any
 
-# Points at the v3 fine-tuned weights (medical/nitrile glove domain).
-MODEL_PATH = Path(__file__).parent.parent.parent.parent / "model-training" / "runs" / "v3" / "weights" / "best.pt"
+
+MODEL_PATH = Path(__file__).parent.parent.parent / "model" / "best.pt"
 CLASS_NAMES = ["glove", "hand"]
 
 # Only report detections at or above this confidence. Filters out noise.
@@ -78,24 +71,25 @@ class Detector:
 
     def _real_detect(self, image_bytes: bytes) -> dict:
         """Real YOLO inference on the uploaded image bytes."""
-        from PIL import Image
+        from PIL import Image, ImageOps
 
-        # 1. Decode raw bytes into a PIL image. RGB to drop any alpha channel.
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-        # 2. Run inference. verbose=False keeps the console quiet.
+        image = Image.open(io.BytesIO(image_bytes))
+        image = ImageOps.exif_transpose(image) or image
+        image = image.convert("RGB")
+
+
         start = time.time()
         results = self.model(image, conf=self.confidence_threshold, verbose=False)
         elapsed_ms = int((time.time() - start) * 1000)
 
-        # 3. Parse results. YOLO returns a list (one entry per image);
-        #    we sent one image, so take results[0].
+
         detections = []
         result = results[0]
         for box in result.boxes:
             class_id = int(box.cls[0])
             confidence = float(box.conf[0])
-            # xyxy = [x1, y1, x2, y2] in pixel coordinates.
+
             coords = box.xyxy[0].tolist()
             x1, y1, x2, y2 = [int(c) for c in coords]
             detections.append({
@@ -105,13 +99,11 @@ class Detector:
                 "box": [x1, y1, x2, y2],
             })
 
-        # 4. Same shape as _stub_detect — only mode and contents differ.
+
         return {
             "detections": detections,
             "inference_time_ms": elapsed_ms,
             "mode": "real",
         }
 
-
-# Module-level singleton. Imported by main.py at startup and by detect.py per-request.
 detector = Detector()
