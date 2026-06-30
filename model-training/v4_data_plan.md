@@ -1,147 +1,78 @@
-# v4 Data Plan — Tray State Detection
+# v4 Data Plan — Tray State via Instrument Detection
 
-**Ticket:** SCRUM-73
-**Goal:** Add tray-state detection to SPAI. The model should tell whether a
-surgical tray is **empty** or **loaded** with instruments — not detect the
-instruments themselves.
+**Ticket:** SCRUM-82 (research/select), SCRUM-84 (train), SCRUM-86 (integrate)
+**Goal:** Tell whether a surgical tray is empty or loaded — by detecting
+instruments and counting them, NOT by classifying the tray directly.
 
-This is v4. It does NOT replace v3 (glove/hand) — it's a separate capability
-that runs alongside it, or as a second model, TBD at integration time.
+## The approach (and why it changed)
 
----
+Original plan was to train a model with two whole-tray classes (empty_tray /
+loaded_tray). Two problems with that: empty-tray training images are scarce,
+and whole-tray state is a vaguer thing for a model to learn.
 
-## Scope
+Better approach landed on: **detect instruments, count them in code.**
+- The model detects surgical instruments (it's trained on a 6-instrument set).
+- App code counts the detections.
+- **1 or more instruments = loaded tray. Zero = empty tray.**
 
-**Two classes:**
+Why this is better:
+- **Solves the empty-data problem.** "Empty" = the detector found nothing.
+  No empty-tray training images needed — absence of detection IS the signal.
+- **The model does one simple thing** (find instruments), which is more
+  reliable than asking it to judge overall tray state.
+- **Loaded/empty logic lives in code**, so the threshold is tunable instantly
+  without retraining.
+- **Bonus:** because we keep all 6 instrument classes (instead of collapsing
+  to one), the model identifies SPECIFIC instruments for free — a head start
+  on a future named-instrument version (v5).
 
-- `empty_tray` — a tray with no instruments on it
-- `loaded_tray` — a tray with instruments on it
+## Dataset
 
-That's it. We are deliberately NOT detecting individual instruments (scalpel,
-forceps, etc.) — that's a much harder problem (small, shiny, overlapping metal)
-and out of scope for the capstone timeline. Empty-vs-loaded gives a real
-workflow signal without the instrument-detection rabbit hole.
+**Source:** ASTRA Surgical Instruments (Roboflow)
+- Workspace/project: `astra-juyrg/astra-surgical-instruments-erspj`, version 12
+- 480 images total — 408 train, 72 test (no valid split; we use test as val)
+- Top-down camera angle (matches how an SPD tech views a tray)
+- Instruments in varied positions across images (real variety)
+- Includes completely empty trays (act as negative examples — teaches the
+  model not to false-positive on an empty tray)
 
-**Why this matters for SPAI:** in sterile processing, knowing a tray's state is
-useful context — an empty tray at a station means "ready to load," a loaded tray
-means "ready to process / inspect." Pairs naturally with station tracking
-(SCRUM-81): *tray detected + station marker = this station is active.*
+**6 classes (kept as-is, not remapped):**
+Adson Dressing Forceps, Babcock Tissue Forceps, Halsted Mosquito Forceps,
+Mayo Hegar Needle Holder, Operating Scissors, Scalpel Handle 3
 
----
+**Reported metrics (treat with healthy skepticism):** the dataset page lists
+99.5% mAP — suspiciously high, likely an "easy" dataset (clean top-down shots).
+The real test is how it does on fresh images, which is why SCRUM-85 validates
+on images outside this dataset, not just the dataset's own numbers.
 
-## Data sourcing — Roboflow
+## Training
 
-Same approach that worked for v3: find existing datasets on Roboflow Universe,
-download via API (free), merge, remap to our two classes, train on Colab.
+Same pipeline as the v3 retrain, but simpler (one dataset, no remap):
+- Train YOLOv8n on the dataset as-is, all 6 classes, ~50 epochs, Colab T4
+- One fix needed: the dataset has no `valid` split, so point `val` at the
+  `test` folder in data.yaml (and use absolute paths — Roboflow's relative
+  paths don't resolve correctly in Colab)
+- The moment training finishes: save to Drive + download + commit (v3 lesson)
+- Weights to model-training/runs/v4_instruments/
 
-### Search terms to try on Roboflow Universe
+## Loaded / empty logic
 
-- "surgical tray"
-- "surgical instruments tray"
-- "instrument tray"
-- "surgical kit"
-- "operating room tray"
-- "sterile tray"
+Decided rule: **detections >= 1 → loaded, detections == 0 → empty.**
+Robust (no frame-to-frame flicker from a high threshold), matches real
+meaning. Lives in backend/app code, not the model.
 
-### What to look for in a candidate dataset
+## Integration (SCRUM-86)
 
-- **Has trays clearly visible** (not just close-up instruments)
-- **Both states represented** — ideally some empty trays AND some loaded ones.
-  If a dataset only has loaded trays, we'll need a separate source for empties.
-- **Decent image count** — aim for a few hundred minimum per class after merge
-- **Varied angles / lighting** — top-down, angled, different trays
+The instrument model is SEPARATE from the existing glove/hand model — they do
+different jobs (PPE check vs tray state). Plan: a new backend endpoint
+(e.g. /detect-tray) that runs the instrument model, counts detections, and
+returns both the raw detections AND the loaded/empty verdict. Keeps the two
+models cleanly separated, consistent with the existing route structure.
 
-### Realistic expectation
+## Validation (SCRUM-85)
 
-Empty trays may be HARDER to find than loaded ones — most surgical datasets show
-instruments, not bare trays. Backup plan if empties are scarce:
-
-- Search "metal tray" / "kidney dish" / "medical tray empty" separately
-- Worst case: photograph empty trays yourself (a metal tray is easy to source/mock)
-  and label them — even 50-100 self-shot empties would help balance the classes
-
----
-
-## Class remapping
-
-However many classes the source datasets use, everything collapses to our two.
-Same pattern as the v3 merge (where we mapped glove/hand variants down to 2
-classes). Example logic, to be filled in once we see the actual datasets:
-
-```
-# Per source dataset, map their class IDs to ours:
-# 0 = empty_tray, 1 = loaded_tray
-#
-# e.g. if a dataset has classes ['tray', 'tray_with_tools']:
-#   tray            -> 0  (empty_tray)
-#   tray_with_tools -> 1  (loaded_tray)
-#
-# if a dataset is ALL loaded trays (one class 'surgical_tray'):
-#   surgical_tray   -> 1  (loaded_tray)
-#
-# empties sourced separately all map to -> 0
-```
-
-Unified `data.yaml`:
-```
-nc: 2
-names: ['empty_tray', 'loaded_tray']
-```
-
----
-
-## Class balance — the thing to watch
-
-The #1 risk for this model: **imbalanced classes.** If we end up with 2000 loaded
-trays and 100 empty trays, the model will just learn to say "loaded" for
-everything and look accurate on paper while being useless.
-
-**Target:** roughly balanced — ideally within a 2:1 ratio between the two classes.
-If empties are scarce, either source more, or downsample the loaded set to match.
-Better to have 300 of each than 2000 loaded + 150 empty.
-
----
-
-## Training (later session — NOT now)
-
-When the data's ready, training reuses the exact pipeline from v3:
-
-- Merge datasets in Colab, remap classes, write `data.yaml`
-- `YOLO("yolov8n.pt")`, ~50 epochs, imgsz 640, batch 16, patience 15
-- Train on free Colab T4 GPU (confirm GPU runtime, `device=0`)
-- **The moment training finishes: save to Drive + download + commit to git**
-  (the lesson from v3 — never let the model exist in only one place)
-- Save weights to `model-training/runs/v4/weights/best.pt`
-
----
-
-## Success criteria
-
-- Both classes detected with reasonable confidence on held-out test images
-- mAP50 in a usable range (v3 hit 0.948; tray state may be easier OR harder
-  depending on data quality — empties especially)
-- Model generalizes to trays it didn't train on (test-set detections, not just
-  training images — the real generalization check)
-
----
-
-## Open questions to resolve before training
-
-1. **Are empty-tray images findable on Roboflow, or do we self-source them?**
-   (Decide after searching — this is the biggest unknown.)
-2. **One model or two?** Does v4 become its own model, or do we merge tray classes
-   into the v3 glove/hand model for a single 4-class model? (Integration decision —
-   a single model is simpler to serve but mixing very different object types can
-   hurt accuracy. Lean toward separate models unless serving two is a problem.)
-3. **How does tray state surface in the UI?** New panel? Part of the existing
-   detection panel? (Frontend decision for a later ticket.)
-
----
-
-## Next steps (in order)
-
-1. Search Roboflow Universe with the terms above, find 1-3 candidate datasets
-2. Check each for tray visibility + class balance (especially empties)
-3. If empties are scarce, find a separate empty-tray source or plan to self-shoot
-4. Note each dataset's download slug + class scheme (like we did for v3)
-5. THEN (later session): merge, remap, train, save-everywhere, commit
+Don't trust the 99.5% mAP. Test the trained model on 10-15 tray images it
+never trained on — ideally some sourced/shot fresh. Record what it gets right
+and wrong, especially: does it correctly find nothing on a genuinely empty
+tray, and does it detect instruments on a loaded one. That proves the
+loaded/empty logic actually works in practice.
