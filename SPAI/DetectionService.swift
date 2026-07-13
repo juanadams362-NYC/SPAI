@@ -2,17 +2,14 @@
 //  DetectionService.swift
 //  SPAI
 //
-//  Created by Juan Adams on 6/17/26.
-//
-
-//
-//  DetectionService.swift
-//  SPAI
-//
-//  Bridges the backend /detect endpoint to the UI. Holds the latest
+//  Bridges the backend detection endpoints to the UI. Holds the latest
 //  result, exposes a derived contamination risk + PPE status, and lets
-//  the sim send an image for inference. Environment readings are NOT from
-//  the model — they stay mock until real sensors are wired.
+//  the sim send an image for inference.
+//
+//  Routing rule lives HERE, not in views: glove/hand detection runs on
+//  every step, everywhere. Tray detection only runs on the Tray Assembly
+//  step, layered on top of PPE — never instead of it. Views just pass in
+//  the current step and the service decides what to call.
 //
 
 import SwiftUI
@@ -23,14 +20,14 @@ import UIKit
 final class DetectionService {
     private let client = BackendClient()
 
-    /// Latest tray state from /detect-tray. Nil until a tray-capable
-    /// result arrives.
+    /// Latest tray state from /detect-tray. Nil unless the last run was
+    /// on the Tray Assembly step — the UI uses nil to hide tray output.
     var trayState: String?
     /// Latest instrument count reported by /detect-tray.
     var instrumentCount: Int?
 
     // --- Live state, fed from the backend ---
-    /// Latest raw detections from /detect.
+    /// Latest detections. On tray assembly this is PPE + instruments merged.
     var detections: [BackendDetection] = []
     /// True while a request is in flight (drives the loading state in the UI).
     var isLoading = false
@@ -59,28 +56,38 @@ final class DetectionService {
         return hasGlove && !hasHand
     }
 
-    /// Send an image to the backend and update state with the result.
-    func detect(image: UIImage) async {
+    /// Run detection for the given workflow step.
+    /// PPE always runs. Tray runs only on .trayAssembly, in parallel,
+    /// and its instruments get merged into the same detections list.
+    func detect(image: UIImage, step: SterileStep?) async {
         isLoading = true
         errorMessage = nil
         trayState = nil
         instrumentCount = nil
+
+        let wantTray = (step == .trayAssembly)
+
         do {
-            // Prefer the tray-aware endpoint so we can surface loaded/empty.
-            // If the backend doesn't support it, fall back to plain detect.
-            do {
-                let tray = try await client.detectTray(image: image)
-                detections = tray.detections
+            // async let starts both requests at the same time instead of
+            // one after the other — the wait is max(a, b), not a + b.
+            async let ppeTask = client.detect(image: image)
+            async let trayTask: TrayDetectResponse? = wantTray
+                ? client.detectTray(image: image)
+                : nil
+
+            let ppe = try await ppeTask
+            var merged = ppe.detections
+
+            if let tray = try await trayTask {
+                merged += tray.detections
                 trayState = tray.trayState
                 instrumentCount = tray.instrumentCount
-                hasResult = true
-                print("[DetectionService] tray: state=\(tray.trayState), instruments=\(tray.instrumentCount), \(tray.detections.count) detections, \(tray.inferenceTimeMs)ms, mode=\(tray.mode)")
-            } catch {
-                let response = try await client.detect(image: image)
-                detections = response.detections
-                hasResult = true
-                print("[DetectionService] (fallback) \(response.detections.count) detections, \(response.inferenceTimeMs)ms, mode=\(response.mode)")
+                print("[DetectionService] tray: state=\(tray.trayState), instruments=\(tray.instrumentCount)")
             }
+
+            detections = merged
+            hasResult = true
+            print("[DetectionService] step=\(step?.title ?? "none"), \(merged.count) detections, \(ppe.inferenceTimeMs)ms, mode=\(ppe.mode)")
         } catch {
             errorMessage = "Detection failed: \(error.localizedDescription)"
             print("[DetectionService] error: \(error)")

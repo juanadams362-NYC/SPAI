@@ -21,6 +21,7 @@ import UIKit
 
 struct UploadWindowView: View {
     @Environment(DetectionService.self) private var service
+    @Environment(AppModel.self) private var appModel
     @Environment(\.dismissWindow) private var dismissWindow
 
     @State private var selectedItem: PhotosPickerItem?
@@ -62,7 +63,7 @@ struct UploadWindowView: View {
                 if let data = try? await newItem.loadTransferable(type: Data.self),
                    let ui = UIImage(data: data) {
                     image = ui
-                    await service.detect(image: ui)
+                    await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
                 }
             }
         }
