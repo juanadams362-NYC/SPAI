@@ -109,13 +109,14 @@ struct ComplianceEventResult: Codable {
 
 /// Talks to the SPAI backend.
 final class BackendClient {
-    let baseURL: URL
-
-    init() {
-            let stored = UserDefaults.standard.string(forKey: "backendURL")
-            self.baseURL = stored.flatMap { URL(string: $0) }
-                ?? URL(string: "http://127.0.0.1:8000")!
-        }
+    // Re-read on every access so a URL change in Settings takes effect
+    // on the very next request. Storing this once at init froze the app
+    // to whatever URL it launched with.
+    var baseURL: URL {
+        let stored = UserDefaults.standard.string(forKey: "backendURL")
+        return stored.flatMap { URL(string: $0) }
+            ?? URL(string: "http://127.0.0.1:8000")!
+    }
 
     // MARK: Detection
 
