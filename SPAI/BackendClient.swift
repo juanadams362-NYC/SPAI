@@ -267,6 +267,54 @@ final class BackendClient {
     }
 }
 
+// MARK: - Ask SPAI
+
+/// Request body for /ask. A proper Codable struct instead of a dictionary
+/// so the JSON keeps its real types (step_index stays an Int).
+struct AskRequest: Codable {
+    let question: String
+    let station: String
+    let stepIndex: Int
+    let detectionSummary: String
+
+    enum CodingKeys: String, CodingKey {
+        case question, station
+        case stepIndex = "step_index"
+        case detectionSummary = "detection_summary"
+    }
+}
+
+/// The /ask response.
+struct AskResponse: Codable {
+    let answer: String
+    let station: String
+    let stepIndex: Int
+
+    enum CodingKeys: String, CodingKey {
+        case answer, station
+        case stepIndex = "step_index"
+    }
+}
+
+extension BackendClient {
+    /// Ask the AI trainer a question with full workflow context.
+    /// The station string matches the backend script keys, e.g. "decontamination".
+    func ask(_ request: AskRequest) async throws -> AskResponse {
+        let url = baseURL.appendingPathComponent("ask")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(request)
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw BackendError.badResponse
+        }
+        return try JSONDecoder().decode(AskResponse.self, from: data)
+    }
+}
+
+
 enum BackendError: Error {
     case imageEncodingFailed
     case badResponse

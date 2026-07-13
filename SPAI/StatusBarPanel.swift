@@ -96,7 +96,7 @@ struct StatusBarPanel: View {
     private var controlButtons: some View {
         HStack(spacing: SPAISpacing.s + 4) {
             Button {
-                // TODO: invoke SPAI assistant (dynamic-island presence)
+                appModel.toggleVisibility("chat")
             } label: {
                 barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
             }

@@ -108,7 +108,7 @@ class AppModel {
     func setMode(_ mode: PanelMode, for panelID: String) { panelModes[panelID] = mode }
 
     // MARK: - Panel appearance
-    var panelVisibility: [String: Bool] = [:]
+    var panelVisibility: [String: Bool] = ["chat": false]
     var panelOpacity: Double = 0.85
     func isVisible(_ panelID: String) -> Bool { panelVisibility[panelID] ?? true }
     func toggleVisibility(_ panelID: String) { panelVisibility[panelID] = !isVisible(panelID) }

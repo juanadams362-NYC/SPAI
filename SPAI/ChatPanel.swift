@@ -1,0 +1,180 @@
+//
+//  ChatPanel.swift
+//  SPAI
+//
+//  Ask SPAI chat. Every question ships with the current station, step,
+//  and live detection state so the backend can ground the answer in
+//  what the user is actually doing right now. The user just types —
+//  the context rides along invisibly.
+//
+
+import SwiftUI
+
+/// One chat bubble. Role decides which side and color it renders.
+struct ChatMessage: Identifiable, Equatable {
+    enum Role { case user, spai, error }
+    let id = UUID()
+    let role: Role
+    let text: String
+}
+
+struct ChatPanel: View {
+    @Environment(AppModel.self) private var appModel
+    @Environment(DetectionService.self) private var detectionService
+
+    private let client = BackendClient()
+
+    @State private var messages: [ChatMessage] = [
+        ChatMessage(role: .spai, text: "Ask me anything about your current step.")
+    ]
+    @State private var draft = ""
+    @State private var isWaiting = false
+
+    var body: some View {
+        VStack(spacing: SPAISpacing.m) {
+            header
+            messageList
+            inputBar
+        }
+        .padding(SPAISpacing.l)
+        .frame(width: 340, height: 440)
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
+    }
+
+    private var header: some View {
+        HStack {
+            Text("ASK SPAI")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .tracking(1.5)
+                .foregroundStyle(.white.opacity(0.7))
+            Spacer()
+            // Always show which step the answers are grounded in —
+            // makes the context injection visible and demoable.
+            Text(currentStep?.title ?? "No step")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(SPAIColor.accent)
+        }
+    }
+
+    private var messageList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: SPAISpacing.s) {
+                    ForEach(messages) { message in
+                        bubble(for: message)
+                            .id(message.id)
+                    }
+                    if isWaiting {
+                        HStack {
+                            ProgressView().controlSize(.small)
+                            Text("thinking…")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.5))
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            // Auto-scroll to the newest message whenever one arrives.
+            .onChange(of: messages) { _, newValue in
+                if let last = newValue.last {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    private func bubble(for message: ChatMessage) -> some View {
+        HStack {
+            if message.role == .user { Spacer(minLength: 40) }
+            Text(message.text)
+                .font(.system(size: 14))
+                .padding(.horizontal, SPAISpacing.m)
+                .padding(.vertical, SPAISpacing.s)
+                .background(bubbleColor(message.role), in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
+                .foregroundStyle(.white)
+            if message.role != .user { Spacer(minLength: 40) }
+        }
+    }
+
+    private func bubbleColor(_ role: ChatMessage.Role) -> Color {
+        switch role {
+        case .user:  return SPAIColor.primary.opacity(0.55)
+        case .spai:  return .white.opacity(0.12)
+        case .error: return SPAIColor.critical.opacity(0.4)
+        }
+    }
+
+    private var inputBar: some View {
+        HStack(spacing: SPAISpacing.s) {
+            TextField("Ask about this step…", text: $draft)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(send)
+            Button(action: send) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 26))
+            }
+            .buttonStyle(.plain)
+            .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || isWaiting)
+        }
+    }
+
+    // MARK: - Send
+
+    private var currentStep: SterileStep? {
+        SterileStep(rawValue: appModel.currentStepIndex)
+    }
+
+    /// Backend script keys are snake_case versions of the step.
+    private var stationKey: String {
+        switch currentStep {
+        case .decontamination: return "decontamination"
+        case .inspection:      return "inspection"
+        case .trayAssembly:    return "tray_assembly"
+        case .packaging:       return "prep_and_pack"
+        case .sealValidation:  return "seal_validation"
+        case nil:              return "decontamination"
+        }
+    }
+
+    /// Turn live detection state into the one-line summary the prompt wants.
+    private var detectionSummary: String {
+        guard detectionService.hasResult else { return "" }
+        var parts: [String] = []
+        let names = detectionService.detections.map { $0.className.lowercased() }
+        parts.append(names.contains("glove") ? "gloves detected" : "no gloves detected")
+        if names.contains("hand") { parts.append("bare hand visible") }
+        if let count = detectionService.instrumentCount {
+            parts.append("\(count) instruments detected")
+        }
+        if let tray = detectionService.trayState {
+            parts.append("tray is \(tray)")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private func send() {
+        let question = draft.trimmingCharacters(in: .whitespaces)
+        guard !question.isEmpty, !isWaiting else { return }
+        draft = ""
+        messages.append(ChatMessage(role: .user, text: question))
+        isWaiting = true
+
+        Task {
+            do {
+                let response = try await client.ask(AskRequest(
+                    question: question,
+                    station: stationKey,
+                    stepIndex: 0,
+                    detectionSummary: detectionSummary
+                ))
+                messages.append(ChatMessage(role: .spai, text: response.answer))
+            } catch {
+                messages.append(ChatMessage(role: .error, text: "Couldn't reach SPAI. Check the backend connection and try again."))
+            }
+            isWaiting = false
+        }
+    }
+}

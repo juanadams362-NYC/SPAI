@@ -48,6 +48,9 @@ struct ImmersiveView: View {
 
             // Outer ring: controls further out on each side.
             place("actions",   angle:  62, height: 1.2,  content, attachments)
+            
+            // Chat on the right outer ring, near actions. Hidden until toggled.
+            place("chat", angle: 62, height: 1.55, content, attachments)
 
             // Sim-only test panels take the outer left.
             #if targetEnvironment(simulator)
@@ -59,6 +62,7 @@ struct ImmersiveView: View {
             setEnabled("detection", attachments)
             setEnabled("eventLog",  attachments)
             setEnabled("workflow",  attachments)
+            setEnabled("chat", attachments)
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
@@ -68,6 +72,8 @@ struct ImmersiveView: View {
             Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
             Attachment(id: "stations") { StationPickerPanel(manager: stationManager) }
             #endif
+            Attachment(id: "chat") {
+                ChatPanel() }
             Attachment(id: "actions") {
                 ActionPanel(actions: [
                     QuickAction(label: "Show All", icon: "rectangle.3.group.fill", tint: SPAIColor.secondary) {
