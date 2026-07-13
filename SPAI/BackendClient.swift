@@ -3,8 +3,8 @@
 //  SPAI
 //
 //  Networking layer that talks to the FastAPI backend. Covers detection,
-//  health/metrics, runtime settings, and the compliance FSM. Reusable by
-//  both the iOS demo and the visionOS app.
+//  tray-state detection, health/metrics, runtime settings, and the
+//  compliance FSM. Reusable by both the iOS demo and the visionOS app.
 //
 
 import Foundation
@@ -38,6 +38,23 @@ struct DetectResponse: Codable {
         case detections
         case inferenceTimeMs = "inference_time_ms"
         case mode
+    }
+}
+
+/// The /detect-tray response — detections plus the loaded/empty verdict.
+struct TrayDetectResponse: Codable {
+    let detections: [BackendDetection]
+    let inferenceTimeMs: Int
+    let mode: String
+    let instrumentCount: Int
+    let trayState: String   // "loaded" or "empty"
+
+    enum CodingKeys: String, CodingKey {
+        case detections
+        case inferenceTimeMs = "inference_time_ms"
+        case mode
+        case instrumentCount = "instrument_count"
+        case trayState = "tray_state"
     }
 }
 
@@ -130,6 +147,38 @@ final class BackendClient {
         }
 
         return try JSONDecoder().decode(DetectResponse.self, from: data)
+    }
+
+    /// Send an image to /detect-tray and return the instruments + tray state.
+    /// Same multipart upload as detect(), just a different endpoint and
+    /// response type (which includes instrument_count and tray_state).
+    func detectTray(image: UIImage) async throws -> TrayDetectResponse {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            throw BackendError.imageEncodingFailed
+        }
+
+        let url = baseURL.appendingPathComponent("detect-tray")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)",
+                         forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"upload.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        let (data, response) = try await URLSession.shared.upload(for: request, from: body)
+
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw BackendError.badResponse
+        }
+
+        return try JSONDecoder().decode(TrayDetectResponse.self, from: data)
     }
 
     // MARK: Health
