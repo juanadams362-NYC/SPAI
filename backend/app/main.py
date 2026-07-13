@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.inference.detector import detector
 from app.inference.tray_detector import tray_detector
-from app.routes import health, model, detect, compliance, batch, settings, detect_tray
+from app.routes import health, model, detect, compliance, batch, settings, detect_tray, ask
 from app.logging_config import setup_logging, get_logger
 from app.metrics import metrics
 
@@ -85,6 +85,7 @@ app.include_router(detect_tray.router)   # tray-state detection
 app.include_router(compliance.router)
 app.include_router(batch.router)
 app.include_router(settings.router)
+app.include_router(ask.router)           # AI trainer chat
 
 
 @app.get("/")
