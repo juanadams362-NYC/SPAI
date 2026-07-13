@@ -158,3 +158,4 @@ struct DetectionPanel: View {
         .padding(60)
         .background(.black)
 }
+

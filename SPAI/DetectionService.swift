@@ -5,7 +5,6 @@
 //  Created by Juan Adams on 6/17/26.
 //
 
-
 //
 //  DetectionService.swift
 //  SPAI
@@ -23,6 +22,12 @@ import UIKit
 @Observable
 final class DetectionService {
     private let client = BackendClient()
+
+    /// Latest tray state from /detect-tray. Nil until a tray-capable
+    /// result arrives.
+    var trayState: String?
+    /// Latest instrument count reported by /detect-tray.
+    var instrumentCount: Int?
 
     // --- Live state, fed from the backend ---
     /// Latest raw detections from /detect.
@@ -58,14 +63,23 @@ final class DetectionService {
     func detect(image: UIImage) async {
         isLoading = true
         errorMessage = nil
+        trayState = nil
+        instrumentCount = nil
         do {
-            let response = try await client.detect(image: image)
-            detections = response.detections
-            hasResult = true
-            print("[DetectionService] \(response.detections.count) detections, "
-                  + "\(response.inferenceTimeMs)ms, mode=\(response.mode)")
-            for d in response.detections {
-                print("  - \(d.className) \(String(format: "%.2f", d.confidence))")
+            // Prefer the tray-aware endpoint so we can surface loaded/empty.
+            // If the backend doesn't support it, fall back to plain detect.
+            do {
+                let tray = try await client.detectTray(image: image)
+                detections = tray.detections
+                trayState = tray.trayState
+                instrumentCount = tray.instrumentCount
+                hasResult = true
+                print("[DetectionService] tray: state=\(tray.trayState), instruments=\(tray.instrumentCount), \(tray.detections.count) detections, \(tray.inferenceTimeMs)ms, mode=\(tray.mode)")
+            } catch {
+                let response = try await client.detect(image: image)
+                detections = response.detections
+                hasResult = true
+                print("[DetectionService] (fallback) \(response.detections.count) detections, \(response.inferenceTimeMs)ms, mode=\(response.mode)")
             }
         } catch {
             errorMessage = "Detection failed: \(error.localizedDescription)"

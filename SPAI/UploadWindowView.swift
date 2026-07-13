@@ -5,7 +5,6 @@
 //  Created by Juan Adams on 6/18/26.
 //
 
-
 //
 //  UploadWindowView.swift
 //  SPAI
@@ -28,7 +27,7 @@ struct UploadWindowView: View {
     @State private var image: UIImage?
 
     var body: some View {
-        VStack(spacing: SPAISpacing.l) {
+        VStack(spacing: SPAISpacing.m) {
             header
 
             if let image {
@@ -42,7 +41,7 @@ struct UploadWindowView: View {
                       systemImage: "photo.badge.plus")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 8)
             }
             .buttonStyle(.borderedProminent)
 
@@ -56,7 +55,7 @@ struct UploadWindowView: View {
 
             Spacer()
         }
-        .padding(SPAISpacing.xl)
+        .padding(SPAISpacing.l)
         .onChange(of: selectedItem) { _, newItem in
             guard let newItem else { return }
             Task {
@@ -86,9 +85,9 @@ struct UploadWindowView: View {
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: SPAIRadius.large)
+        RoundedRectangle(cornerRadius: SPAIRadius.medium)
             .fill(SPAIColor.neutralMid.opacity(0.2))
-            .frame(height: 280)
+            .frame(height: 220)
             .overlay {
                 VStack(spacing: 8) {
                     Image(systemName: "photo.on.rectangle.angled").font(.system(size: 40))
@@ -105,10 +104,12 @@ struct UploadWindowView: View {
             let displayHeight = uiImage.size.height * scale
 
             ZStack(alignment: .topLeading) {
+                // Base image
                 Image(uiImage: uiImage)
                     .resizable()
                     .frame(width: displayWidth, height: displayHeight)
 
+                // Detection boxes (tighter stroke, small label)
                 ForEach(service.detections) { det in
                     let x = CGFloat(det.box[0]) * scale
                     let y = CGFloat(det.box[1]) * scale
@@ -116,15 +117,16 @@ struct UploadWindowView: View {
                     let h = CGFloat(det.box[3] - det.box[1]) * scale
 
                     Rectangle()
-                        .stroke(boxColor(det.className), lineWidth: 2)
+                        .stroke(boxColor(det.className), lineWidth: 1.5)
                         .frame(width: w, height: h)
                         .overlay(alignment: .topLeading) {
                             Text("\(det.className) \(Int(det.confidence * 100))%")
-                                .font(.caption2.bold())
+                                .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 5).padding(.vertical, 2)
-                                .background(boxColor(det.className))
-                                .offset(y: -18)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .background(boxColor(det.className).opacity(0.9))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .offset(y: -16)
                         }
                         .offset(x: x, y: y)
                 }
@@ -135,9 +137,22 @@ struct UploadWindowView: View {
     }
 
     private var resultSummary: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+        VStack(alignment: .leading, spacing: SPAISpacing.xs) {
             Text("Found \(service.detections.count) object\(service.detections.count == 1 ? "" : "s")")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
+            if let tray = service.trayState?.capitalized {
+                HStack(spacing: 8) {
+                    Image(systemName: tray.lowercased() == "loaded" ? "tray.full" : "tray")
+                        .foregroundStyle(.white)
+                    Text("Tray: \(tray)")
+                        .font(.subheadline.weight(.semibold))
+                    if let count = service.instrumentCount {
+                        Text("(\(count))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             ForEach(service.detections) { det in
                 HStack {
                     Circle().fill(boxColor(det.className)).frame(width: 10, height: 10)
@@ -145,7 +160,7 @@ struct UploadWindowView: View {
                     Spacer()
                     Text("\(Int(det.confidence * 100))%").foregroundStyle(.secondary)
                 }
-                .font(.subheadline)
+                .font(.footnote)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -159,3 +174,4 @@ struct UploadWindowView: View {
         }
     }
 }
+

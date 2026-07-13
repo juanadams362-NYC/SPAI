@@ -12,6 +12,7 @@ import SwiftUI
 
 struct DetectionUploadPanel: View {
     let service: DetectionService
+    @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -45,11 +46,17 @@ struct DetectionUploadPanel: View {
                 Text("\(service.detections.count) detection(s)")
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.5))
+                if let tray = service.trayState?.capitalized {
+                    Text("Tray: \(tray)\(service.instrumentCount.map { " (\($0))" } ?? "")")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
             }
         }
         .padding(SPAISpacing.l)
         .frame(width: 260)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
     }
 }
+
