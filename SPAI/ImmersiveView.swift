@@ -2,14 +2,13 @@
 //  ImmersiveView.swift
 //  SPAI
 //
-//  The spatial workspace. Panels placed once, billboarded, fixed in a
-//  grounded arc around the user with the center kept clear. StationManager
-//  drives which step the user is on (a + b). Per-station environments (c)
-//  are a future sprint.
+//  The spatial workspace. Panels sit on a cockpit arc: every panel at the
+//  same radius from the user, positioned by angle + height instead of
+//  hand-typed xyz. Center of the arc at eye level stays empty — that's
+//  the work zone. Negative angle = left of center, positive = right.
 //
-//  On hardware, the main camera feeds live frames into DetectionService
-//  (SCRUM-80) — the same detection path the sim's upload flow uses. Camera
-//  access only works inside an ImmersiveSpace, which is exactly here.
+//  On hardware, the main camera feeds live frames into DetectionService.
+//  Camera access only works inside an ImmersiveSpace, which is exactly here.
 //
 
 import SwiftUI
@@ -26,27 +25,34 @@ struct ImmersiveView: View {
     // (its start() denies cleanly without the entitlement / a real camera).
     @State private var cameraService = CameraFrameService()
 
+    // One radius for the whole cockpit. Change this to pull the entire
+    // arc closer or push it away — everything stays consistent.
+    private let arcRadius: Float = 1.25
+
     var body: some View {
         RealityView { content, attachments in
             if let env = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
                 content.add(env)
             }
 
-            // Grounded arc. Eye level ~1.5m. Center kept clear.
-            // Status bar across the top.
-            place("statusBar", at: [0, 1.75, -1.4],      content, attachments)
-            // Flanking panels at eye level, angled in.
-            place("detection", at: [-0.75, 1.45, -1.25], content, attachments)
-            place("eventLog",  at: [0.75, 1.45, -1.25],  content, attachments)
-            // Workflow just below eye line, centered but low so center stays open.
-            place("workflow",  at: [0, 1.15, -1.3],       content, attachments)
-            // Quick actions tucked lower-right.
-            place("actions",   at: [0.7, 1.05, -1.15],    content, attachments)
+            // Top rail: status bar above the sightline, dead center.
+            place("statusBar", angle: 0,   height: 1.95, content, attachments)
 
-            // Sim-only test panels, lower-left so they don't crowd the work area.
+            // Inner ring at eye level: live info flanking the clear center.
+            place("detection", angle: -38, height: 1.45, content, attachments)
+            place("eventLog",  angle:  38, height: 1.45, content, attachments)
+
+            // Instrument cluster: workflow low center, closer in, below the
+            // work zone like a car dashboard — visible but never in the way.
+            place("workflow",  angle: 0,   height: 0.95, radius: 1.1, content, attachments)
+
+            // Outer ring: controls further out on each side.
+            place("actions",   angle:  62, height: 1.2,  content, attachments)
+
+            // Sim-only test panels take the outer left.
             #if targetEnvironment(simulator)
-            place("upload",   at: [-0.7, 1.05, -1.15],   content, attachments)
-            place("stations", at: [-0.7, 0.7, -1.05],    content, attachments)
+            place("upload",    angle: -62, height: 1.4,  content, attachments)
+            place("stations",  angle: -62, height: 0.9,  content, attachments)
             #endif
         } update: { _, attachments in
             setEnabled("statusBar", attachments)
@@ -101,7 +107,7 @@ struct ImmersiveView: View {
         .task {
             cameraService.onFrameForDetection = { readOnlyBuffer in
                 guard let image = UIImage.from(readOnlyBuffer: readOnlyBuffer) else { return }
-                Task { await detectionService.detect(image: image) }
+                Task { await detectionService.detect(image: image, step: SterileStep(rawValue: appModel.currentStepIndex)) }
             }
             await cameraService.start()
         }
@@ -114,14 +120,25 @@ struct ImmersiveView: View {
         }
     }
 
+    /// Convert (angle, height) on the cockpit arc into a 3D position.
+    /// 0° is straight ahead, negative left, positive right. sin gives the
+    /// sideways offset, cos gives the forward distance — so every panel
+    /// lands exactly `radius` meters away no matter the angle.
+    private func arcPosition(angle degrees: Float, height: Float, radius: Float) -> SIMD3<Float> {
+        let a = degrees * .pi / 180
+        return [radius * sin(a), height, -radius * cos(a)]
+    }
+
     private func place(
         _ id: some Hashable,
-        at position: SIMD3<Float>,
+        angle: Float,
+        height: Float,
+        radius: Float? = nil,
         _ content: RealityViewContent,
         _ attachments: RealityViewAttachments
     ) {
         guard let panel = attachments.entity(for: id) else { return }
-        panel.position = position
+        panel.position = arcPosition(angle: angle, height: height, radius: radius ?? arcRadius)
         panel.components.set(BillboardComponent())
         content.add(panel)
     }
