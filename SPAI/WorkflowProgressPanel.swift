@@ -55,18 +55,63 @@ struct WorkflowProgressPanel: View {
     }
 
     // MARK: - Header
-
+    
     private var header: some View {
         HStack {
             Text("WORKFLOW PROGRESS")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.7))
+
             Spacer()
+
             Text("\(currentStepIndex)/\(SterileStep.allCases.count)")
-                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
-                .contentTransition(.numericText())   // the count rolls up
+        }
+    }
+
+    private var controls: some View {
+        HStack(spacing: SPAISpacing.m) {
+            if appModel.isHalted {
+                // Contamination halt owns the panel: no starting, no completing,
+                // one path forward — acknowledge and resume.
+                Label("CONTAMINATION — WORKFLOW HALTED", systemImage: "exclamationmark.octagon.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(SPAIColor.critical)
+
+                Spacer()
+
+                actionButton("Acknowledge & Resume", icon: "checkmark.shield.fill", tint: SPAIColor.critical) {
+                    appModel.acknowledgeContamination()
+                }
+            } else {
+                Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
+
+                Spacer()
+
+                if !stepStarted {
+                    actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
+                        appModel.startStep()
+                    }
+                } else {
+                    if canRedo {
+                        actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
+                            appModel.redoStep()
+                        }
+                    }
+                    if canSendBack {
+                        actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
+                            appModel.failStep()
+                        }
+                    }
+                    actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
+                        appModel.completeStep()
+                    }
+                }
+            }
         }
     }
 
@@ -126,35 +171,35 @@ struct WorkflowProgressPanel: View {
 
     // MARK: - Controls
 
-    private var controls: some View {
-        HStack(spacing: SPAISpacing.m) {
-            Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.7))
-
-            Spacer()
-
-            if !stepStarted {
-                actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
-                    appModel.startStep()
-                }
-            } else {
-                if canRedo {
-                    actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
-                        appModel.redoStep()
-                    }
-                }
-                if canSendBack {
-                    actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
-                        appModel.failStep()
-                    }
-                }
-                actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
-                    appModel.completeStep()
-                }
-            }
-        }
-    }
+//    private var controls: some View {
+//        HStack(spacing: SPAISpacing.m) {
+//            Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
+//                .font(.system(size: 14))
+//                .foregroundStyle(.white.opacity(0.7))
+//
+//            Spacer()
+//
+//            if !stepStarted {
+//                actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
+//                    appModel.startStep()
+//                }
+//            } else {
+//                if canRedo {
+//                    actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
+//                        appModel.redoStep()
+//                    }
+//                }
+//                if canSendBack {
+//                    actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
+//                        appModel.failStep()
+//                    }
+//                }
+//                actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
+//                    appModel.completeStep()
+//                }
+//            }
+//        }
+//    }
 
     private func actionButton(
         _ label: String,

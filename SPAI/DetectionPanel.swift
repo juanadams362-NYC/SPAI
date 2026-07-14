@@ -49,9 +49,14 @@ struct DetectionPanel: View {
         // Play the alert ONCE when contamination crosses into critical.
         // Comparing old vs new means it only fires on the safe→critical
         // edge, not every update and not while it stays critical.
-        .onChange(of: contaminationRisk) { oldValue, newValue in
-            if oldValue < 0.5 && newValue >= 0.5 {
+        .onChange(of: service.contaminationRisk) { old, new in
+            if old < 0.5 && new >= 0.5 {
                 SoundManager.shared.playContaminationAlert()
+                // Detection drives the workflow: a real contamination halts the
+                // FSM until someone acknowledges it. Don't re-raise if already halted.
+                if !appModel.isHalted {
+                    appModel.raiseContamination()
+                }
             }
         }
     }
