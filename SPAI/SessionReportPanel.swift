@@ -1,15 +1,7 @@
-//
 //  SessionReportPanel.swift
 //  SPAI
 //
 //  Created by AVP Student on 7/14/26.
-//
-
-
-//
-//  SessionReportPanel.swift
-//  SPAI
-//
 //  End-of-session compliance report. Appears when the last workflow
 //  step completes — the session's receipt. Pass means zero
 //  contamination events, fail means the log tells the story.
