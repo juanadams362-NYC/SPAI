@@ -51,6 +51,9 @@ struct ImmersiveView: View {
             
             // Chat on the right outer ring, near actions. Hidden until toggled.
             place("chat", angle: 62, height: 1.55, content, attachments)
+            
+            // Session report: front and center, but only exists when the session ends.
+            place("report", angle: 0, height: 1.45, radius: 1.0, content, attachments)
 
             // Sim-only test panels take the outer left.
             #if targetEnvironment(simulator)
@@ -63,6 +66,7 @@ struct ImmersiveView: View {
             setEnabled("eventLog",  attachments)
             setEnabled("workflow",  attachments)
             setEnabled("chat", attachments)
+            attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
@@ -93,6 +97,7 @@ struct ImmersiveView: View {
                     }
                 ])
             }
+            Attachment(id: "report") { SessionReportPanel() }
         }
         .onAppear {
             appModel.immersiveSpaceState = .open

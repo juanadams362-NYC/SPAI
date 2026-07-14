@@ -133,6 +133,12 @@ class AppModel {
     var stepStarted: Bool = false
     /// True when the backend FSM is halted for contamination.
     var isHalted: Bool = false
+    
+    // Session report data. Filled in as the session runs, shown when
+    // the last step completes.
+    var sessionComplete: Bool = false
+    var sessionStart: Date = Date()
+    var contaminationCount: Int = 0
 
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
 
@@ -162,6 +168,7 @@ class AppModel {
                     log("Completed \(completed.title)", kind: .success)
                 } else {
                     log("Completed \(completed.title) — workflow complete", kind: .success)
+                    sessionComplete = true
                 }
                 stepStarted = false
             }
@@ -184,6 +191,7 @@ class AppModel {
     func raiseContamination() {
         isHalted = true
         log("Contamination detected — workflow halted", kind: .warning)
+        contaminationCount += 1
         Task { _ = try? await client.sendComplianceEvent("contamination") }
     }
 
@@ -207,6 +215,9 @@ class AppModel {
         isHalted = false
         eventLog.removeAll()
         log("Session reset", kind: .info)
+        sessionComplete = false
+        contaminationCount = 0
+        sessionStart = Date()
         Task { _ = try? await client.resetCompliance() }
     }
 
