@@ -7,9 +7,10 @@
 //  the sim send an image for inference.
 //
 //  Routing rule lives HERE, not in views: glove/hand detection runs on
-//  every step, everywhere. Tray detection only runs on the Tray Assembly
-//  step, layered on top of PPE — never instead of it. Views just pass in
-//  the current step and the service decides what to call.
+//  every step, everywhere. The instrument model runs on every step that
+//  handles instruments (decontam, inspection, tray assembly) so guided
+//  gates and the AI can see them — but the tray loaded/empty VERDICT
+//  is only surfaced on Tray Assembly, where it means something.
 //
 
 import SwiftUI
@@ -20,14 +21,19 @@ import UIKit
 final class DetectionService {
     private let client = BackendClient()
 
-    /// Latest tray state from /detect-tray. Nil unless the last run was
-    /// on the Tray Assembly step — the UI uses nil to hide tray output.
+    /// Steps where instruments are physically in play, so the instrument
+    /// model should run. Data for gates + AI context — not the same thing
+    /// as showing the tray verdict UI.
+    private let instrumentSteps: Set<SterileStep> = [.decontamination, .inspection, .trayAssembly]
+
+    /// Tray verdict from /detect-tray. Only set on Tray Assembly — the
+    /// UI uses nil to hide tray output everywhere else.
     var trayState: String?
-    /// Latest instrument count reported by /detect-tray.
+    /// Instrument count for the tray verdict. Same rule: Tray Assembly only.
     var instrumentCount: Int?
 
     // --- Live state, fed from the backend ---
-    /// Latest detections. On tray assembly this is PPE + instruments merged.
+    /// Latest detections. Instruments merge in on instrument steps.
     var detections: [BackendDetection] = []
     /// True while a request is in flight (drives the loading state in the UI).
     var isLoading = false
@@ -57,21 +63,23 @@ final class DetectionService {
     }
 
     /// Run detection for the given workflow step.
-    /// PPE always runs. Tray runs only on .trayAssembly, in parallel,
-    /// and its instruments get merged into the same detections list.
+    /// PPE always runs. The instrument model runs on instrument steps,
+    /// in parallel, and its detections merge into the same list. The
+    /// tray verdict (state + count) is only kept on Tray Assembly.
     func detect(image: UIImage, step: SterileStep?) async {
         isLoading = true
         errorMessage = nil
         trayState = nil
         instrumentCount = nil
 
-        let wantTray = (step == .trayAssembly)
+        let wantInstruments = step.map { instrumentSteps.contains($0) } ?? false
+        let wantTrayVerdict = (step == .trayAssembly)
 
         do {
             // async let starts both requests at the same time instead of
             // one after the other — the wait is max(a, b), not a + b.
             async let ppeTask = client.detect(image: image)
-            async let trayTask: TrayDetectResponse? = wantTray
+            async let trayTask: TrayDetectResponse? = wantInstruments
                 ? client.detectTray(image: image)
                 : nil
 
@@ -80,9 +88,11 @@ final class DetectionService {
 
             if let tray = try await trayTask {
                 merged += tray.detections
-                trayState = tray.trayState
-                instrumentCount = tray.instrumentCount
-                print("[DetectionService] tray: state=\(tray.trayState), instruments=\(tray.instrumentCount)")
+                if wantTrayVerdict {
+                    trayState = tray.trayState
+                    instrumentCount = tray.instrumentCount
+                }
+                print("[DetectionService] instruments: \(tray.detections.count) found, verdict shown: \(wantTrayVerdict)")
             }
 
             detections = merged

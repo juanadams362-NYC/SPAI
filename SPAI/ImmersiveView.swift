@@ -54,6 +54,9 @@ struct ImmersiveView: View {
             
             // Session report: front and center, but only exists when the session ends.
             place("report", angle: 0, height: 1.45, radius: 1.0, content, attachments)
+            
+            // Guided sim: right of center at eye level, only while a step runs.
+            place("guided", angle: 22, height: 1.5, radius: 1.15, content, attachments)
 
             // Sim-only test panels take the outer left.
             #if targetEnvironment(simulator)
@@ -67,6 +70,7 @@ struct ImmersiveView: View {
             setEnabled("workflow",  attachments)
             setEnabled("chat", attachments)
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
+            attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
@@ -98,6 +102,7 @@ struct ImmersiveView: View {
                 ])
             }
             Attachment(id: "report") { SessionReportPanel() }
+            Attachment(id: "guided") { GuidedStepPanel() }
         }
         .onAppear {
             appModel.immersiveSpaceState = .open

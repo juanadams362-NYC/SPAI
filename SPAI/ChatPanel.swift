@@ -146,8 +146,9 @@ struct ChatPanel: View {
         let names = detectionService.detections.map { $0.className.lowercased() }
         parts.append(names.contains("glove") ? "gloves detected" : "no gloves detected")
         if names.contains("hand") { parts.append("bare hand visible") }
-        if let count = detectionService.instrumentCount {
-            parts.append("\(count) instruments detected")
+        let instrumentHits = names.filter { $0 == "instrument" }.count
+        if instrumentHits > 0 {
+            parts.append("\(instrumentHits) instruments detected")
         }
         if let tray = detectionService.trayState {
             parts.append("tray is \(tray)")
@@ -167,7 +168,7 @@ struct ChatPanel: View {
                 let response = try await client.ask(AskRequest(
                     question: question,
                     station: stationKey,
-                    stepIndex: 0,
+                    stepIndex: appModel.guidedStepIndex,
                     detectionSummary: detectionSummary
                 ))
                 messages.append(ChatMessage(role: .spai, text: response.answer))

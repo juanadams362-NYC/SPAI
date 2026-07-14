@@ -133,18 +133,22 @@ class AppModel {
     var stepStarted: Bool = false
     /// True when the backend FSM is halted for contamination.
     var isHalted: Bool = false
-    
+
     // Session report data. Filled in as the session runs, shown when
     // the last step completes.
     var sessionComplete: Bool = false
     var sessionStart: Date = Date()
     var contaminationCount: Int = 0
-
+    // Which step inside the current station's guided script we're on.
+    // Only meaningful within one station — reset on every station
+    // start/finish/fail/reset or it leaks into the next station.
+    var guidedStepIndex: Int = 0
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
 
     func startStep() {
         let step = currentStep
         stepStarted = true
+        guidedStepIndex = 0
         log("Started \(step.title)", kind: .info)
         Task {
             let result = try? await client.sendComplianceEvent("start_step", step: step.backendName)
@@ -171,6 +175,7 @@ class AppModel {
                     sessionComplete = true
                 }
                 stepStarted = false
+                guidedStepIndex = 0
             }
         }
     }
@@ -182,6 +187,7 @@ class AppModel {
         let failed = currentStep
         currentStepIndex = 0
         stepStarted = false
+        guidedStepIndex = 0
         isHalted = false
         log("Failed \(failed.title) — tray sent back to Decontamination", kind: .warning)
         Task { _ = try? await client.resetCompliance() }
@@ -205,6 +211,7 @@ class AppModel {
     func redoStep() {
         let step = currentStep
         stepStarted = false
+        guidedStepIndex = 0
         log("Redo \(step.title)", kind: .info)
     }
 
@@ -212,6 +219,7 @@ class AppModel {
     func resetWorkflow() {
         currentStepIndex = 0
         stepStarted = false
+        guidedStepIndex = 0
         isHalted = false
         eventLog.removeAll()
         log("Session reset", kind: .info)
