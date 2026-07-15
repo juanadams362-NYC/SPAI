@@ -2,15 +2,9 @@
 //  ChatPanel.swift
 //  SPAI
 //
-//  Ask SPAI chat. Every question ships with the current station, step,
-//  and live detection state so the backend can ground the answer in
-//  what the user is actually doing right now. The user just types —
-//  the context rides along invisibly.
-//
 
 import SwiftUI
 
-/// One chat bubble. Role decides which side and color it renders.
 struct ChatMessage: Identifiable, Equatable {
     enum Role { case user, spai, error }
     let id = UUID()
@@ -48,8 +42,6 @@ struct ChatPanel: View {
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.7))
             Spacer()
-            // Always show which step the answers are grounded in —
-            // makes the context injection visible and demoable.
             Text(currentStep?.title ?? "No step")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(SPAIColor.accent)
@@ -75,7 +67,6 @@ struct ChatPanel: View {
                     }
                 }
             }
-            // Auto-scroll to the newest message whenever one arrives.
             .onChange(of: messages) { _, newValue in
                 if let last = newValue.last {
                     withAnimation(.easeOut(duration: 0.25)) {
@@ -127,7 +118,6 @@ struct ChatPanel: View {
         SterileStep(rawValue: appModel.currentStepIndex)
     }
 
-    /// Backend script keys are snake_case versions of the step.
     private var stationKey: String {
         switch currentStep {
         case .decontamination: return "decontamination"
@@ -139,7 +129,6 @@ struct ChatPanel: View {
         }
     }
 
-    /// Turn live detection state into the one-line summary the prompt wants.
     private var detectionSummary: String {
         guard detectionService.hasResult else { return "" }
         var parts: [String] = []

@@ -5,17 +5,6 @@
 //  Created by AVP Student on 7/14/26.
 //
 
-
-//
-//  GuidedStepPanel.swift
-//  SPAI
-//
-//  The guided sim: walks the user through the current station's steps
-//  one at a time. Detection-verifiable steps gate on live detection
-//  state; manual steps take a confirm tap. Visible only while a
-//  station step is in progress.
-//
-
 import SwiftUI
 
 struct GuidedStepPanel: View {
@@ -31,12 +20,10 @@ struct GuidedStepPanel: View {
     private var step: GuidedStep { script[guidedIndex] }
     private var isLast: Bool { guidedIndex == script.count - 1 }
 
-    /// Live check: does the current detection state satisfy this step?
     private var satisfied: Bool {
         let names = detectionService.detections.map { $0.className.lowercased() }
         switch step.condition {
         case .glovesOn:
-            // Gloved hands often fire both classes... glove present is the pass.
             return names.contains("glove")
         case .instrumentsPresent:
             return names.contains("instrument")

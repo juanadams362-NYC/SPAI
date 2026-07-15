@@ -3,19 +3,15 @@
 //  SPAI
 //
 //  Created by AVP Student on 7/14/26.
-//  The guided-sim step scripts. One source of truth for what each
-//  station's steps are and what detection state satisfies each one.
-//  Mirrors ask_spai.py on the backend — if a step changes, change both.
 //
 
 import Foundation
 
-/// What live detection state marks a guided step as verified.
 enum StepCondition {
-    case glovesOn            // glove detected, no bare hand
-    case instrumentsPresent  // at least one instrument detected
-    case trayLoaded          // tray state == loaded
-    case manual              // no detection can verify this — user confirms
+    case glovesOn
+    case instrumentsPresent
+    case trayLoaded
+    case manual
 }
 
 struct GuidedStep: Identifiable {
@@ -28,49 +24,49 @@ enum StationScripts {
     static func script(for step: SterileStep) -> [GuidedStep] {
         switch step {
         case .decontamination: return [
-            GuidedStep(instruction: "Put on PPE: gloves, gown, and eye protection before touching anything.",
+            GuidedStep(instruction: "Put on your protective gear first — a fluid-resistant mask with eye protection, a gown, and heavy-duty gloves. This keeps splashes and germs off you before you touch anything dirty.",
                        condition: .glovesOn),
-            GuidedStep(instruction: "Manual clean: keep instruments at the sink, brush below the waterline so soil never aerosolizes.",
+            GuidedStep(instruction: "Keep the instruments wet and take apart any that come apart. Dried-on soil is much harder to clean, and hidden surfaces need to be exposed.",
+                       condition: .instrumentsPresent),
+            GuidedStep(instruction: "Scrub gently under the water line with a soft brush so nothing sprays into the air. For any instrument with a channel inside, brush and flush it through.",
                        condition: .manual),
-            GuidedStep(instruction: "Rinse thoroughly with treated water, keeping instruments low in the basin.",
-                       condition: .manual),
-            GuidedStep(instruction: "Load instruments open and unlocked into the washer, hinged side down.",
+            GuidedStep(instruction: "Open and unlock any hinged instruments, then load them into the ultrasonic cleaner or washer. Open hinges let the machine clean every surface.",
                        condition: .manual),
         ]
         case .inspection: return [
-            GuidedStep(instruction: "Confirm hands are clean and gloves are fresh before handling processed instruments.",
+            GuidedStep(instruction: "Make sure your gloves are on and your hands are clean before you handle cleaned instruments. This is the point where things need to stay clean.",
                        condition: .glovesOn),
-            GuidedStep(instruction: "Inspect each instrument under light and magnification for soil, damage, and corrosion.",
+            GuidedStep(instruction: "Look over each instrument under good light and magnification. You're checking for leftover soil, stains, or rust.",
                        condition: .instrumentsPresent),
-            GuidedStep(instruction: "Function-test moving parts: hinges open smooth, ratchets hold, tips align.",
+            GuidedStep(instruction: "Test the moving parts — hinges should open and close smoothly, ratchets should hold, and tips should line up.",
                        condition: .manual),
-            GuidedStep(instruction: "Set aside anything that fails: soiled goes back to decontam, damaged goes to repair.",
+            GuidedStep(instruction: "Pull anything that fails. Still dirty goes back to decontamination; broken goes to repair.",
                        condition: .manual),
         ]
         case .trayAssembly: return [
-            GuidedStep(instruction: "Verify the count sheet matches the tray you are building.",
+            GuidedStep(instruction: "Check the count sheet — it lists exactly what goes in this tray. Make sure you have the right sheet for the right tray.",
                        condition: .manual),
-            GuidedStep(instruction: "Place instruments per the count sheet: heavy items on the bottom, ring-handled instruments open on stringers.",
+            GuidedStep(instruction: "Lay the instruments in as the sheet shows: hinges open, tips pointing the same way, and don't overcrowd it. This helps steam reach everything.",
                        condition: .trayLoaded),
-            GuidedStep(instruction: "Confirm the instrument count matches the sheet exactly.",
+            GuidedStep(instruction: "Count the instruments and match them to the sheet exactly. The tray also needs to stay under the weight limit.",
                        condition: .instrumentsPresent),
-            GuidedStep(instruction: "Place the internal chemical indicator and close the tray.",
+            GuidedStep(instruction: "Add the chemical indicator (it confirms the sterilizer worked) in the spot hardest for steam to reach, then close the tray.",
                        condition: .manual),
         ]
         case .packaging: return [
-            GuidedStep(instruction: "Select the correct wrap or container size for the tray weight.",
+            GuidedStep(instruction: "Pick the right wrap or container for the tray's size and weight. If you're unsure, check the instructions for that tray.",
                        condition: .manual),
-            GuidedStep(instruction: "Wrap using the correct fold technique with no gaps or tears.",
+            GuidedStep(instruction: "Wrap it snugly with no gaps, holes, or thin spots — any opening lets germs back in after sterilizing.",
                        condition: .manual),
-            GuidedStep(instruction: "Secure with indicator tape and label with contents, date, and initials.",
+            GuidedStep(instruction: "Seal it with indicator tape (never clips or staples, which poke holes) and label it with the contents, date, and your initials.",
                        condition: .manual),
         ]
         case .sealValidation: return [
-            GuidedStep(instruction: "Inspect the package seal for complete closure with no channels or wrinkles.",
+            GuidedStep(instruction: "Check the seal all the way around — no gaps, wrinkles, or open channels where germs could get in.",
                        condition: .manual),
-            GuidedStep(instruction: "Verify the external indicator is present and unexposed.",
+            GuidedStep(instruction: "Make sure the indicator on the outside is there and hasn't already changed color.",
                        condition: .manual),
-            GuidedStep(instruction: "Confirm the label is complete and legible, then release to sterile storage.",
+            GuidedStep(instruction: "Check that the label is complete and easy to read, then send the tray off to be sterilized.",
                        condition: .manual),
         ]
         }

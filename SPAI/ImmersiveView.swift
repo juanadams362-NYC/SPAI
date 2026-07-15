@@ -2,14 +2,6 @@
 //  ImmersiveView.swift
 //  SPAI
 //
-//  The spatial workspace. Panels sit on a cockpit arc: every panel at the
-//  same radius from the user, positioned by angle + height instead of
-//  hand-typed xyz. Center of the arc at eye level stays empty — that's
-//  the work zone. Negative angle = left of center, positive = right.
-//
-//  On hardware, the main camera feeds live frames into DetectionService.
-//  Camera access only works inside an ImmersiveSpace, which is exactly here.
-//
 
 import SwiftUI
 import RealityKit
@@ -21,12 +13,8 @@ struct ImmersiveView: View {
     @Environment(DetectionService.self) private var detectionService
     @State private var stationManager = StationManager()
 
-    // Live camera feed. Hardware-only — on the sim this object just sits idle
-    // (its start() denies cleanly without the entitlement / a real camera).
     @State private var cameraService = CameraFrameService()
 
-    // One radius for the whole cockpit. Change this to pull the entire
-    // arc closer or push it away — everything stays consistent.
     private let arcRadius: Float = 1.25
 
     var body: some View {
@@ -35,33 +23,24 @@ struct ImmersiveView: View {
                 content.add(env)
             }
 
-            // Top rail: status bar above the sightline, dead center.
-            place("statusBar", angle: 0,   height: 1.95, content, attachments)
+            place("statusBar", angle: 0, height: 1.9, radius: 1.3, content, attachments)
 
-            // Inner ring at eye level: live info flanking the clear center.
-            place("detection", angle: -38, height: 1.45, content, attachments)
-            place("eventLog",  angle:  38, height: 1.45, content, attachments)
+            place("detection", angle: -30, height: 1.45, radius: 1.2, content, attachments)
+            place("eventLog",  angle:  30, height: 1.45, radius: 1.2, content, attachments)
 
-            // Instrument cluster: workflow low center, closer in, below the
-            // work zone like a car dashboard — visible but never in the way.
-            place("workflow",  angle: 0,   height: 0.95, radius: 1.1, content, attachments)
+            place("guided",    angle:  16, height: 1.15, radius: 1.15, content, attachments)
 
-            // Outer ring: controls further out on each side.
-            place("actions",   angle:  62, height: 1.2,  content, attachments)
-            
-            // Chat on the right outer ring, near actions. Hidden until toggled.
-            place("chat", angle: 62, height: 1.55, content, attachments)
-            
-            // Session report: front and center, but only exists when the session ends.
-            place("report", angle: 0, height: 1.45, radius: 1.0, content, attachments)
-            
-            // Guided sim: right of center at eye level, only while a step runs.
-            place("guided", angle: 22, height: 1.5, radius: 1.15, content, attachments)
+            place("workflow",  angle:  0,  height: 0.85, radius: 1.1, content, attachments)
 
-            // Sim-only test panels take the outer left.
+            place("actions",   angle:  52, height: 1.25, radius: 1.3, content, attachments)
+            place("chat",      angle:  48, height: 1.7,  radius: 1.3, content, attachments)
+            place("history",   angle: -52, height: 1.55, radius: 1.3, content, attachments)
+
+            place("report",    angle:  0,  height: 1.4,  radius: 1.05, content, attachments)
+
             #if targetEnvironment(simulator)
-            place("upload",    angle: -62, height: 1.4,  content, attachments)
-            place("stations",  angle: -62, height: 0.9,  content, attachments)
+            place("upload",    angle: -52, height: 1.0,  radius: 1.3, content, attachments)
+            place("stations",  angle: -30, height: 0.85, radius: 1.2, content, attachments)
             #endif
         } update: { _, attachments in
             setEnabled("statusBar", attachments)
@@ -69,6 +48,7 @@ struct ImmersiveView: View {
             setEnabled("eventLog",  attachments)
             setEnabled("workflow",  attachments)
             setEnabled("chat", attachments)
+            setEnabled("history", attachments)
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
             attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete
         } attachments: {
@@ -80,8 +60,7 @@ struct ImmersiveView: View {
             Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
             Attachment(id: "stations") { StationPickerPanel(manager: stationManager) }
             #endif
-            Attachment(id: "chat") {
-                ChatPanel() }
+            Attachment(id: "chat") { ChatPanel() }
             Attachment(id: "actions") {
                 ActionPanel(actions: [
                     QuickAction(label: "Show All", icon: "rectangle.3.group.fill", tint: SPAIColor.secondary) {
@@ -96,6 +75,9 @@ struct ImmersiveView: View {
                     QuickAction(label: "Event Log", icon: "waveform.path.ecg", tint: SPAIColor.primary) {
                         appModel.toggleVisibility("eventLog")
                     },
+                    QuickAction(label: "History", icon: "clock.arrow.circlepath", tint: SPAIColor.secondary) {
+                        appModel.toggleVisibility("history")
+                    },
                     QuickAction(label: "Reset", icon: "arrow.clockwise", tint: SPAIColor.critical) {
                         appModel.resetWorkflow()
                     }
@@ -103,6 +85,7 @@ struct ImmersiveView: View {
             }
             Attachment(id: "report") { SessionReportPanel() }
             Attachment(id: "guided") { GuidedStepPanel() }
+            Attachment(id: "history") { SessionHistoryPanel() }
         }
         .onAppear {
             appModel.immersiveSpaceState = .open
@@ -115,10 +98,7 @@ struct ImmersiveView: View {
             Task { await stationManager.startImageTracking() }
             #endif
         }
-        // Hardware-only: start the live camera feed and route frames into the
-        // existing detection pipeline. Each throttled frame is converted to a
-        // UIImage and sent through the SAME detectionService.detect() the
-        // upload flow uses — so panels, alerts, and borders all react identically.
+
         #if !targetEnvironment(simulator)
         .task {
             cameraService.onFrameForDetection = { readOnlyBuffer in
@@ -136,10 +116,6 @@ struct ImmersiveView: View {
         }
     }
 
-    /// Convert (angle, height) on the cockpit arc into a 3D position.
-    /// 0° is straight ahead, negative left, positive right. sin gives the
-    /// sideways offset, cos gives the forward distance — so every panel
-    /// lands exactly `radius` meters away no matter the angle.
     private func arcPosition(angle degrees: Float, height: Float, radius: Float) -> SIMD3<Float> {
         let a = degrees * .pi / 180
         return [radius * sin(a), height, -radius * cos(a)]

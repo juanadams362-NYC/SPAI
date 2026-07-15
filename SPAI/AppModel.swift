@@ -84,6 +84,7 @@ struct LogEvent: Identifiable {
 @Observable
 class AppModel {
     let immersiveSpaceID = "SPAIImmersiveSpace"
+    let history = SessionHistory()
 
     enum ImmersiveSpaceState {
         case closed
@@ -108,7 +109,7 @@ class AppModel {
     func setMode(_ mode: PanelMode, for panelID: String) { panelModes[panelID] = mode }
 
     // MARK: - Panel appearance
-    var panelVisibility: [String: Bool] = ["chat": false]
+    var panelVisibility: [String: Bool] = ["chat": false, "history": false]
     var panelOpacity: Double = 0.85
     func isVisible(_ panelID: String) -> Bool { panelVisibility[panelID] ?? true }
     func toggleVisibility(_ panelID: String) { panelVisibility[panelID] = !isVisible(panelID) }
@@ -131,17 +132,11 @@ class AppModel {
 
     var currentStepIndex: Int = 0
     var stepStarted: Bool = false
-    /// True when the backend FSM is halted for contamination.
     var isHalted: Bool = false
 
-    // Session report data. Filled in as the session runs, shown when
-    // the last step completes.
     var sessionComplete: Bool = false
     var sessionStart: Date = Date()
     var contaminationCount: Int = 0
-    // Which step inside the current station's guided script we're on.
-    // Only meaningful within one station — reset on every station
-    // start/finish/fail/reset or it leaks into the next station.
     var guidedStepIndex: Int = 0
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
 
@@ -173,6 +168,14 @@ class AppModel {
                 } else {
                     log("Completed \(completed.title) — workflow complete", kind: .success)
                     sessionComplete = true
+                    log("Completed \(completed.title) — workflow complete", kind: .success)
+                                        sessionComplete = true
+                                        history.add(SessionRecord(
+                                            passed: contaminationCount == 0,
+                                            contaminationCount: contaminationCount,
+                                            durationSeconds: Int(Date().timeIntervalSince(sessionStart)),
+                                            events: eventLog.map { "\($0.timestamp)  \($0.message)" }
+                                        ))
                 }
                 stepStarted = false
                 guidedStepIndex = 0
@@ -180,9 +183,6 @@ class AppModel {
         }
     }
 
-    /// Fail the current step — send the tray back to decontamination and
-    /// reset the backend FSM so it's not left halted. This is a restart,
-    /// not a contamination freeze, so the workflow stays usable.
     func failStep() {
         let failed = currentStep
         currentStepIndex = 0
@@ -193,7 +193,6 @@ class AppModel {
         Task { _ = try? await client.resetCompliance() }
     }
 
-    /// Trigger a contamination halt (e.g. from a detection event).
     func raiseContamination() {
         isHalted = true
         log("Contamination detected — workflow halted", kind: .warning)
@@ -201,7 +200,6 @@ class AppModel {
         Task { _ = try? await client.sendComplianceEvent("contamination") }
     }
 
-    /// Acknowledge the halt so work can resume.
     func acknowledgeContamination() {
         isHalted = false
         log("Contamination acknowledged — workflow resumed", kind: .info)
@@ -215,7 +213,6 @@ class AppModel {
         log("Redo \(step.title)", kind: .info)
     }
 
-    /// Reset both local state and the backend FSM. Clears any stuck halt.
     func resetWorkflow() {
         currentStepIndex = 0
         stepStarted = false
@@ -231,7 +228,7 @@ class AppModel {
 
     init() {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
-        Task { _ = try? await client.resetCompliance() }   // start clean
+        Task { _ = try? await client.resetCompliance() }
         log("Session started", kind: .info)
     }
 }
