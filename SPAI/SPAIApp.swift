@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct SPAIApp: App {
     @State private var appModel = AppModel()
-    @State private var detectionService = DetectionService()   // shared everywhere now
+    @State private var detectionService = DetectionService()
 
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
 
@@ -35,8 +35,6 @@ struct SPAIApp: App {
         }
         .windowStyle(.plain)
 
-        // Sim-only upload window. PhotosPicker presents a sheet, which can't
-        // appear inside an ImmersiveSpace — so the picker lives here.
         WindowGroup(id: "upload") {
             UploadWindowView()
                 .environment(appModel)

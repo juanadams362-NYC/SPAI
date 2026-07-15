@@ -1,41 +1,27 @@
 //
-//  EnvironmentReading.swift
+//  CompliancePanel.swift
 //  SPAI
 //
 //  Created by Juan Adams on 6/7/26.
 //
 
-
-//
-//  CompliancePanel.swift
-//  SPAI
-//
-//  Environmental + compliance status panel from the Figma. Shows an
-//  overall compliance state and a few live environmental readouts.
-//  The overall state is driven by the readings so it stays honest.
-//
-
 import SwiftUI
 
-/// A single environmental reading (temperature, humidity, etc.).
 struct EnvironmentReading: Identifiable {
     let id = UUID()
     let label: String
     let value: String
     let icon: String
-    let inRange: Bool   // drives whether this reading counts as compliant
+    let inRange: Bool
 }
 
 struct CompliancePanel: View {
-    // Sample readings for now. Later these come from sensors / backend.
     private let readings: [EnvironmentReading] = [
         EnvironmentReading(label: "Temperature", value: "68°F", icon: "thermometer.medium", inRange: true),
         EnvironmentReading(label: "Humidity",    value: "44%",  icon: "humidity",           inRange: true),
         EnvironmentReading(label: "Air Pressure", value: "Positive", icon: "wind",          inRange: true)
     ]
 
-    // Overall compliance = every reading in range. Derived, not hardcoded,
-    // so the headline can't lie about the readings below it.
     private var allCompliant: Bool {
         readings.allSatisfy { $0.inRange }
     }
@@ -61,8 +47,6 @@ struct CompliancePanel: View {
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
     }
 
-    // MARK: - Headline
-
     private var complianceHeadline: some View {
         HStack(spacing: SPAISpacing.s + 4) {
             Image(systemName: allCompliant ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
@@ -85,8 +69,6 @@ struct CompliancePanel: View {
             in: RoundedRectangle(cornerRadius: SPAIRadius.medium)
         )
     }
-
-    // MARK: - Reading row
 
     private func readingRow(_ reading: EnvironmentReading) -> some View {
         HStack(spacing: SPAISpacing.s + 4) {

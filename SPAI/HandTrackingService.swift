@@ -2,10 +2,6 @@
 //  HandTrackingService.swift
 //  SPAI
 //
-//  SCRUM-50 spike: confirm we can read hand joint positions from ARKit
-//  on visionOS and print them. Proves the data is available for future
-//  contamination / hand-pose logic.
-//
 
 import ARKit
 import SwiftUI
@@ -16,14 +12,11 @@ final class HandTrackingService {
     private let session = ARKitSession()
     private let handTracking = HandTrackingProvider()
 
-    // Latest readings, exposed so a view could display them later.
     var leftWristPosition: SIMD3<Float>?
     var rightWristPosition: SIMD3<Float>?
     var isTracking = false
 
-    /// Request authorization and start the ARKit session.
     func start() async {
-        // Hand tracking needs explicit authorization on visionOS.
         guard HandTrackingProvider.isSupported else {
             print("[hand-tracking] not supported on this device")
             return
@@ -39,18 +32,13 @@ final class HandTrackingService {
         }
     }
 
-    /// Listen for hand anchor updates and print joint positions.
     private func processUpdates() async {
         for await update in handTracking.anchorUpdates {
             let anchor = update.anchor
 
-            // Only use tracked hands (skip when hand leaves view).
             guard anchor.isTracked else { continue }
 
-            // The wrist joint is a good single reference point for the spike.
             if let wrist = anchor.handSkeleton?.joint(.wrist) {
-                // Joint transform is relative to the anchor; combine with
-                // the anchor's world transform for a world-space position.
                 let worldTransform = anchor.originFromAnchorTransform
                 let wristTransform = wrist.anchorFromJointTransform
                 let combined = worldTransform * wristTransform

@@ -11,32 +11,32 @@ from app.llm_client import ask_llm, LLMError
 # Keys have to match the app's station names exactly or lookup fails.
 STATION_SCRIPTS = {
     "decontamination": [
-        "Verify PPE: gloves, gown, eye protection on before touching anything.",
-        "Manual clean: keep instruments at the sink, brush below the waterline so soil never aerosolizes.",
-        "Rinse thoroughly with treated water, keeping instruments low in the basin.",
-        "Load instruments open and unlocked into the washer, hinged side down.",
+        "Put on your protective gear first — a fluid-resistant mask with eye protection, a gown, and heavy-duty gloves. This keeps splashes and germs off you before you touch anything dirty.",
+        "Keep the instruments wet and take apart any that come apart. Dried-on soil is much harder to clean, and hidden surfaces need to be exposed.",
+        "Scrub gently under the water line with a soft brush so nothing sprays into the air. For any instrument with a channel inside, brush and flush it through.",
+        "Open and unlock any hinged instruments, then load them into the ultrasonic cleaner or washer. Open hinges let the machine clean every surface.",
     ],
     "inspection": [
-        "Confirm hands are clean and gloves are fresh before handling processed instruments.",
-        "Inspect each instrument under light and magnification for soil, damage, and corrosion.",
-        "Function-test moving parts: hinges open smooth, ratchets hold, tips align.",
-        "Set aside anything that fails: soiled goes back to decontam, damaged goes to repair.",
+        "Make sure your gloves are on and your hands are clean before you handle cleaned instruments. This is the point where things need to stay clean.",
+        "Look over each instrument under good light and magnification. You're checking for leftover soil, stains, or rust.",
+        "Test the moving parts — hinges should open and close smoothly, ratchets should hold, and tips should line up.",
+        "Pull anything that fails. Still dirty goes back to decontamination; broken goes to repair.",
     ],
     "tray_assembly": [
-        "Verify the count sheet matches the tray you are building.",
-        "Place instruments per the count sheet, heavy items on the bottom, ring-handled instruments open on stringers.",
-        "Confirm the instrument count matches the sheet exactly.",
-        "Place the internal chemical indicator and close the tray.",
+        "Check the count sheet — it lists exactly what goes in this tray. Make sure you have the right sheet for the right tray.",
+        "Lay the instruments in as the sheet shows: hinges open, tips pointing the same way, and don't overcrowd it. This helps steam reach everything.",
+        "Count the instruments and match them to the sheet exactly. The tray also needs to stay under the weight limit.",
+        "Add the chemical indicator (it confirms the sterilizer worked) in the spot hardest for steam to reach, then close the tray.",
     ],
-    "prep_and_pack": [
-        "Select the correct wrap or container size for the tray weight.",
-        "Wrap using the correct fold technique with no gaps or tears.",
-        "Secure with indicator tape and label with contents, date, and initials.",
+    "packaging": [
+        "Pick the right wrap or container for the tray's size and weight. If you're unsure, check the instructions for that tray.",
+        "Wrap it snugly with no gaps, holes, or thin spots — any opening lets germs back in after sterilizing.",
+        "Seal it with indicator tape (never clips or staples, which poke holes) and label it with the contents, date, and your initials.",
     ],
     "seal_validation": [
-        "Inspect the package seal for complete closure with no channels or wrinkles.",
-        "Verify the external indicator is present and unexposed.",
-        "Confirm the label is complete and legible, then release to sterile storage.",
+        "Check the seal all the way around — no gaps, wrinkles, or open channels where germs could get in.",
+        "Make sure the indicator on the outside is there and hasn't already changed color.",
+        "Confirm the label is complete and easy to read, then send the tray off to be sterilized.",
     ],
 }
 

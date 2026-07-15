@@ -5,16 +5,6 @@
 //  Created by Juan Adams on 6/18/26.
 //
 
-//
-//  UploadWindowView.swift
-//  SPAI
-//
-//  Sim-only upload window. Lives as a regular window so the PhotosPicker
-//  sheet can actually present (it can't inside an ImmersiveSpace). Picks an
-//  image, runs it through the SHARED DetectionService, and draws the boxes.
-//  Because the service is shared, the immersive Detection panel updates too.
-//
-
 import SwiftUI
 import PhotosUI
 import UIKit
@@ -105,12 +95,10 @@ struct UploadWindowView: View {
             let displayHeight = uiImage.size.height * scale
 
             ZStack(alignment: .topLeading) {
-                // Base image
                 Image(uiImage: uiImage)
                     .resizable()
                     .frame(width: displayWidth, height: displayHeight)
 
-                // Detection boxes (tighter stroke, small label)
                 ForEach(service.detections) { det in
                     let x = CGFloat(det.box[0]) * scale
                     let y = CGFloat(det.box[1]) * scale

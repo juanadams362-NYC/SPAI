@@ -5,16 +5,6 @@
 //  Created by Juan Adams on 6/17/26.
 //
 
-
-//
-//  StationPickerPanel.swift
-//  SPAI
-//
-//  Simulator-only: tap a station to "walk" to it, since there's no real
-//  movement or marker tracking in the sim. On hardware the image-tracker
-//  triggers the same enter() when it sees a station's printed marker.
-//
-
 import SwiftUI
 
 struct StationPickerPanel: View {

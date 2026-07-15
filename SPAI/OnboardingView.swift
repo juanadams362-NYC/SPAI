@@ -2,9 +2,6 @@
 //  OnboardingView.swift
 //  SPAI
 //
-//  First-launch guided walkthrough. Introduces what SPAI does and how
-//  stations work, then enters the workspace.
-//
 
 import SwiftUI
 
@@ -130,8 +127,6 @@ struct OnboardingView: View {
                 if page < 2 {
                     withAnimation { page += 1 }
                 } else {
-                    // Finish onboarding. Turn off the testing flag so we
-                    // actually leave, and mark it complete.
                     alwaysShowOnboarding = false
                     appModel.hasCompletedOnboarding = true
                 }

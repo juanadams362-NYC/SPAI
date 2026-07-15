@@ -2,11 +2,6 @@
 //  DetectionPanel.swift
 //  SPAI
 //
-//  Merged awareness panel. Surfaces ONLY contamination risk to the user
-//  (glove/hand run silently as a PPE check), plus AAMI ST79 environment
-//  readouts. Contamination + PPE come live from DetectionService.
-//  Environment is still mock — sensor readings wired separately later.
-//
 
 import SwiftUI
 
@@ -22,9 +17,6 @@ struct DetectionPanel: View {
     private var ppePassing: Bool { service.ppePassing }
     private var riskHigh: Bool { contaminationRisk >= 0.5 }
 
-    // The border reacts to how risky things are right now.
-    // High risk (bare hand) → critical red. Some risk → warning amber.
-    // All clear → calm blue.
     private var borderState: BorderState {
         if !service.hasResult { return .normal }
         if contaminationRisk >= 0.5 { return .critical }
@@ -46,14 +38,9 @@ struct DetectionPanel: View {
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.4), value: riskHigh)
-        // Play the alert ONCE when contamination crosses into critical.
-        // Comparing old vs new means it only fires on the safe→critical
-        // edge, not every update and not while it stays critical.
         .onChange(of: service.contaminationRisk) { old, new in
             if old < 0.5 && new >= 0.5 {
                 SoundManager.shared.playContaminationAlert()
-                // Detection drives the workflow: a real contamination halts the
-                // FSM until someone acknowledges it. Don't re-raise if already halted.
                 if !appModel.isHalted {
                     appModel.raiseContamination()
                 }

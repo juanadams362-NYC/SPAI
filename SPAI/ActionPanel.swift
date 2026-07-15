@@ -1,23 +1,11 @@
 //
-//  QuickAction.swift
-//  SPAI
-//
-//  Created by Juan Adams on 6/7/26.
-//
-
-
-//
 //  ActionPanel.swift
 //  SPAI
-//
-//  A compact vertical cluster of quick actions (the floating button
-//  stack from the Figma). Each action is an icon button that reveals
-//  its label, and triggers a callback so the parent can respond.
+//  Created by Juan Adams on 6/7/26.
 //
 
 import SwiftUI
 
-/// One quick action in the cluster.
 struct QuickAction: Identifiable {
     let id = UUID()
     let label: String
@@ -29,7 +17,6 @@ struct QuickAction: Identifiable {
 struct ActionPanel: View {
     let actions: [QuickAction]
 
-    // Which action's label is currently expanded (tap to reveal).
     @State private var expandedID: UUID?
 
     var body: some View {
@@ -47,7 +34,6 @@ struct ActionPanel: View {
         let isExpanded = expandedID == action.id
 
         return HStack(spacing: SPAISpacing.s) {
-            // The label slides in when expanded.
             if isExpanded {
                 Text(action.label)
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
@@ -59,7 +45,6 @@ struct ActionPanel: View {
             }
 
             Button {
-                // Tap once to reveal the label; tap again to fire the action.
                 if isExpanded {
                     action.action()
                     withAnimation(.easeOut(duration: 0.2)) { expandedID = nil }

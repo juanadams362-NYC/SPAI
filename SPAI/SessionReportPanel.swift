@@ -2,9 +2,6 @@
 //  SPAI
 //
 //  Created by AVP Student on 7/14/26.
-//  End-of-session compliance report. Appears when the last workflow
-//  step completes — the session's receipt. Pass means zero
-//  contamination events, fail means the log tells the story.
 //
 
 import SwiftUI
@@ -21,7 +18,6 @@ struct SessionReportPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.l) {
-            // Verdict up top, unmissable.
             HStack(spacing: SPAISpacing.m) {
                 Image(systemName: passed ? "checkmark.seal.fill" : "xmark.seal.fill")
                     .font(.system(size: 34))
@@ -48,7 +44,6 @@ struct SessionReportPanel: View {
 
             Divider().overlay(.white.opacity(0.2))
 
-            // The event log is the evidence backing the verdict.
             VStack(alignment: .leading, spacing: SPAISpacing.s) {
                 Text("EVENT HISTORY")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))

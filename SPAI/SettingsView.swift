@@ -2,10 +2,6 @@
 //  SettingsView.swift
 //  SPAI
 //
-//  Settings: backend URL, confidence threshold, streaming fps, panel
-//  transparency. Persisted via UserDefaults. Confidence pushes to the
-//  backend; transparency previews live on the panels.
-//
 
 import SwiftUI
 
@@ -43,7 +39,6 @@ struct SettingsView: View {
                     .tint(SPAIColor.accent)
             }
 
-            // Live panel transparency — previews instantly on the panels.
             settingBlock(title: "Panel opacity: \(Int(appModel.panelOpacity * 100))%") {
                 Slider(
                     value: Binding(

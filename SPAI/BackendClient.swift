@@ -2,23 +2,18 @@
 //  BackendClient.swift
 //  SPAI
 //
-//  Networking layer that talks to the FastAPI backend. Covers detection,
-//  tray-state detection, health/metrics, runtime settings, and the
-//  compliance FSM. Reusable by both the iOS demo and the visionOS app.
-//
 
 import Foundation
 import UIKit
 
 // MARK: - Detection models
 
-/// One detection returned by the backend. Matches the JSON shape from /detect.
 struct BackendDetection: Codable, Identifiable {
     var id = UUID()
     let classId: Int
     let className: String
     let confidence: Double
-    let box: [Int]   // [x1, y1, x2, y2] in pixel coordinates
+    let box: [Int]
 
     enum CodingKeys: String, CodingKey {
         case classId = "class_id"
@@ -28,7 +23,6 @@ struct BackendDetection: Codable, Identifiable {
     }
 }
 
-/// The full /detect response.
 struct DetectResponse: Codable {
     let detections: [BackendDetection]
     let inferenceTimeMs: Int
@@ -41,13 +35,12 @@ struct DetectResponse: Codable {
     }
 }
 
-/// The /detect-tray response — detections plus the loaded/empty verdict.
 struct TrayDetectResponse: Codable {
     let detections: [BackendDetection]
     let inferenceTimeMs: Int
     let mode: String
     let instrumentCount: Int
-    let trayState: String   // "loaded" or "empty"
+    let trayState: String
 
     enum CodingKeys: String, CodingKey {
         case detections
@@ -60,7 +53,6 @@ struct TrayDetectResponse: Codable {
 
 // MARK: - Settings models
 
-/// The /settings response.
 struct BackendSettings: Codable {
     let confidenceThreshold: Double
     let modelPath: String
@@ -75,7 +67,6 @@ struct BackendSettings: Codable {
 
 // MARK: - Compliance models
 
-/// The current FSM state, from /compliance/state and /compliance/event.
 struct ComplianceState: Codable {
     let state: String
     let currentStep: String?
@@ -88,7 +79,6 @@ struct ComplianceState: Codable {
     }
 }
 
-/// The result of posting an event, which adds accepted/message on top of state.
 struct ComplianceEventResult: Codable {
     let accepted: Bool
     let message: String
@@ -107,11 +97,7 @@ struct ComplianceEventResult: Codable {
 
 // MARK: - Client
 
-/// Talks to the SPAI backend.
 final class BackendClient {
-    // Re-read on every access so a URL change in Settings takes effect
-    // on the very next request. Storing this once at init froze the app
-    // to whatever URL it launched with.
     var baseURL: URL {
         let stored = UserDefaults.standard.string(forKey: "backendURL")
         return stored.flatMap { URL(string: $0) }
@@ -120,7 +106,6 @@ final class BackendClient {
 
     // MARK: Detection
 
-    /// Send an image to /detect and return the parsed detections.
     func detect(image: UIImage) async throws -> DetectResponse {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             throw BackendError.imageEncodingFailed
@@ -150,9 +135,6 @@ final class BackendClient {
         return try JSONDecoder().decode(DetectResponse.self, from: data)
     }
 
-    /// Send an image to /detect-tray and return the instruments + tray state.
-    /// Same multipart upload as detect(), just a different endpoint and
-    /// response type (which includes instrument_count and tray_state).
     func detectTray(image: UIImage) async throws -> TrayDetectResponse {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             throw BackendError.imageEncodingFailed
@@ -184,7 +166,6 @@ final class BackendClient {
 
     // MARK: Health
 
-    /// Quick health check — returns true if the backend is reachable.
     func health() async -> Bool {
         let url = baseURL.appendingPathComponent("health")
         do {
@@ -197,7 +178,6 @@ final class BackendClient {
 
     // MARK: Settings
 
-    /// Read the current runtime settings from /settings.
     func getSettings() async throws -> BackendSettings {
         let url = baseURL.appendingPathComponent("settings")
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -207,7 +187,6 @@ final class BackendClient {
         return try JSONDecoder().decode(BackendSettings.self, from: data)
     }
 
-    /// Update the confidence threshold via PATCH /settings.
     func updateConfidenceThreshold(_ value: Double) async throws -> BackendSettings {
         let url = baseURL.appendingPathComponent("settings")
         var request = URLRequest(url: url)
@@ -224,7 +203,6 @@ final class BackendClient {
 
     // MARK: Compliance
 
-    /// Read the current FSM state from /compliance/state.
     func complianceState() async throws -> ComplianceState {
         let url = baseURL.appendingPathComponent("compliance/state")
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -234,8 +212,6 @@ final class BackendClient {
         return try JSONDecoder().decode(ComplianceState.self, from: data)
     }
 
-    /// Send an event to the FSM via POST /compliance/event.
-    /// `step` is required for start/complete events, nil for contamination/acknowledge.
     func sendComplianceEvent(_ event: String, step: String? = nil) async throws -> ComplianceEventResult {
         let url = baseURL.appendingPathComponent("compliance/event")
         var request = URLRequest(url: url)
@@ -253,7 +229,6 @@ final class BackendClient {
         return try JSONDecoder().decode(ComplianceEventResult.self, from: data)
     }
 
-    /// Reset the workflow via POST /compliance/reset.
     func resetCompliance() async throws -> ComplianceState {
         let url = baseURL.appendingPathComponent("compliance/reset")
         var request = URLRequest(url: url)
@@ -269,8 +244,6 @@ final class BackendClient {
 
 // MARK: - Ask SPAI
 
-/// Request body for /ask. A proper Codable struct instead of a dictionary
-/// so the JSON keeps its real types (step_index stays an Int).
 struct AskRequest: Codable {
     let question: String
     let station: String
@@ -284,7 +257,6 @@ struct AskRequest: Codable {
     }
 }
 
-/// The /ask response.
 struct AskResponse: Codable {
     let answer: String
     let station: String
@@ -297,8 +269,6 @@ struct AskResponse: Codable {
 }
 
 extension BackendClient {
-    /// Ask the AI trainer a question with full workflow context.
-    /// The station string matches the backend script keys, e.g. "decontamination".
     func ask(_ request: AskRequest) async throws -> AskResponse {
         let url = baseURL.appendingPathComponent("ask")
         var req = URLRequest(url: url)

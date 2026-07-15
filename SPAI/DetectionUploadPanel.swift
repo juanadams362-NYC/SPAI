@@ -2,11 +2,6 @@
 //  DetectionUploadPanel.swift
 //  SPAI
 //
-//  Sim-only launcher. The picker can't live in the immersive space
-//  (PhotosPicker presents a sheet, which visionOS won't show inside an
-//  ImmersiveSpace), so this just opens the upload window and shows the
-//  latest result here.
-//
 
 import SwiftUI
 

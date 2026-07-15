@@ -2,9 +2,6 @@
 //  StatusBarPanel.swift
 //  SPAI
 //
-//  Top HUD status bar: Sterile Node logo, identity, session time, role,
-//  and the session actions — Ask SPAI, Settings, End Session.
-//
 
 import SwiftUI
 internal import Combine
@@ -146,8 +143,6 @@ struct StatusBarPanel: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 }
-
-// MARK: - Sterile Node logo mark
 
 struct SterileNodeMark: View {
     var size: CGFloat = 38
