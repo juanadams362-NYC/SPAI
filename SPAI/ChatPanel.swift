@@ -33,17 +33,19 @@ struct ChatPanel: View {
         .padding(SPAISpacing.l)
         .frame(width: 340, height: 440)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Ask SPAI chat. \(messages.count) messages. Answers are grounded in \(currentStep?.title ?? "no step").")
     }
 
     private var header: some View {
         HStack {
             Text("ASK SPAI")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
                 .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.white.opacity(0.85))
             Spacer()
             Text(currentStep?.title ?? "No step")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(SPAIColor.accent)
         }
     }
@@ -60,10 +62,11 @@ struct ChatPanel: View {
                         HStack {
                             ProgressView().controlSize(.small)
                             Text("thinking…")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white.opacity(0.75))
                             Spacer()
                         }
+                        .accessibilityLabel("Waiting for an answer")
                     }
                 }
             }
@@ -81,20 +84,30 @@ struct ChatPanel: View {
         HStack {
             if message.role == .user { Spacer(minLength: 40) }
             Text(message.text)
-                .font(.system(size: 14))
+                .font(.system(size: 15))
                 .padding(.horizontal, SPAISpacing.m)
                 .padding(.vertical, SPAISpacing.s)
                 .background(bubbleColor(message.role), in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
                 .foregroundStyle(.white)
             if message.role != .user { Spacer(minLength: 40) }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(speakerName(message.role)): \(message.text)")
+    }
+
+    private func speakerName(_ role: ChatMessage.Role) -> String {
+        switch role {
+        case .user:  return "You said"
+        case .spai:  return "SPAI said"
+        case .error: return "Error"
+        }
     }
 
     private func bubbleColor(_ role: ChatMessage.Role) -> Color {
         switch role {
-        case .user:  return SPAIColor.primary.opacity(0.55)
-        case .spai:  return .white.opacity(0.12)
-        case .error: return SPAIColor.critical.opacity(0.4)
+        case .user:  return SPAIColor.primary.opacity(0.6)
+        case .spai:  return .white.opacity(0.18)
+        case .error: return SPAIColor.critical.opacity(0.45)
         }
     }
 
@@ -103,12 +116,15 @@ struct ChatPanel: View {
             TextField("Ask about this step…", text: $draft)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(send)
+                .accessibilityLabel("Question field")
+                .accessibilityHint("Dictate or type a question about the current step")
             Button(action: send) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 26))
             }
             .buttonStyle(.plain)
             .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || isWaiting)
+            .accessibilityLabel("Send question")
         }
     }
 
@@ -118,15 +134,9 @@ struct ChatPanel: View {
         SterileStep(rawValue: appModel.currentStepIndex)
     }
 
+    // Must match the backend script keys exactly or /ask returns 400.
     private var stationKey: String {
-        switch currentStep {
-        case .decontamination: return "decontamination"
-        case .inspection:      return "inspection"
-        case .trayAssembly:    return "tray_assembly"
-        case .packaging:       return "prep_and_pack"
-        case .sealValidation:  return "seal_validation"
-        case nil:              return "decontamination"
-        }
+        currentStep?.backendName ?? "decontamination"
     }
 
     private var detectionSummary: String {

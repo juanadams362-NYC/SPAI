@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("confidenceThreshold") private var confidenceThreshold = 0.25
     @AppStorage("streamingFPS") private var streamingFPS = 5.0
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
+    @AppStorage("speakSteps") private var speakSteps = false
 
     @State private var pushStatus: String?
     private let client = BackendClient()
@@ -19,24 +20,27 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.l) {
             Text("SETTINGS")
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .font(.system(size: 15, weight: .bold, design: .monospaced))
                 .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.white.opacity(0.8))
 
             settingBlock(title: "Backend URL") {
                 TextField( "http://127.0.0.1:8000", text: $backendURL)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 14, design: .monospaced))
+                    .accessibilityLabel("Backend URL")
             }
 
             settingBlock(title: "Confidence threshold: \(String(format: "%.2f", confidenceThreshold))") {
                 Slider(value: $confidenceThreshold, in: 0.05...0.95, step: 0.05)
                     .tint(SPAIColor.primary)
+                    .accessibilityLabel("Confidence threshold")
             }
 
             settingBlock(title: "Streaming FPS: \(Int(streamingFPS))") {
                 Slider(value: $streamingFPS, in: 1...30, step: 1)
                     .tint(SPAIColor.accent)
+                    .accessibilityLabel("Streaming frames per second")
             }
 
             settingBlock(title: "Panel opacity: \(Int(appModel.panelOpacity * 100))%") {
@@ -49,12 +53,23 @@ struct SettingsView: View {
                     step: 0.05
                 )
                 .tint(SPAIColor.secondary)
+                .accessibilityLabel("Panel opacity")
             }
+
+            // Reads each guided step out loud as it comes up. Contamination
+            // alerts speak regardless of this setting.
+            Toggle(isOn: $speakSteps) {
+                Text("Speak step instructions")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.95))
+            }
+            .tint(SPAIColor.primary)
+            .accessibilityHint("Reads each guided step aloud when it appears")
 
             Toggle(isOn: $alwaysShowOnboarding) {
                 Text("Always show onboarding (testing)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.95))
             }
             .tint(SPAIColor.primary)
 
@@ -62,18 +77,19 @@ struct SettingsView: View {
                 Task { await pushThreshold() }
             } label: {
                 Label("Apply to backend", systemImage: "arrow.up.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, SPAISpacing.l)
                     .padding(.vertical, SPAISpacing.s + 2)
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Apply confidence threshold to backend")
 
             if let pushStatus {
                 Text(pushStatus)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.8))
             }
         }
         .padding(SPAISpacing.xl)
@@ -87,8 +103,8 @@ struct SettingsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: SPAISpacing.s) {
             Text(title)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.white.opacity(0.95))
             content()
         }
     }

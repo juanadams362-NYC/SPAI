@@ -24,6 +24,10 @@ struct DetectionPanel: View {
         return .normal
     }
 
+    private var ppeText: String {
+        service.hasResult ? (ppePassing ? "PPE check passing" : "PPE check failed") : "PPE check idle"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             header
@@ -41,29 +45,37 @@ struct DetectionPanel: View {
         .onChange(of: service.contaminationRisk) { old, new in
             if old < 0.5 && new >= 0.5 {
                 SoundManager.shared.playContaminationAlert()
+                // force: a safety alert speaks whether or not the user
+                // turned spoken guidance on.
+                SpeechManager.shared.speak(
+                    "Contamination detected. Bare hand visible. Workflow halted.",
+                    force: true
+                )
                 if !appModel.isHalted {
                     appModel.raiseContamination()
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Detection. Contamination risk \(service.hasResult ? "\(Int(contaminationRisk * 100)) percent" : "not measured"). \(ppeText).")
     }
 
     private var header: some View {
         HStack {
             Text("DETECTION")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
                 .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.white.opacity(0.85))
             Spacer()
             if service.isLoading {
                 Text("…")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.85))
             } else if riskHigh {
                 HStack(spacing: 6) {
                     Circle().fill(SPAIColor.warning).frame(width: 7, height: 7)
                     Text("RISK")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundStyle(SPAIColor.warning)
                 }
             }
@@ -87,17 +99,17 @@ struct DetectionPanel: View {
             } else {
                 Text("—")
                     .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.white.opacity(0.6))
             }
         }
     }
 
     private var environmentSection: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.s) {
-            Text("ENVIRONMENT")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+            Text("ENVIRONMENT (SIMULATED)")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .tracking(1.2)
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.white.opacity(0.75))
             environmentRow(icon: "thermometer.medium", label: "Temperature",
                            value: "\(temperatureF)°F", ok: (68...73).contains(temperatureF))
             environmentRow(icon: "humidity.fill", label: "Humidity",
@@ -105,18 +117,20 @@ struct DetectionPanel: View {
             environmentRow(icon: "wind", label: "Air pressure",
                            value: positivePressure ? "Positive" : "Negative", ok: positivePressure)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Simulated environment. Temperature \(temperatureF) degrees. Humidity \(humidityPct) percent. Air pressure \(positivePressure ? "positive" : "negative").")
     }
 
     private func environmentRow(icon: String, label: String, value: String, ok: Bool) -> some View {
         HStack(spacing: 10) {
             Circle().fill(ok ? SPAIColor.safe : SPAIColor.warning).frame(width: 8, height: 8)
             Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.85))
                 .frame(width: 18)
             Text(label)
                 .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(.white.opacity(0.95))
             Spacer()
             Text(value)
                 .font(.system(size: 14, weight: .medium, design: .monospaced))
@@ -127,20 +141,20 @@ struct DetectionPanel: View {
     private var ppeRow: some View {
         HStack(spacing: 8) {
             Image(systemName: ppePassing ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 14))
+                .font(.system(size: 15))
                 .foregroundStyle(ppePassing ? SPAIColor.safe : SPAIColor.warning)
-            Text(service.hasResult ? (ppePassing ? "PPE check passing" : "PPE check failed") : "PPE check idle")
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.9))
+            Text(ppeText)
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.95))
             Spacer()
             Text("glove · hand")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.7))
         }
     }
 
     private var divider: some View {
-        Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
+        Rectangle().fill(.white.opacity(0.2)).frame(height: 1)
     }
 }
 
@@ -150,4 +164,3 @@ struct DetectionPanel: View {
         .padding(60)
         .background(.black)
 }
-

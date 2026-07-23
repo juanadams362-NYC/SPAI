@@ -2,6 +2,8 @@
 //  SpeechManager.swift
 //  SPAI
 //
+//  Created by Juan Adams on 7/23/26.
+//
 
 import AVFoundation
 import SwiftUI
@@ -13,8 +15,6 @@ final class SpeechManager {
 
     private let synthesizer = AVSpeechSynthesizer()
 
-    // Off by default so nothing starts talking on its own.
-    // Settings flips it, and it sticks between launches.
     var isEnabled: Bool {
         get { UserDefaults.standard.bool(forKey: "speakSteps") }
         set { UserDefaults.standard.set(newValue, forKey: "speakSteps") }
@@ -22,8 +22,6 @@ final class SpeechManager {
 
     private init() {}
 
-    // force = true is for safety alerts. A preference shouldn't be able
-    // to silence a contamination warning.
     func speak(_ text: String, force: Bool = false) {
         guard isEnabled || force else { return }
         stop()

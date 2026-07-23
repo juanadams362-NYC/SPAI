@@ -1,7 +1,6 @@
 //
 //  ActionPanel.swift
 //  SPAI
-//  Created by Juan Adams on 6/7/26.
 //
 
 import SwiftUI
@@ -28,6 +27,8 @@ struct ActionPanel: View {
         .padding(SPAISpacing.s + 4)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Quick actions")
     }
 
     private func actionButton(_ action: QuickAction) -> some View {
@@ -36,12 +37,13 @@ struct ActionPanel: View {
         return HStack(spacing: SPAISpacing.s) {
             if isExpanded {
                 Text(action.label)
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.white)
                     .padding(.horizontal, SPAISpacing.m)
                     .padding(.vertical, SPAISpacing.s)
-                    .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                    .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .accessibilityHidden(true)
             }
 
             Button {
@@ -56,13 +58,17 @@ struct ActionPanel: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(action.tint)
                     .frame(width: 52, height: 52)
-                    .background(action.tint.opacity(0.18), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+                    .background(action.tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
                     .overlay {
                         RoundedRectangle(cornerRadius: SPAIRadius.medium)
-                            .stroke(action.tint.opacity(0.4), lineWidth: 1)
+                            .stroke(action.tint.opacity(0.5), lineWidth: 1)
                     }
             }
             .buttonStyle(.plain)
+            // Icon-only buttons read as nothing to VoiceOver, and this one
+            // needs two taps, so say what each tap does.
+            .accessibilityLabel(action.label)
+            .accessibilityHint(isExpanded ? "Double tap to run" : "Double tap to confirm, then again to run")
         }
     }
 }
