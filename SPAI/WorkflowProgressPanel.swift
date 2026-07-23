@@ -44,7 +44,7 @@ struct WorkflowProgressPanel: View {
     }
 
     // MARK: - Header
-    
+
     private var header: some View {
         HStack {
             Text("WORKFLOW PROGRESS")
@@ -69,9 +69,22 @@ struct WorkflowProgressPanel: View {
 
                 Spacer()
 
-                actionButton("Acknowledge & Resume", icon: "checkmark.shield.fill", tint: SPAIColor.critical) {
-                    appModel.acknowledgeContamination()
+                if appModel.canRunWorkflow {
+                    actionButton("Acknowledge & Resume", icon: "checkmark.shield.fill", tint: SPAIColor.critical) {
+                        appModel.acknowledgeContamination()
+                    }
                 }
+            } else if !appModel.canRunWorkflow {
+                Label("Viewing as \(appModel.role.rawValue) — read only",
+                      systemImage: appModel.role == .observer ? "eye.fill" : "checkmark.seal.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+
+                Spacer()
+
+                Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready: \(currentStep.title)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.5))
             } else {
                 Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
                     .font(.system(size: 14))

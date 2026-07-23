@@ -50,7 +50,7 @@ struct ImmersiveView: View {
             setEnabled("chat", attachments)
             setEnabled("history", attachments)
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
-            attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete
+            attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }

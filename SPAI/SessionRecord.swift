@@ -14,15 +14,33 @@ struct SessionRecord: Codable, Identifiable {
     let contaminationCount: Int
     let durationSeconds: Int
     let events: [String]
+    let role: String
 
     init(id: UUID = UUID(), date: Date = Date(), passed: Bool,
-         contaminationCount: Int, durationSeconds: Int, events: [String]) {
+         contaminationCount: Int, durationSeconds: Int, events: [String],
+         role: String = "Technician") {
         self.id = id
         self.date = date
         self.passed = passed
         self.contaminationCount = contaminationCount
         self.durationSeconds = durationSeconds
         self.events = events
+        self.role = role
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, date, passed, contaminationCount, durationSeconds, events, role
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        date = try c.decode(Date.self, forKey: .date)
+        passed = try c.decode(Bool.self, forKey: .passed)
+        contaminationCount = try c.decode(Int.self, forKey: .contaminationCount)
+        durationSeconds = try c.decode(Int.self, forKey: .durationSeconds)
+        events = try c.decode([String].self, forKey: .events)
+        role = (try? c.decode(String.self, forKey: .role)) ?? "Technician"
     }
 
     var durationText: String {
@@ -45,6 +63,12 @@ final class SessionHistory {
     func add(_ record: SessionRecord) {
         records.insert(record, at: 0)
         save()
+    }
+
+    var passRate: Double {
+        guard !records.isEmpty else { return 0 }
+        let passed = records.filter { $0.passed }.count
+        return Double(passed) / Double(records.count)
     }
 
     private func load() {
