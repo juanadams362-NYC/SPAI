@@ -8,6 +8,7 @@ internal import Combine
 
 struct StatusBarPanel: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(DetectionService.self) private var detectionService
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @Environment(\.openWindow) private var openWindow
 
@@ -21,6 +22,8 @@ struct StatusBarPanel: View {
             sessionTimeBlock
             divider
             roleBlock
+            divider
+            modeBlock
             Spacer()
             controlButtons
         }
@@ -88,6 +91,21 @@ struct StatusBarPanel: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var modeBlock: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(detectionService.mode == .cloud ? SPAIColor.safe :
+                      detectionService.mode == .onDevice ? SPAIColor.warning : SPAIColor.critical)
+                .frame(width: 8, height: 8)
+            Text(detectionService.mode.rawValue.uppercased())
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .padding(.horizontal, SPAISpacing.m)
+        .padding(.vertical, SPAISpacing.s)
+        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
     }
 
     private var controlButtons: some View {
@@ -201,6 +219,7 @@ struct SPAIHexagon: Shape {
 #Preview {
     StatusBarPanel()
         .environment(AppModel())
+        .environment(DetectionService())
         .padding(60)
         .background(.black)
 }
