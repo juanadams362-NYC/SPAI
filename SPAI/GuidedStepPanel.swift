@@ -2,8 +2,6 @@
 //  GuidedStepPanel.swift
 //  SPAI
 //
-//  Created by AVP Student on 7/14/26.
-//
 
 import SwiftUI
 
@@ -20,7 +18,18 @@ struct GuidedStepPanel: View {
     private var step: GuidedStep { script[guidedIndex] }
     private var isLast: Bool { guidedIndex == script.count - 1 }
 
+    private var canVerify: Bool {
+        switch step.condition {
+        case .manual: return false
+        case .glovesOn: return true
+        case .instrumentsPresent, .trayLoaded:
+            return detectionService.mode == .cloud
+        }
+    }
+
     private var satisfied: Bool {
+        if step.condition == .manual { return true }
+        if !canVerify { return true }
         let names = detectionService.detections.map { $0.className.lowercased() }
         switch step.condition {
         case .glovesOn:
@@ -38,12 +47,12 @@ struct GuidedStepPanel: View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             HStack {
                 Text("GUIDED · \(appModel.currentStep.title.uppercased())")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.white.opacity(0.8))
                 Spacer()
                 Text("Step \(guidedIndex + 1) of \(script.count)")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(SPAIColor.accent)
             }
 
@@ -56,8 +65,8 @@ struct GuidedStepPanel: View {
                 Image(systemName: verificationIcon)
                     .foregroundStyle(satisfied ? SPAIColor.safe : SPAIColor.warning)
                 Text(verificationText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.85))
 
                 Spacer()
 
@@ -70,7 +79,7 @@ struct GuidedStepPanel: View {
                 } label: {
                     Label(isLast ? "Finish Station" : "Next Step",
                           systemImage: isLast ? "checkmark.seal" : "arrow.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, SPAISpacing.m)
                         .padding(.vertical, SPAISpacing.s)
@@ -79,6 +88,8 @@ struct GuidedStepPanel: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!satisfied)
+                .accessibilityLabel(isLast ? "Finish station" : "Next step")
+                .accessibilityHint(satisfied ? "Ready" : "Waiting for detection to confirm this step")
             }
         }
         .padding(SPAISpacing.l)
@@ -86,15 +97,30 @@ struct GuidedStepPanel: View {
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.25), value: appModel.guidedStepIndex)
+        // Read the step out loud. Hands are busy holding instruments, so
+        // hearing it beats reading a floating panel.
+        .onAppear {
+            SpeechManager.shared.speak(step.instruction)
+        }
+        .onChange(of: appModel.guidedStepIndex) { _, _ in
+            SpeechManager.shared.speak(step.instruction)
+        }
+        .onChange(of: appModel.currentStepIndex) { _, _ in
+            SpeechManager.shared.speak(step.instruction)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Guided step \(guidedIndex + 1) of \(script.count), \(appModel.currentStep.title). \(step.instruction) \(verificationText)")
     }
 
     private var verificationIcon: String {
         if step.condition == .manual { return "hand.tap.fill" }
+        if !canVerify { return "icloud.slash" }
         return satisfied ? "checkmark.circle.fill" : "viewfinder.circle"
     }
 
     private var verificationText: String {
         if step.condition == .manual { return "Confirm when done" }
+        if !canVerify { return "Can't verify offline — confirm manually" }
         return satisfied ? "Verified by detection" : "Waiting for detection…"
     }
 }
@@ -102,6 +128,7 @@ struct GuidedStepPanel: View {
 #Preview {
     GuidedStepPanel()
         .environment(AppModel())
+        .environment(DetectionService())
         .padding(60)
         .background(.black)
 }

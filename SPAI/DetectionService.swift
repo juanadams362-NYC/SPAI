@@ -6,12 +6,21 @@
 import SwiftUI
 import UIKit
 
+enum DetectionMode: String {
+    case cloud = "Cloud"
+    case onDevice = "On-Device"
+    case offline = "Offline"
+}
+
 @MainActor
 @Observable
 final class DetectionService {
     private let client = BackendClient()
+    private let onDevice = OnDeviceDetector()
 
     private let instrumentSteps: Set<SterileStep> = [.decontamination, .inspection, .trayAssembly]
+
+    var mode: DetectionMode = .cloud
 
     var trayState: String?
     var instrumentCount: Int?
@@ -60,15 +69,26 @@ final class DetectionService {
                     trayState = tray.trayState
                     instrumentCount = tray.instrumentCount
                 }
-                print("[DetectionService] instruments: \(tray.detections.count) found, verdict shown: \(wantTrayVerdict)")
             }
 
             detections = merged
             hasResult = true
-            print("[DetectionService] step=\(step?.title ?? "none"), \(merged.count) detections, \(ppe.inferenceTimeMs)ms, mode=\(ppe.mode)")
+            mode = .cloud
+            print("[DetectionService] cloud: step=\(step?.title ?? "none"), \(merged.count) detections, \(ppe.inferenceTimeMs)ms")
         } catch {
-            errorMessage = "Detection failed: \(error.localizedDescription)"
-            print("[DetectionService] error: \(error)")
+            print("[DetectionService] cloud failed (\(error.localizedDescription)) — trying on-device")
+
+            if onDevice.isAvailable {
+                let local = await onDevice.detect(image: image)
+                detections = local
+                hasResult = true
+                mode = .onDevice
+                print("[DetectionService] on-device: \(local.count) detections")
+            } else {
+                mode = .offline
+                errorMessage = "Detection unavailable — no backend and no on-device model."
+                print("[DetectionService] fully offline")
+            }
         }
         isLoading = false
     }

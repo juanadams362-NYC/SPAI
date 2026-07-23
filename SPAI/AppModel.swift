@@ -102,7 +102,23 @@ class AppModel {
         }
     }
 
-    var role: TechRole = .technician
+    var role: TechRole = .technician {
+        didSet {
+            guard role != oldValue else { return }
+            log("Role changed to \(role.rawValue)", kind: .info)
+            if role == .observer || role == .supervisor {
+                panelVisibility["history"] = true
+            }
+            if isReadOnly && stepStarted {
+                resetWorkflow()
+            }
+        }
+    }
+
+    // MARK: - Role permissions
+
+    var canRunWorkflow: Bool { role == .technician || role == .trainee }
+    var isReadOnly: Bool { role == .supervisor || role == .observer }
 
     var panelModes: [String: PanelMode] = [:]
     func mode(for panelID: String) -> PanelMode { panelModes[panelID] ?? .fixed }
@@ -141,6 +157,7 @@ class AppModel {
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
 
     func startStep() {
+        guard canRunWorkflow else { return }
         let step = currentStep
         stepStarted = true
         guidedStepIndex = 0
@@ -148,12 +165,16 @@ class AppModel {
         Task {
             let result = try? await client.sendComplianceEvent("start_step", step: step.backendName)
             if let result, !result.accepted {
-                await MainActor.run { log("Backend rejected start: \(result.message)", kind: .warning) }
+                await MainActor.run {
+                    stepStarted = false
+                    log("Backend rejected start: \(result.message)", kind: .warning)
+                }
             }
         }
     }
 
     func completeStep() {
+        guard canRunWorkflow else { return }
         let completed = currentStep
         Task {
             let result = try? await client.sendComplianceEvent("complete_step", step: completed.backendName)
@@ -168,14 +189,13 @@ class AppModel {
                 } else {
                     log("Completed \(completed.title) — workflow complete", kind: .success)
                     sessionComplete = true
-                    log("Completed \(completed.title) — workflow complete", kind: .success)
-                                        sessionComplete = true
-                                        history.add(SessionRecord(
-                                            passed: contaminationCount == 0,
-                                            contaminationCount: contaminationCount,
-                                            durationSeconds: Int(Date().timeIntervalSince(sessionStart)),
-                                            events: eventLog.map { "\($0.timestamp)  \($0.message)" }
-                                        ))
+                    history.add(SessionRecord(
+                        passed: contaminationCount == 0,
+                        contaminationCount: contaminationCount,
+                        durationSeconds: Int(Date().timeIntervalSince(sessionStart)),
+                        events: eventLog.map { "\($0.timestamp)  \($0.message)" },
+                        role: role.rawValue
+                    ))
                 }
                 stepStarted = false
                 guidedStepIndex = 0
@@ -184,6 +204,7 @@ class AppModel {
     }
 
     func failStep() {
+        guard canRunWorkflow else { return }
         let failed = currentStep
         currentStepIndex = 0
         stepStarted = false
@@ -201,12 +222,14 @@ class AppModel {
     }
 
     func acknowledgeContamination() {
+        guard canRunWorkflow else { return }
         isHalted = false
         log("Contamination acknowledged — workflow resumed", kind: .info)
         Task { _ = try? await client.sendComplianceEvent("acknowledge") }
     }
 
     func redoStep() {
+        guard canRunWorkflow else { return }
         let step = currentStep
         stepStarted = false
         guidedStepIndex = 0

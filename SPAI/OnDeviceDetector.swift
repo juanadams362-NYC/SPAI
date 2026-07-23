@@ -5,16 +5,6 @@
 //  Created by Juan Adams on 7/23/26.
 //
 
-
-//
-//  OnDeviceDetector.swift
-//  SPAI
-//
-//  Runs the PPE model directly on the device using Core ML + Vision.
-//  Same trained weights as the backend, different container — this is
-//  the fallback when the cloud is unreachable. No network, no Python.
-//
-
 import Vision
 import CoreML
 import UIKit
@@ -23,8 +13,6 @@ final class OnDeviceDetector {
     private let visionModel: VNCoreMLModel?
 
     init() {
-        // Load once. If the model file is missing the detector just
-        // reports unavailable instead of crashing the app.
         if let model = try? best(configuration: MLModelConfiguration()).model,
            let vnModel = try? VNCoreMLModel(for: model) {
             self.visionModel = vnModel
@@ -36,8 +24,6 @@ final class OnDeviceDetector {
 
     var isAvailable: Bool { visionModel != nil }
 
-    /// Run detection on-device. Returns the same BackendDetection shape
-    /// the cloud returns, so everything downstream works unchanged.
     func detect(image: UIImage) async -> [BackendDetection] {
         guard let visionModel, let cgImage = image.cgImage else { return [] }
 
@@ -54,10 +40,7 @@ final class OnDeviceDetector {
 
                 let detections = observations.compactMap { obs -> BackendDetection? in
                     guard let label = obs.labels.first else { return nil }
-                    // Vision boxes are normalized 0-1 with origin at
-                    // BOTTOM-left. Backend boxes are pixels, TOP-left
-                    // origin. Flip the y and scale to pixels so both
-                    // paths produce identical data.
+                    guard label.confidence >= 0.5 else { return nil }
                     let box = obs.boundingBox
                     let x1 = Int(box.minX * width)
                     let y1 = Int((1 - box.maxY) * height)
@@ -73,7 +56,7 @@ final class OnDeviceDetector {
                 }
                 continuation.resume(returning: detections)
             }
-            request.imageCropAndScaleOption = .scaleFill
+            request.imageCropAndScaleOption = .scaleFit
 
             let handler = VNImageRequestHandler(cgImage: cgImage)
             try? handler.perform([request])
