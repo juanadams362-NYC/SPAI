@@ -90,3 +90,4 @@ datasets/
 # their internals, which silently kept the real model out of the repo.
 !SPAI/best.mlpackage/
 !SPAI/best.mlpackage/**
+backend/model/*.mlpackage/
