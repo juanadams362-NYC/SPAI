@@ -8,6 +8,21 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import AVKit
+import UniformTypeIdentifiers
+
+struct PickedMovie: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .movie) { received in
+            let dest = FileManager.default.temporaryDirectory
+                .appendingPathComponent("spai_\(UUID().uuidString).mov")
+            try FileManager.default.copyItem(at: received.file, to: dest)
+            return PickedMovie(url: dest)
+        }
+    }
+}
 
 struct UploadWindowView: View {
     @Environment(DetectionService.self) private var service
@@ -16,19 +31,26 @@ struct UploadWindowView: View {
 
     @State private var selectedItem: PhotosPickerItem?
     @State private var image: UIImage?
+    @State private var videoURL: URL?
+    @State private var videoDuration: Double = 0
+    @State private var loadError: String?
+    @State private var isLoadingMedia = false
 
     var body: some View {
         VStack(spacing: SPAISpacing.m) {
             header
 
-            if let image {
+            if let videoURL {
+                videoPreview(videoURL)
+            } else if let image {
                 imageWithBoxes(image)
             } else {
                 placeholder
             }
 
-            PhotosPicker(selection: $selectedItem, matching: .images) {
-                Label(image == nil ? "Choose image" : "Choose another",
+            PhotosPicker(selection: $selectedItem,
+                         matching: .any(of: [.images, .videos])) {
+                Label(hasMedia ? "Choose another" : "Choose image or video",
                       systemImage: "photo.badge.plus")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
@@ -36,8 +58,17 @@ struct UploadWindowView: View {
             }
             .buttonStyle(.borderedProminent)
 
-            if service.isLoading {
+            if isLoadingMedia {
+                ProgressView("Loading media…")
+            } else if let loadError {
+                Text(loadError)
+                    .font(.footnote)
+                    .foregroundStyle(SPAIColor.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if service.isLoading {
                 ProgressView("Detecting…")
+            } else if videoURL != nil {
+                videoSummary
             } else if service.hasResult {
                 resultSummary
             } else if let error = service.errorMessage {
@@ -49,14 +80,60 @@ struct UploadWindowView: View {
         .padding(SPAISpacing.l)
         .onChange(of: selectedItem) { _, newItem in
             guard let newItem else { return }
-            Task {
-                if let data = try? await newItem.loadTransferable(type: Data.self),
-                   let ui = UIImage(data: data) {
-                    image = ui
-                    await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
-                }
-            }
+            Task { await load(newItem) }
         }
+    }
+
+    private var hasMedia: Bool { image != nil || videoURL != nil }
+
+    private func load(_ item: PhotosPickerItem) async {
+        loadError = nil
+        isLoadingMedia = true
+        defer { isLoadingMedia = false }
+
+        let isVideo = item.supportedContentTypes.contains { $0.conforms(to: .movie) }
+        print("[Upload] picked item, types: \(item.supportedContentTypes.map(\.identifier)), isVideo: \(isVideo)")
+
+        if isVideo {
+            do {
+                guard let movie = try await item.loadTransferable(type: PickedMovie.self) else {
+                    loadError = "Video came back empty. If it's stored in iCloud it may still be downloading."
+                    print("[Upload] movie transferable was nil")
+                    return
+                }
+                image = nil
+                videoURL = movie.url
+                videoDuration = await duration(of: movie.url)
+                print("[Upload] video loaded: \(movie.url.lastPathComponent), \(videoDuration)s")
+            } catch {
+                loadError = "Couldn't load that video: \(error.localizedDescription)"
+                print("[Upload] video load failed: \(error)")
+            }
+            return
+        }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let ui = UIImage(data: data) else {
+                loadError = "Couldn't read that image."
+                print("[Upload] image data was nil or undecodable")
+                return
+            }
+            videoURL = nil
+            videoDuration = 0
+            image = ui
+            await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
+        } catch {
+            loadError = "Couldn't load that image: \(error.localizedDescription)"
+            print("[Upload] image load failed: \(error)")
+        }
+    }
+
+    private func duration(of url: URL) async -> Double {
+        let asset = AVURLAsset(url: url)
+        guard let seconds = try? await asset.load(.duration).seconds,
+              seconds.isFinite else { return 0 }
+        return seconds
     }
 
     private var header: some View {
@@ -82,10 +159,34 @@ struct UploadWindowView: View {
             .overlay {
                 VStack(spacing: 8) {
                     Image(systemName: "photo.on.rectangle.angled").font(.system(size: 40))
-                    Text("Choose an image to run detection")
+                    Text("Choose an image or video to run detection")
                 }
                 .foregroundStyle(.secondary)
             }
+    }
+
+    private func videoPreview(_ url: URL) -> some View {
+        VideoPlayer(player: AVPlayer(url: url))
+            .frame(height: 260)
+            .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
+    }
+
+    private var videoSummary: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.xs) {
+            HStack(spacing: 8) {
+                Image(systemName: "film")
+                Text("Video loaded")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(String(format: "%.1fs", videoDuration))
+                    .font(.subheadline.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            Text("Frame-by-frame detection comes next.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func imageWithBoxes(_ uiImage: UIImage) -> some View {
@@ -163,4 +264,3 @@ struct UploadWindowView: View {
         }
     }
 }
-
