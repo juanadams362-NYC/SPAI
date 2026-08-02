@@ -29,6 +29,8 @@ struct UploadWindowView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismissWindow) private var dismissWindow
 
+    @State private var videoService = VideoFrameService()
+    @State private var player: AVPlayer?
     @State private var selectedItem: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var videoURL: URL?
@@ -82,6 +84,7 @@ struct UploadWindowView: View {
             guard let newItem else { return }
             Task { await load(newItem) }
         }
+        .onDisappear { videoService.stop() }
     }
 
     private var hasMedia: Bool { image != nil || videoURL != nil }
@@ -128,6 +131,20 @@ struct UploadWindowView: View {
             print("[Upload] image load failed: \(error)")
         }
     }
+ 
+        private func runVideo() {
+            guard let videoURL else { return }
+            if player == nil { player = AVPlayer(url: videoURL) }
+            guard let player else { return }
+
+            videoService.onFrame = { frame in
+                await service.detect(image: frame, step: SterileStep(rawValue: appModel.currentStepIndex))
+            }
+            player.isMuted = true
+            Task {
+                await videoService.start(url: videoURL, player: player, interval: 1.0)
+            }
+        }
 
     private func duration(of url: URL) async -> Double {
         let asset = AVURLAsset(url: url)
@@ -166,28 +183,56 @@ struct UploadWindowView: View {
     }
 
     private func videoPreview(_ url: URL) -> some View {
-        VideoPlayer(player: AVPlayer(url: url))
-            .frame(height: 260)
-            .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
-    }
+            VideoPlayer(player: player)
+                .frame(height: 260)
+                .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
+                .onAppear {
+                    if player == nil { player = AVPlayer(url: url) }
+                }
+        }
 
     private var videoSummary: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.xs) {
-            HStack(spacing: 8) {
-                Image(systemName: "film")
-                Text("Video loaded")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(String(format: "%.1fs", videoDuration))
-                    .font(.subheadline.monospaced())
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: SPAISpacing.s) {
+                HStack(spacing: 8) {
+                    Image(systemName: "film")
+                    Text("Video loaded")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(String(format: "%.1fs", videoDuration))
+                        .font(.subheadline.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+
+                if videoService.isRunning {
+                    HStack(spacing: SPAISpacing.m) {
+                        ProgressView().controlSize(.small)
+                        Text(String(format: "%.1fs · %d frames", videoService.currentTime, videoService.framesProcessed))
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Stop") { videoService.stop() }
+                            .buttonStyle(.bordered)
+                    }
+                } else {
+                    Button {
+                        runVideo()
+                    } label: {
+                        Label("Run detection on video", systemImage: "play.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    if videoService.framesProcessed > 0 {
+                        Text("\(videoService.framesProcessed) frames processed. Watch the detection and workflow panels.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            Text("Frame-by-frame detection comes next.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 
     private func imageWithBoxes(_ uiImage: UIImage) -> some View {
         GeometryReader { geo in

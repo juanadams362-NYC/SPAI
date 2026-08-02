@@ -18,7 +18,7 @@ struct DetectionUploadPanel: View {
                 .foregroundStyle(.white.opacity(0.5))
 
             Button { openWindow(id: "upload") } label: {
-                Label("Upload test image", systemImage: "photo.badge.plus")
+                Label("Upload test media", systemImage: "photo.badge.plus")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
