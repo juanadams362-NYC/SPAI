@@ -155,6 +155,12 @@ class AppModel {
     var contaminationCount: Int = 0
     var guidedStepIndex: Int = 0
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
+    var shouldHaltOnBareHand: Bool {
+        guard stepStarted else { return false }
+        let script = StationScripts.script(for: currentStep)
+        let idx = min(max(guidedStepIndex, 0), script.count - 1)
+        return script[idx].condition != .glovesOn
+    }
 
     func startStep() {
         guard canRunWorkflow else { return }
