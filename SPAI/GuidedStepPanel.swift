@@ -74,7 +74,7 @@ struct GuidedStepPanel: View {
                     if isLast {
                         appModel.completeStep()
                     } else {
-                        appModel.guidedStepIndex += 1
+                        appModel.advanceGuidedStep()
                     }
                 } label: {
                     Label(isLast ? "Finish Station" : "Next Step",
@@ -97,17 +97,6 @@ struct GuidedStepPanel: View {
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.25), value: appModel.guidedStepIndex)
-        // Read the step out loud. Hands are busy holding instruments, so
-        // hearing it beats reading a floating panel.
-        .onAppear {
-            SpeechManager.shared.speak(step.instruction)
-        }
-        .onChange(of: appModel.guidedStepIndex) { _, _ in
-            SpeechManager.shared.speak(step.instruction)
-        }
-        .onChange(of: appModel.currentStepIndex) { _, _ in
-            SpeechManager.shared.speak(step.instruction)
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Guided step \(guidedIndex + 1) of \(script.count), \(appModel.currentStep.title). \(step.instruction) \(verificationText)")
     }

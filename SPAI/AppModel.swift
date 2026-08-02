@@ -155,11 +155,28 @@ class AppModel {
     var contaminationCount: Int = 0
     var guidedStepIndex: Int = 0
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
+
     var shouldHaltOnBareHand: Bool {
         guard stepStarted else { return false }
         let script = StationScripts.script(for: currentStep)
         let idx = min(max(guidedStepIndex, 0), script.count - 1)
         return script[idx].condition != .glovesOn
+    }
+
+    // MARK: - Guided step speech
+
+    private func speakCurrentGuidedStep() {
+        let script = StationScripts.script(for: currentStep)
+        guard !script.isEmpty else { return }
+        let idx = min(max(guidedStepIndex, 0), script.count - 1)
+        SpeechManager.shared.speak(script[idx].instruction)
+    }
+
+    func advanceGuidedStep() {
+        let script = StationScripts.script(for: currentStep)
+        guard guidedStepIndex < script.count - 1 else { return }
+        guidedStepIndex += 1
+        speakCurrentGuidedStep()
     }
 
     func startStep() {
@@ -168,11 +185,13 @@ class AppModel {
         stepStarted = true
         guidedStepIndex = 0
         log("Started \(step.title)", kind: .info)
+        speakCurrentGuidedStep()
         Task {
             let result = try? await client.sendComplianceEvent("start_step", step: step.backendName)
             if let result, !result.accepted {
                 await MainActor.run {
                     stepStarted = false
+                    SpeechManager.shared.stop()
                     log("Backend rejected start: \(result.message)", kind: .warning)
                 }
             }
@@ -205,6 +224,7 @@ class AppModel {
                 }
                 stepStarted = false
                 guidedStepIndex = 0
+                SpeechManager.shared.stop()
             }
         }
     }
@@ -216,6 +236,7 @@ class AppModel {
         stepStarted = false
         guidedStepIndex = 0
         isHalted = false
+        SpeechManager.shared.stop()
         log("Failed \(failed.title) — tray sent back to Decontamination", kind: .warning)
         Task { _ = try? await client.resetCompliance() }
     }
@@ -239,10 +260,12 @@ class AppModel {
         let step = currentStep
         stepStarted = false
         guidedStepIndex = 0
+        SpeechManager.shared.stop()
         log("Redo \(step.title)", kind: .info)
     }
 
     func resetWorkflow() {
+        SpeechManager.shared.stop()
         currentStepIndex = 0
         stepStarted = false
         guidedStepIndex = 0

@@ -22,15 +22,35 @@ final class SpeechManager {
 
     private init() {}
 
-    func speak(_ text: String, force: Bool = false) {
-        guard isEnabled || force else { return }
-        stop()
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = 0.48
-        utterance.pitchMultiplier = 1.0
-        utterance.volume = 1.0
-        synthesizer.speak(utterance)
-    }
+    private static let preferredVoice: AVSpeechSynthesisVoice? = bestEnglishVoice()
+
+        func speak(_ text: String, force: Bool = false) {
+            guard isEnabled || force else { return }
+            stop()
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.voice = Self.preferredVoice
+            utterance.rate = 0.46
+            utterance.pitchMultiplier = 0.98
+            utterance.volume = 1.0
+            utterance.preUtteranceDelay = 0.1
+            synthesizer.speak(utterance)
+        }
+
+        private static func bestEnglishVoice() -> AVSpeechSynthesisVoice? {
+            let english = AVSpeechSynthesisVoice.speechVoices()
+                .filter { $0.language.hasPrefix("en") }
+
+            if let premium = english.first(where: { $0.quality == .premium }) {
+                print("[Speech] using premium voice: \(premium.name)")
+                return premium
+            }
+            if let enhanced = english.first(where: { $0.quality == .enhanced }) {
+                print("[Speech] using enhanced voice: \(enhanced.name)")
+                return enhanced
+            }
+            print("[Speech] falling back to default voice")
+            return AVSpeechSynthesisVoice(language: "en-US")
+        }
 
     func stop() {
         if synthesizer.isSpeaking {
