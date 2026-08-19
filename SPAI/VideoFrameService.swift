@@ -17,9 +17,15 @@ final class VideoFrameService {
     private var timer: Timer?
     private var isDetecting = false
     private var duration: Double = 0
+    private var sampleInterval: Double = 1.0
+    private var lastFingerprint: [UInt8]?
+    private var isPausedForContamination = false
+
+    private let maxProcessedFrames = 100
 
     var isRunning = false
     var framesProcessed = 0
+    var framesSkipped = 0
     var currentTime: Double = 0
 
     var onFrame: ((UIImage) async -> Void)?
@@ -31,6 +37,9 @@ final class VideoFrameService {
         let asset = AVURLAsset(url: url)
         duration = (try? await asset.load(.duration).seconds) ?? 0
         if !duration.isFinite { duration = 0 }
+        sampleInterval = duration > 0
+            ? max(duration / Double(maxProcessedFrames), 0.1)
+            : interval
         print("[VideoFrameService] duration from asset: \(duration)s")
 
         let gen = AVAssetImageGenerator(asset: asset)
@@ -41,14 +50,15 @@ final class VideoFrameService {
         generator = gen
 
         framesProcessed = 0
+        framesSkipped = 0
         currentTime = 0
+        lastFingerprint = nil
+        isPausedForContamination = false
         isRunning = true
         await player.seek(to: .zero)
         player.play()
 
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in await self?.sample() }
-        }
+        scheduleTimer()
     }
 
     func stop() {
@@ -56,6 +66,30 @@ final class VideoFrameService {
         timer = nil
         player?.pause()
         isRunning = false
+        isPausedForContamination = false
+        lastFingerprint = nil
+    }
+
+    func pauseForContamination() {
+        guard isRunning, !isPausedForContamination else { return }
+        timer?.invalidate()
+        timer = nil
+        player?.pause()
+        isPausedForContamination = true
+    }
+
+    func resumeAfterContamination() {
+        guard isRunning, isPausedForContamination else { return }
+        isPausedForContamination = false
+        player?.play()
+        scheduleTimer()
+    }
+
+    private func scheduleTimer() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: sampleInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.sample() }
+        }
     }
 
     private var effectiveDuration: Double {
@@ -67,6 +101,7 @@ final class VideoFrameService {
     private func sample() async {
         guard let player, let generator else { return }
         guard !isDetecting else { return }
+        guard !isPausedForContamination else { return }
 
         let time = player.currentTime()
         currentTime = time.seconds.isFinite ? time.seconds : 0
@@ -78,7 +113,7 @@ final class VideoFrameService {
             return
         }
 
-        if framesProcessed >= 200 {
+        if framesProcessed >= maxProcessedFrames {
             print("[VideoFrameService] frame backstop hit, stopping")
             stop()
             return
@@ -90,10 +125,52 @@ final class VideoFrameService {
         do {
             let cgImage = try await generator.image(at: time).image
             let frame = UIImage(cgImage: cgImage)
+            guard shouldProcess(frame) else {
+                framesSkipped += 1
+                return
+            }
             framesProcessed += 1
             await onFrame?(frame)
         } catch {
             print("[VideoFrameService] frame grab failed at \(currentTime)s: \(error)")
         }
+    }
+
+    private func shouldProcess(_ image: UIImage) -> Bool {
+        guard let fingerprint = fingerprint(for: image) else { return true }
+        defer { lastFingerprint = fingerprint }
+
+        guard let lastFingerprint, lastFingerprint.count == fingerprint.count else {
+            return true
+        }
+
+        let totalDelta = zip(lastFingerprint, fingerprint).reduce(0) { sum, pair in
+            sum + abs(Int(pair.0) - Int(pair.1))
+        }
+        let averageDelta = Double(totalDelta) / Double(fingerprint.count)
+        return averageDelta >= 4
+    }
+
+    private func fingerprint(for image: UIImage) -> [UInt8]? {
+        guard let cgImage = image.cgImage else { return nil }
+
+        let width = 8
+        let height = 8
+        var pixels = [UInt8](repeating: 0, count: width * height)
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else {
+            return nil
+        }
+
+        context.interpolationQuality = .low
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return pixels
     }
 }

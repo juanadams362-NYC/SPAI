@@ -144,6 +144,17 @@ class AppModel {
         log("Entered \(name) station", kind: .info)
     }
 
+    func logVideoDetectionTransition(_ state: String, at seconds: Double) {
+        let timestamp = Self.videoTimestamp(seconds)
+        let kind: LogEvent.Kind = state == "bare hand" ? .warning : .info
+        log("Video: \(state) at \(timestamp)", kind: kind)
+    }
+
+    private static func videoTimestamp(_ seconds: Double) -> String {
+        let totalSeconds = max(Int(seconds.rounded()), 0)
+        return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+
     // MARK: - Workflow state
 
     var currentStepIndex: Int = 0

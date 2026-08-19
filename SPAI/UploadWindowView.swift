@@ -37,6 +37,7 @@ struct UploadWindowView: View {
     @State private var videoDuration: Double = 0
     @State private var loadError: String?
     @State private var isLoadingMedia = false
+    @State private var lastVideoDetectionState: String?
 
     var body: some View {
         VStack(spacing: SPAISpacing.m) {
@@ -84,6 +85,13 @@ struct UploadWindowView: View {
             guard let newItem else { return }
             Task { await load(newItem) }
         }
+        .onChange(of: appModel.isHalted) { _, isHalted in
+            if isHalted {
+                videoService.pauseForContamination()
+            } else {
+                videoService.resumeAfterContamination()
+            }
+        }
         .onDisappear { videoService.stop() }
     }
 
@@ -107,6 +115,7 @@ struct UploadWindowView: View {
                 image = nil
                 videoURL = movie.url
                 videoDuration = await duration(of: movie.url)
+                lastVideoDetectionState = nil
                 print("[Upload] video loaded: \(movie.url.lastPathComponent), \(videoDuration)s")
             } catch {
                 loadError = "Couldn't load that video: \(error.localizedDescription)"
@@ -125,6 +134,7 @@ struct UploadWindowView: View {
             videoURL = nil
             videoDuration = 0
             image = ui
+            lastVideoDetectionState = nil
             await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
         } catch {
             loadError = "Couldn't load that image: \(error.localizedDescription)"
@@ -136,9 +146,15 @@ struct UploadWindowView: View {
             guard let videoURL else { return }
             if player == nil { player = AVPlayer(url: videoURL) }
             guard let player else { return }
+            lastVideoDetectionState = nil
 
             videoService.onFrame = { frame in
-                await service.detect(image: frame, step: SterileStep(rawValue: appModel.currentStepIndex))
+                await service.detect(
+                    image: frame,
+                    step: SterileStep(rawValue: appModel.currentStepIndex),
+                    preferOnDevice: shouldPreferOnDeviceForVideo
+                )
+                logVideoDetectionTransitionIfNeeded()
             }
             player.isMuted = true
             Task {
@@ -206,7 +222,7 @@ struct UploadWindowView: View {
                 if videoService.isRunning {
                     HStack(spacing: SPAISpacing.m) {
                         ProgressView().controlSize(.small)
-                        Text(String(format: "%.1fs · %d frames", videoService.currentTime, videoService.framesProcessed))
+                        Text(String(format: "%.1fs · %d frames · %d skipped", videoService.currentTime, videoService.framesProcessed, videoService.framesSkipped))
                             .font(.footnote.monospaced())
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -225,7 +241,7 @@ struct UploadWindowView: View {
                     .buttonStyle(.borderedProminent)
 
                     if videoService.framesProcessed > 0 {
-                        Text("\(videoService.framesProcessed) frames processed. Watch the detection and workflow panels.")
+                        Text("\(videoService.framesProcessed) frames processed, \(videoService.framesSkipped) skipped. Watch the detection and workflow panels.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -233,6 +249,32 @@ struct UploadWindowView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+
+    private var shouldPreferOnDeviceForVideo: Bool {
+        videoDuration >= 60
+    }
+
+    private func logVideoDetectionTransitionIfNeeded() {
+        let state = currentVideoDetectionState
+        guard state != lastVideoDetectionState else { return }
+        lastVideoDetectionState = state
+        appModel.logVideoDetectionTransition(state, at: videoService.currentTime)
+    }
+
+    private var currentVideoDetectionState: String {
+        let hasHand = service.detections.contains {
+            DetectionService.isHandClass($0.className)
+        }
+        let hasGlove = service.detections.contains {
+            DetectionService.isGloveClass($0.className)
+        }
+
+        if hasHand && !hasGlove { return "bare hand" }
+        if hasGlove && !hasHand { return "gloves on" }
+        if service.trayState == "loaded" { return "tray loaded" }
+        if service.hasInstrumentDetection { return "instruments visible" }
+        return "no detection"
+    }
 
     private func imageWithBoxes(_ uiImage: UIImage) -> some View {
         GeometryReader { geo in

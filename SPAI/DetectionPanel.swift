@@ -43,7 +43,7 @@ struct DetectionPanel: View {
         .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.4), value: riskHigh)
         .onChange(of: service.contaminationRisk) { old, new in
-            if old < 0.5 && new >= 0.5 {
+            if old < 0.5 && new >= 0.5 && appModel.shouldHaltOnBareHand {
                 SoundManager.shared.playContaminationAlert()
                 // force: a safety alert speaks whether or not the user
                 // turned spoken guidance on.
