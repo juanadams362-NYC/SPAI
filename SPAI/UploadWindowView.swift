@@ -38,6 +38,7 @@ struct UploadWindowView: View {
     @State private var loadError: String?
     @State private var isLoadingMedia = false
     @State private var lastVideoDetectionState: String?
+    @State private var isFileImporterPresented = false
 
     var body: some View {
         VStack(spacing: SPAISpacing.m) {
@@ -60,6 +61,16 @@ struct UploadWindowView: View {
                     .padding(.vertical, 8)
             }
             .buttonStyle(.borderedProminent)
+
+            Button {
+                isFileImporterPresented = true
+            } label: {
+                Label("Import from Files", systemImage: "folder.badge.plus")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.bordered)
 
             if isLoadingMedia {
                 ProgressView("Loading media…")
@@ -93,6 +104,16 @@ struct UploadWindowView: View {
             }
         }
         .onDisappear { videoService.stop() }
+        .fileImporter(isPresented: $isFileImporterPresented, allowedContentTypes: [.image, .movie], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                Task { await loadFromFileURL(url) }
+            case .failure(let error):
+                loadError = "Couldn't import file: \(error.localizedDescription)"
+                print("[Upload] file import failed: \(error)")
+            }
+        }
     }
 
     private var hasMedia: Bool { image != nil || videoURL != nil }
@@ -141,26 +162,102 @@ struct UploadWindowView: View {
             print("[Upload] image load failed: \(error)")
         }
     }
- 
-        private func runVideo() {
-            guard let videoURL else { return }
-            if player == nil { player = AVPlayer(url: videoURL) }
-            guard let player else { return }
-            lastVideoDetectionState = nil
 
-            videoService.onFrame = { frame in
-                await service.detect(
-                    image: frame,
-                    step: SterileStep(rawValue: appModel.currentStepIndex),
-                    preferOnDevice: shouldPreferOnDeviceForVideo
-                )
-                logVideoDetectionTransitionIfNeeded()
+    private func loadFromFileURL(_ url: URL) async {
+        loadError = nil
+        isLoadingMedia = true
+        defer { isLoadingMedia = false }
+
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+
+        let ext = url.pathExtension
+        let type = UTType(filenameExtension: ext)
+
+        do {
+            if type?.conforms(to: .movie) == true {
+                let destExt = ext.isEmpty ? "mov" : ext
+                let dest = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("spai_\(UUID().uuidString)")
+                    .appendingPathExtension(destExt)
+                if FileManager.default.fileExists(atPath: dest.path) {
+                    try? FileManager.default.removeItem(at: dest)
+                }
+                try FileManager.default.copyItem(at: url, to: dest)
+
+                image = nil
+                videoURL = dest
+                videoDuration = await duration(of: dest)
+                lastVideoDetectionState = nil
+                print("[Upload] video imported: \(dest.lastPathComponent), \(videoDuration)s")
+                return
             }
-            player.isMuted = true
-            Task {
-                await videoService.start(url: videoURL, player: player, interval: 1.0)
+
+            if type?.conforms(to: .image) == true {
+                let data = try Data(contentsOf: url)
+                guard let ui = UIImage(data: data) else {
+                    loadError = "Couldn't read that image."
+                    print("[Upload] file image data undecodable: \(url)")
+                    return
+                }
+                videoURL = nil
+                videoDuration = 0
+                image = ui
+                lastVideoDetectionState = nil
+                await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
+                print("[Upload] image imported: \(url.lastPathComponent)")
+                return
             }
+
+            // Fallback: try image first, then treat as video
+            if let data = try? Data(contentsOf: url), let ui = UIImage(data: data) {
+                videoURL = nil
+                videoDuration = 0
+                image = ui
+                lastVideoDetectionState = nil
+                await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
+                print("[Upload] image imported via fallback: \(url.lastPathComponent)")
+            } else {
+                let destExt = ext.isEmpty ? "mov" : ext
+                let dest = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("spai_\(UUID().uuidString)")
+                    .appendingPathExtension(destExt)
+                if FileManager.default.fileExists(atPath: dest.path) {
+                    try? FileManager.default.removeItem(at: dest)
+                }
+                try FileManager.default.copyItem(at: url, to: dest)
+
+                image = nil
+                videoURL = dest
+                videoDuration = await duration(of: dest)
+                lastVideoDetectionState = nil
+                print("[Upload] video imported via fallback: \(dest.lastPathComponent), \(videoDuration)s")
+            }
+        } catch {
+            loadError = "Couldn't import that file: \(error.localizedDescription)"
+            print("[Upload] file import processing failed: \(error)")
         }
+    }
+
+    private func runVideo() {
+        guard let videoURL else { return }
+        if player == nil { player = AVPlayer(url: videoURL) }
+        guard let player else { return }
+        lastVideoDetectionState = nil
+
+        videoService.onFrame = { frame in
+            await service.detect(
+                image: frame,
+                step: SterileStep(rawValue: appModel.currentStepIndex),
+                preferOnDevice: shouldPreferOnDeviceForVideo
+            )
+            logVideoDetectionTransitionIfNeeded()
+        }
+        player.isMuted = true
+        Task {
+            await videoService.start(url: videoURL, player: player, interval: 1.0)
+        }
+    }
 
     private func duration(of url: URL) async -> Double {
         let asset = AVURLAsset(url: url)
@@ -173,7 +270,7 @@ struct UploadWindowView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Detection Test").font(.title2.bold())
-                Text("Sim-only · feeds the live detection panel")
+                Text("Feeds the live detection panel")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -199,56 +296,56 @@ struct UploadWindowView: View {
     }
 
     private func videoPreview(_ url: URL) -> some View {
-            VideoPlayer(player: player)
-                .frame(height: 260)
-                .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
-                .onAppear {
-                    if player == nil { player = AVPlayer(url: url) }
-                }
-        }
+        VideoPlayer(player: player)
+            .frame(height: 260)
+            .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
+            .onAppear {
+                if player == nil { player = AVPlayer(url: url) }
+            }
+    }
 
     private var videoSummary: some View {
-            VStack(alignment: .leading, spacing: SPAISpacing.s) {
-                HStack(spacing: 8) {
-                    Image(systemName: "film")
-                    Text("Video loaded")
-                        .font(.subheadline.weight(.semibold))
+        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+            HStack(spacing: 8) {
+                Image(systemName: "film")
+                Text("Video loaded")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(String(format: "%.1fs", videoDuration))
+                    .font(.subheadline.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+
+            if videoService.isRunning {
+                HStack(spacing: SPAISpacing.m) {
+                    ProgressView().controlSize(.small)
+                    Text(String(format: "%.1fs · %d frames · %d skipped", videoService.currentTime, videoService.framesProcessed, videoService.framesSkipped))
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(.secondary)
                     Spacer()
-                    Text(String(format: "%.1fs", videoDuration))
-                        .font(.subheadline.monospaced())
+                    Button("Stop") { videoService.stop() }
+                        .buttonStyle(.bordered)
+                }
+            } else {
+                Button {
+                    runVideo()
+                } label: {
+                    Label("Run detection on video", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+
+                if videoService.framesProcessed > 0 {
+                    Text("\(videoService.framesProcessed) frames processed, \(videoService.framesSkipped) skipped. Watch the detection and workflow panels.")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-
-                if videoService.isRunning {
-                    HStack(spacing: SPAISpacing.m) {
-                        ProgressView().controlSize(.small)
-                        Text(String(format: "%.1fs · %d frames · %d skipped", videoService.currentTime, videoService.framesProcessed, videoService.framesSkipped))
-                            .font(.footnote.monospaced())
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Stop") { videoService.stop() }
-                            .buttonStyle(.bordered)
-                    }
-                } else {
-                    Button {
-                        runVideo()
-                    } label: {
-                        Label("Run detection on video", systemImage: "play.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    if videoService.framesProcessed > 0 {
-                        Text("\(videoService.framesProcessed) frames processed, \(videoService.framesSkipped) skipped. Watch the detection and workflow panels.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     private var shouldPreferOnDeviceForVideo: Bool {
         videoDuration >= 60
@@ -351,3 +448,4 @@ struct UploadWindowView: View {
         }
     }
 }
+

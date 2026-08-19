@@ -31,6 +31,7 @@ struct ImmersiveView: View {
             place("guided",    angle:  16, height: 1.15, radius: 1.15, content, attachments)
 
             place("workflow",  angle:  0,  height: 0.85, radius: 1.1, content, attachments)
+            place("camera",    angle: -16, height: 1.15, radius: 1.15, content, attachments)
 
             place("actions",   angle:  52, height: 1.25, radius: 1.3, content, attachments)
             place("chat",      angle:  48, height: 1.7,  radius: 1.3, content, attachments)
@@ -38,7 +39,7 @@ struct ImmersiveView: View {
 
             place("report",    angle:  0,  height: 1.4,  radius: 1.05, content, attachments)
 
-            #if targetEnvironment(simulator)
+            #if true
             place("upload",    angle: -52, height: 1.0,  radius: 1.3, content, attachments)
             place("stations",  angle: -30, height: 0.85, radius: 1.2, content, attachments)
             #endif
@@ -47,6 +48,7 @@ struct ImmersiveView: View {
             setEnabled("detection", attachments)
             setEnabled("eventLog",  attachments)
             setEnabled("workflow",  attachments)
+            setEnabled("camera", attachments)
             setEnabled("chat", attachments)
             setEnabled("history", attachments)
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
@@ -56,7 +58,8 @@ struct ImmersiveView: View {
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
             Attachment(id: "eventLog")  { EventLogPanel() }
             Attachment(id: "workflow")  { WorkflowProgressPanel() }
-            #if targetEnvironment(simulator)
+            Attachment(id: "camera")    { ContinuityCameraPanel() }
+            #if true
             Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
             Attachment(id: "stations") { StationPickerPanel(manager: stationManager) }
             #endif
@@ -101,11 +104,16 @@ struct ImmersiveView: View {
 
         #if !targetEnvironment(simulator)
         .task {
+            // Legacy ARKit camera path (requires special entitlements). Disabled by default
+            // now that Continuity Camera is integrated. Leave in place for reference.
+            // If you do enable this, ensure you are not also running ContinuityCameraService.
+            /*
             cameraService.onFrameForDetection = { readOnlyBuffer in
                 guard let image = UIImage.from(readOnlyBuffer: readOnlyBuffer) else { return }
                 Task { await detectionService.detect(image: image, step: SterileStep(rawValue: appModel.currentStepIndex)) }
             }
             await cameraService.start()
+            */
         }
         #endif
         .onDisappear {
@@ -144,3 +152,4 @@ struct ImmersiveView: View {
     ImmersiveView()
         .environment(AppModel())
 }
+

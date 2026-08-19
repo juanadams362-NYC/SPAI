@@ -11,6 +11,7 @@ import SwiftUI
 struct SPAIApp: App {
     @State private var appModel = AppModel()
     @State private var detectionService = DetectionService()
+    @State private var continuityCamera = ContinuityCameraService()
 
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
 
@@ -25,6 +26,7 @@ struct SPAIApp: App {
             }
             .environment(appModel)
             .environment(detectionService)
+            .environment(continuityCamera)
         }
         .windowStyle(.plain)
 
@@ -32,6 +34,7 @@ struct SPAIApp: App {
             SettingsView()
                 .environment(appModel)
                 .environment(detectionService)
+                .environment(continuityCamera)
         }
         .windowStyle(.plain)
 
@@ -39,6 +42,7 @@ struct SPAIApp: App {
             UploadWindowView()
                 .environment(appModel)
                 .environment(detectionService)
+                .environment(continuityCamera)
         }
         .windowStyle(.plain)
         .defaultSize(width: 520, height: 640)
@@ -47,6 +51,7 @@ struct SPAIApp: App {
             ImmersiveView()
                 .environment(appModel)
                 .environment(detectionService)
+                .environment(continuityCamera)
         }
         .immersionStyle(selection: .constant(.mixed), in: .mixed)
     }
