@@ -20,6 +20,12 @@ final class OnDeviceDetector {
             print("[OnDeviceDetector] PPE model failed to load")
         }
 
+        // Temporarily disabled - instruments_best.mlpackage is corrupted
+        // TODO: Re-add the model file properly
+        instrumentModel = nil
+        print("[OnDeviceDetector] instrument model disabled (file corrupted)")
+        
+        /*
         if let model = try? instruments_best(configuration: MLModelConfiguration()).model,
            let vn = try? VNCoreMLModel(for: model) {
             instrumentModel = vn
@@ -27,6 +33,7 @@ final class OnDeviceDetector {
             instrumentModel = nil
             print("[OnDeviceDetector] instrument model failed to load")
         }
+        */
     }
 
     var isAvailable: Bool { ppeModel != nil }

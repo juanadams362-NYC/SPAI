@@ -39,6 +39,12 @@ struct UploadWindowView: View {
     @State private var isLoadingMedia = false
     @State private var lastVideoDetectionState: String?
     @State private var isFileImporterPresented = false
+    
+    // Batch testing mode for simulator
+    @State private var batchImages: [UIImage] = []
+    @State private var batchIndex: Int = 0
+    @State private var batchTimer: Timer?
+    @State private var isBatchMode: Bool = false
 
     var body: some View {
         VStack(spacing: SPAISpacing.m) {
@@ -56,21 +62,25 @@ struct UploadWindowView: View {
                          matching: .any(of: [.images, .videos])) {
                 Label(hasMedia ? "Choose another" : "Choose image or video",
                       systemImage: "photo.badge.plus")
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, SPAISpacing.s + 2)
+                    .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
 
             Button {
                 isFileImporterPresented = true
             } label: {
                 Label("Import from Files", systemImage: "folder.badge.plus")
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, SPAISpacing.s + 2)
+                    .background(SPAIColor.secondary.opacity(0.8), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
 
             if isLoadingMedia {
                 ProgressView("Loading media…")
@@ -317,25 +327,36 @@ struct UploadWindowView: View {
             }
 
             if videoService.isRunning {
-                HStack(spacing: SPAISpacing.m) {
+                HStack(spacing: SPAISpacing.s) {
                     ProgressView().controlSize(.small)
                     Text(String(format: "%.1fs · %d frames · %d skipped", videoService.currentTime, videoService.framesProcessed, videoService.framesSkipped))
                         .font(.footnote.monospaced())
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Stop") { videoService.stop() }
-                        .buttonStyle(.bordered)
+                    Button {
+                        videoService.stop()
+                    } label: {
+                        Label("Stop", systemImage: "stop.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, SPAISpacing.m)
+                            .padding(.vertical, SPAISpacing.xs)
+                            .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                    }
+                    .buttonStyle(.plain)
                 }
             } else {
                 Button {
                     runVideo()
                 } label: {
                     Label("Run detection on video", systemImage: "play.fill")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, SPAISpacing.s + 2)
+                        .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
 
                 if videoService.framesProcessed > 0 {
                     Text("\(videoService.framesProcessed) frames processed, \(videoService.framesSkipped) skipped. Watch the detection and workflow panels.")
@@ -348,14 +369,19 @@ struct UploadWindowView: View {
     }
 
     private var shouldPreferOnDeviceForVideo: Bool {
-        videoDuration >= 60
+        // Use VideoFrameService's long video detection (> 2 min)
+        // This routes long videos to on-device model automatically
+        videoService.isLongVideo() || videoDuration >= 60
     }
 
     private func logVideoDetectionTransitionIfNeeded() {
         let state = currentVideoDetectionState
         guard state != lastVideoDetectionState else { return }
         lastVideoDetectionState = state
+        
+        // Log to both AppModel and VideoFrameService
         appModel.logVideoDetectionTransition(state, at: videoService.currentTime)
+        videoService.logStateTransition(state: state, at: videoService.currentTime)
     }
 
     private var currentVideoDetectionState: String {

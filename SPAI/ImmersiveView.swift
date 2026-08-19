@@ -53,6 +53,22 @@ struct ImmersiveView: View {
             setEnabled("history", attachments)
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
             attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
+            
+            // Update billboard state for all panels
+            updateBillboard("statusBar", attachments)
+            updateBillboard("detection", attachments)
+            updateBillboard("eventLog", attachments)
+            updateBillboard("workflow", attachments)
+            updateBillboard("camera", attachments)
+            updateBillboard("guided", attachments)
+            updateBillboard("actions", attachments)
+            updateBillboard("chat", attachments)
+            updateBillboard("history", attachments)
+            updateBillboard("report", attachments)
+            #if true
+            updateBillboard("upload", attachments)
+            updateBillboard("stations", attachments)
+            #endif
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
@@ -139,12 +155,28 @@ struct ImmersiveView: View {
     ) {
         guard let panel = attachments.entity(for: id) else { return }
         panel.position = arcPosition(angle: angle, height: height, radius: radius ?? arcRadius)
-        panel.components.set(BillboardComponent())
+        
+        // Only add billboard if enabled in settings
+        if appModel.panelsBillboard {
+            panel.components.set(BillboardComponent())
+        } else {
+            panel.components.remove(BillboardComponent.self)
+        }
+        
         content.add(panel)
     }
 
     private func setEnabled(_ id: String, _ attachments: RealityViewAttachments) {
         attachments.entity(for: id)?.isEnabled = appModel.isVisible(id)
+    }
+    
+    private func updateBillboard(_ id: String, _ attachments: RealityViewAttachments) {
+        guard let entity = attachments.entity(for: id) else { return }
+        if appModel.panelsBillboard {
+            entity.components.set(BillboardComponent())
+        } else {
+            entity.components.remove(BillboardComponent.self)
+        }
     }
 }
 

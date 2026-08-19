@@ -53,6 +53,17 @@ final class ContinuityCameraService: NSObject {
     private var lastDetectionTime: Date = .distantPast
     var onFrameForDetection: ((UIImage) async -> Void)?
     private var lastFingerprint: [UInt8]?
+    
+    // Simulator testing
+    #if targetEnvironment(simulator)
+    var testImageURL: URL? {
+        didSet {
+            if isRunning, let url = testImageURL {
+                loadTestImage(from: url)
+            }
+        }
+    }
+    #endif
 
     override init() {
         super.init()
@@ -63,6 +74,11 @@ final class ContinuityCameraService: NSObject {
     func start() {
         guard !isRunning else { return }
         discoveryTimer?.invalidate()
+        
+        #if targetEnvironment(simulator)
+        // Simulator mode: use mock data
+        startSimulatorMode()
+        #else
         status = .searching
         attemptDiscoveryAndStart()
         if !isRunning {
@@ -71,11 +87,18 @@ final class ContinuityCameraService: NSObject {
                 self?.attemptDiscoveryAndStart()
             }
         }
+        #endif
     }
 
     func stop() {
         discoveryTimer?.invalidate()
         discoveryTimer = nil
+        
+        #if targetEnvironment(simulator)
+        simulatorTimer?.invalidate()
+        simulatorTimer = nil
+        #endif
+        
         session?.stopRunning()
         session = nil
         videoOutput = nil
@@ -88,9 +111,14 @@ final class ContinuityCameraService: NSObject {
     // MARK: - Discovery
 
     private func discoverContinuityCamera() -> AVCaptureDevice? {
+        #if targetEnvironment(simulator)
+        // Simulator doesn't support AVCapture devices
+        return nil
+        #else
         // On visionOS, use the default video device if available. This will represent
         // an attached Continuity Camera source when present.
         return AVCaptureDevice.default(for: .video)
+        #endif
     }
 
     private func attemptDiscoveryAndStart() {
@@ -103,6 +131,104 @@ final class ContinuityCameraService: NSObject {
             status = .searching
         }
     }
+    
+    // MARK: - Simulator Mode
+    
+    #if targetEnvironment(simulator)
+    private var simulatorTimer: Timer?
+    
+    private func startSimulatorMode() {
+        isRunning = true
+        status = .connected(deviceName: "Simulator Test Camera")
+        
+        // Generate a test image
+        let testImage = generateTestImage()
+        latestImage = testImage
+        
+        // Simulate camera frames at 30fps
+        simulatorTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                // Generate slightly different images to simulate camera feed
+                let img = self.generateTestImage()
+                self.latestImage = img
+                
+                // Throttled detection forwarding
+                let now = Date()
+                if self.detectionEnabled && now.timeIntervalSince(self.lastDetectionTime) >= self.detectionInterval {
+                    if self.shouldProcess(img) {
+                        self.lastDetectionTime = now
+                        await self.onFrameForDetection?(img)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func generateTestImage() -> UIImage {
+        let size = CGSize(width: 1920, height: 1080)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        
+        return renderer.image { context in
+            // Background gradient
+            let colors = [UIColor.systemBlue.withAlphaComponent(0.3), UIColor.systemPurple.withAlphaComponent(0.2)]
+            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                      colors: colors.map { $0.cgColor } as CFArray,
+                                      locations: [0.0, 1.0])!
+            context.cgContext.drawLinearGradient(gradient,
+                                                  start: .zero,
+                                                  end: CGPoint(x: size.width, y: size.height),
+                                                  options: [])
+            
+            // Add some text to make frames visually different
+            let timeString = "Simulator Feed\n\(Date().formatted(date: .omitted, time: .standard))"
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 48, weight: .bold),
+                .foregroundColor: UIColor.white
+            ]
+            
+            let textSize = timeString.size(withAttributes: attributes)
+            let textRect = CGRect(x: (size.width - textSize.width) / 2,
+                                  y: (size.height - textSize.height) / 2,
+                                  width: textSize.width,
+                                  height: textSize.height)
+            
+            timeString.draw(in: textRect, withAttributes: attributes)
+            
+            // Add a "fake" surgical tray overlay for testing
+            context.cgContext.setStrokeColor(UIColor.white.withAlphaComponent(0.8).cgColor)
+            context.cgContext.setLineWidth(4)
+            let trayRect = CGRect(x: size.width * 0.2, y: size.height * 0.3,
+                                  width: size.width * 0.6, height: size.height * 0.4)
+            context.cgContext.stroke(trayRect)
+            
+            // Add "tools" rectangles
+            for i in 0..<5 {
+                let x = size.width * 0.25 + CGFloat(i) * size.width * 0.1
+                let toolRect = CGRect(x: x, y: size.height * 0.45, width: 60, height: 200)
+                context.cgContext.setFillColor(UIColor.systemGray.withAlphaComponent(0.6).cgColor)
+                context.cgContext.fill(toolRect)
+            }
+        }
+    }
+    
+    private func loadTestImage(from url: URL) {
+        Task { @MainActor in
+            guard let data = try? Data(contentsOf: url),
+                  let image = UIImage(data: data) else {
+                status = .error("Failed to load test image")
+                return
+            }
+            latestImage = image
+            status = .connected(deviceName: "Test Image: \(url.lastPathComponent)")
+            
+            // Trigger detection if enabled
+            if detectionEnabled {
+                await onFrameForDetection?(image)
+            }
+        }
+    }
+    #endif
 
     // MARK: - Session
 

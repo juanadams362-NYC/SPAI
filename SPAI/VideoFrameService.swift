@@ -22,13 +22,19 @@ final class VideoFrameService {
     private var isPausedForContamination = false
 
     private let maxProcessedFrames = 100
+    private let longVideoThreshold: Double = 120.0 // 2 minutes
 
     var isRunning = false
     var framesProcessed = 0
     var framesSkipped = 0
     var currentTime: Double = 0
+    
+    // State tracking for logging
+    private var lastGloveState: String?
+    var stateTransitions: [(timestamp: Double, state: String)] = []
 
     var onFrame: ((UIImage) async -> Void)?
+    var preferOnDeviceForLongVideos: Bool = true
 
     func start(url: URL, player: AVPlayer, interval: Double = 1.0) async {
         stop()
@@ -40,7 +46,20 @@ final class VideoFrameService {
         sampleInterval = duration > 0
             ? max(duration / Double(maxProcessedFrames), 0.1)
             : interval
+        
+        // Reset state tracking
+        lastGloveState = nil
+        stateTransitions = []
+        
+        let isLong = isLongVideo()
         print("[VideoFrameService] duration from asset: \(duration)s")
+        if isLong {
+            print("⚠️ [VideoFrameService] Long video detected (\(Int(duration))s > \(Int(longVideoThreshold))s)")
+            if preferOnDeviceForLongVideos {
+                print("💡 [VideoFrameService] Routing to on-device model to avoid excessive cloud calls")
+            }
+        }
+        print("[VideoFrameService] Sample interval: \(String(format: "%.2f", sampleInterval))s (max \(maxProcessedFrames) frames)")
 
         let gen = AVAssetImageGenerator(asset: asset)
         gen.appliesPreferredTrackTransform = true
@@ -68,6 +87,30 @@ final class VideoFrameService {
         isRunning = false
         isPausedForContamination = false
         lastFingerprint = nil
+        
+        // Print summary of state transitions
+        if !stateTransitions.isEmpty {
+            print("📊 [VideoFrameService] State transitions summary:")
+            for (timestamp, state) in stateTransitions {
+                let minutes = Int(timestamp / 60)
+                let seconds = Int(timestamp.truncatingRemainder(dividingBy: 60))
+                print("   \(String(format: "%02d:%02d", minutes, seconds)) - \(state)")
+            }
+        }
+    }
+    
+    func logStateTransition(state: String, at time: Double) {
+        guard state != lastGloveState else { return }
+        lastGloveState = state
+        stateTransitions.append((timestamp: time, state: state))
+        
+        let minutes = Int(time / 60)
+        let seconds = Int(time.truncatingRemainder(dividingBy: 60))
+        print("🔄 [VideoFrameService] State change at \(String(format: "%02d:%02d", minutes, seconds)): \(state)")
+    }
+    
+    func isLongVideo() -> Bool {
+        return duration > longVideoThreshold
     }
 
     func pauseForContamination() {

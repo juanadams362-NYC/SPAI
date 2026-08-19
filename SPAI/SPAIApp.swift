@@ -29,6 +29,7 @@ struct SPAIApp: App {
             .environment(continuityCamera)
         }
         .windowStyle(.plain)
+        .defaultSize(width: 800, height: 600)
 
         WindowGroup(id: "settings") {
             SettingsView()
@@ -37,6 +38,7 @@ struct SPAIApp: App {
                 .environment(continuityCamera)
         }
         .windowStyle(.plain)
+        .defaultSize(width: 450, height: 700)
 
         WindowGroup(id: "upload") {
             UploadWindowView()

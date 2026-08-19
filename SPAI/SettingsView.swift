@@ -55,6 +55,17 @@ struct SettingsView: View {
                 .tint(SPAIColor.secondary)
                 .accessibilityLabel("Panel opacity")
             }
+            
+            Toggle(isOn: Binding(
+                get: { appModel.panelsBillboard },
+                set: { appModel.panelsBillboard = $0 }
+            )) {
+                Text("Panels look at you")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.95))
+            }
+            .tint(SPAIColor.accent)
+            .accessibilityHint("When enabled, panels follow your gaze and rotate to face you")
 
             // Reads each guided step out loud as it comes up. Contamination
             // alerts speak regardless of this setting.
