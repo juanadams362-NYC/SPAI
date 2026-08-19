@@ -57,6 +57,14 @@ final class DetectionServiceTests: XCTestCase {
         XCTAssertEqual(service.contaminationRisk, 0.0, accuracy: 0.001)
     }
 
+    func testBareHandLabelIsHighRisk() {
+        let service = DetectionService()
+        service.detections = [detection("bare_hand")]
+        service.hasResult = true
+
+        XCTAssertEqual(service.contaminationRisk, 0.85, accuracy: 0.001)
+    }
+
     // MARK: - PPE status
 
     func testPPEPassesWithGloveNoHand() {
@@ -73,6 +81,21 @@ final class DetectionServiceTests: XCTestCase {
         service.hasResult = true
 
         XCTAssertFalse(service.ppePassing)
+    }
+
+    func testPPEClassifierRejectsInstrumentLabels() {
+        XCTAssertTrue(DetectionService.isPPEClass("glove"))
+        XCTAssertTrue(DetectionService.isPPEClass("bare_hand"))
+        XCTAssertFalse(DetectionService.isPPEClass("forceps"))
+        XCTAssertFalse(DetectionService.isPPEClass("instrument"))
+    }
+
+    func testSpecificInstrumentLabelsCountAsInstrumentDetections() {
+        let service = DetectionService()
+        service.detections = [detection("forceps")]
+        service.hasResult = true
+
+        XCTAssertTrue(service.hasInstrumentDetection)
     }
 
     func testPPEFailsWhenHandAlsoShowing() {
