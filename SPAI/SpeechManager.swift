@@ -6,6 +6,7 @@
 //
 
 import AVFoundation
+import Speech
 import SwiftUI
 
 @MainActor
@@ -55,6 +56,122 @@ final class SpeechManager {
     func stop() {
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class VoiceInputManager {
+    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private let audioEngine = AVAudioEngine()
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+
+    var transcript = ""
+    var isListening = false
+    var errorMessage: String?
+
+    func toggleListening() {
+        if isListening {
+            stopListening()
+        } else {
+            Task { await startListening() }
+        }
+    }
+
+    func startListening() async {
+        guard !isListening else { return }
+        errorMessage = nil
+
+        guard await requestPermissions() else {
+            errorMessage = "Microphone or speech recognition permission was not granted."
+            return
+        }
+
+        guard let recognizer, recognizer.isAvailable else {
+            errorMessage = "Speech recognition is not available right now."
+            return
+        }
+
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        transcript = ""
+
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        recognitionRequest = request
+
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        inputNode.removeTap(onBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            request.append(buffer)
+        }
+
+        audioEngine.prepare()
+
+        do {
+            try audioEngine.start()
+            isListening = true
+        } catch {
+            errorMessage = "Couldn't start microphone input."
+            cleanupRecognition()
+            return
+        }
+
+        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let result {
+                    self.transcript = result.bestTranscription.formattedString
+                    if result.isFinal {
+                        self.stopListening()
+                    }
+                }
+
+                if error != nil {
+                    self.errorMessage = "Speech recognition stopped."
+                    self.stopListening()
+                }
+            }
+        }
+    }
+
+    func stopListening() {
+        guard isListening || recognitionTask != nil || recognitionRequest != nil else { return }
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        cleanupRecognition()
+    }
+
+    private func cleanupRecognition() {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
+        isListening = false
+    }
+
+    private func requestPermissions() async -> Bool {
+        let speechAllowed = await requestSpeechPermission()
+        let micAllowed = await requestMicrophonePermission()
+        return speechAllowed && micAllowed
+    }
+
+    private func requestSpeechPermission() async -> Bool {
+        await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status == .authorized)
+            }
+        }
+    }
+
+    private func requestMicrophonePermission() async -> Bool {
+        await withCheckedContinuation { continuation in
+            AVAudioApplication.requestRecordPermission { allowed in
+                continuation.resume(returning: allowed)
+            }
         }
     }
 }

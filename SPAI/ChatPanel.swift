@@ -21,6 +21,7 @@ struct ChatPanel: View {
     @State private var messages: [ChatMessage] = [
         ChatMessage(role: .spai, text: "Ask me anything about your current step.")
     ]
+    @State private var voiceInput = VoiceInputManager()
     @State private var draft = ""
     @State private var isWaiting = false
 
@@ -112,19 +113,46 @@ struct ChatPanel: View {
     }
 
     private var inputBar: some View {
-        HStack(spacing: SPAISpacing.s) {
-            TextField("Ask about this step…", text: $draft)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(send)
-                .accessibilityLabel("Question field")
-                .accessibilityHint("Dictate or type a question about the current step")
-            Button(action: send) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 26))
+        VStack(alignment: .leading, spacing: SPAISpacing.xs) {
+            HStack(spacing: SPAISpacing.s) {
+                TextField("Ask about this step…", text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(send)
+                    .accessibilityLabel("Question field")
+                    .accessibilityHint("Dictate or type a question about the current step")
+
+                Button {
+                    voiceInput.toggleListening()
+                } label: {
+                    Image(systemName: voiceInput.isListening ? "stop.circle.fill" : "mic.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(voiceInput.isListening ? SPAIColor.warning : SPAIColor.accent)
+                }
+                .buttonStyle(.plain)
+                .disabled(isWaiting)
+                .accessibilityLabel(voiceInput.isListening ? "Stop voice input" : "Start voice input")
+
+                Button(action: send) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 26))
+                }
+                .buttonStyle(.plain)
+                .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || isWaiting)
+                .accessibilityLabel("Send question")
             }
-            .buttonStyle(.plain)
-            .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || isWaiting)
-            .accessibilityLabel("Send question")
+
+            if voiceInput.isListening {
+                Text("Listening…")
+                    .font(.caption)
+                    .foregroundStyle(SPAIColor.accent)
+            } else if let error = voiceInput.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(SPAIColor.warning)
+            }
+        }
+        .onChange(of: voiceInput.transcript) { _, transcript in
+            draft = transcript
         }
     }
 
@@ -158,6 +186,7 @@ struct ChatPanel: View {
     private func send() {
         let question = draft.trimmingCharacters(in: .whitespaces)
         guard !question.isEmpty, !isWaiting else { return }
+        voiceInput.stopListening()
         draft = ""
         messages.append(ChatMessage(role: .user, text: question))
         isWaiting = true
