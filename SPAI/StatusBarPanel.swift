@@ -10,6 +10,7 @@ struct StatusBarPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(DetectionService.self) private var detectionService
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openWindow) private var openWindow
 
     @State private var sessionSeconds: Int = 0
@@ -24,12 +25,12 @@ struct StatusBarPanel: View {
             roleBlock
             divider
             modeBlock
-            Spacer()
+            Spacer(minLength: SPAISpacing.xl)
             controlButtons
         }
         .padding(.horizontal, SPAISpacing.l)
         .padding(.vertical, SPAISpacing.m)
-        .frame(width: 1100)
+        .frame(width: 1200)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .onReceive(timer) { _ in sessionSeconds += 1 }
@@ -109,7 +110,7 @@ struct StatusBarPanel: View {
     }
 
     private var controlButtons: some View {
-        HStack(spacing: SPAISpacing.s + 4) {
+        HStack(spacing: SPAISpacing.m) {
             Button {
                 appModel.toggleVisibility("chat")
             } label: {
@@ -118,7 +119,13 @@ struct StatusBarPanel: View {
             .buttonStyle(.plain)
 
             Button {
-                openWindow(id: "settings")
+                if appModel.isSettingsWindowOpen {
+                    dismissWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = false
+                } else {
+                    openWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = true
+                }
             } label: {
                 barButtonLabel("Settings", icon: "gearshape.fill", tint: SPAIColor.secondary)
             }

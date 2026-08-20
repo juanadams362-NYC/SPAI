@@ -39,12 +39,13 @@ struct UploadWindowView: View {
     @State private var isLoadingMedia = false
     @State private var lastVideoDetectionState: String?
     @State private var isFileImporterPresented = false
-    
+
     // Batch testing mode for simulator
     @State private var batchImages: [UIImage] = []
     @State private var batchIndex: Int = 0
     @State private var batchTimer: Timer?
     @State private var isBatchMode: Bool = false
+    @State private var showContinuityCamera: Bool = false
 
     var body: some View {
         VStack(spacing: SPAISpacing.m) {
@@ -82,6 +83,25 @@ struct UploadWindowView: View {
             }
             .buttonStyle(.plain)
 
+            #if !targetEnvironment(simulator)
+            Button {
+                showContinuityCamera.toggle()
+            } label: {
+                Label(showContinuityCamera ? "Hide Camera" : "Use Live Camera", systemImage: "iphone.and.arrow.forward")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SPAISpacing.s + 2)
+                    .background(SPAIColor.accent.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            }
+            .buttonStyle(.plain)
+
+            if showContinuityCamera {
+                Divider().padding(.vertical, SPAISpacing.s)
+                ContinuityCameraMini()
+            }
+            #endif
+
             if isLoadingMedia {
                 ProgressView("Loading media…")
             } else if let loadError {
@@ -113,7 +133,12 @@ struct UploadWindowView: View {
                 videoService.resumeAfterContamination()
             }
         }
-        .onDisappear { videoService.stop() }
+        .onDisappear {
+            videoService.stop()
+            // Same reasoning as SettingsView: catch the system close
+            // button too, not just our own toggle path.
+            appModel.isUploadWindowOpen = false
+        }
         .fileImporter(isPresented: $isFileImporterPresented, allowedContentTypes: [.image, .movie], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls):
@@ -279,12 +304,15 @@ struct UploadWindowView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Detection Test").font(.title2.bold())
-                Text("Feeds the live detection panel")
+                Text("Test Detection").font(.title2.bold())
+                Text("Upload images/videos or use live camera")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button { dismissWindow(id: "upload") } label: {
+            Button {
+                dismissWindow(id: "upload")
+                appModel.isUploadWindowOpen = false
+            } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title2).foregroundStyle(.secondary)
             }
@@ -369,8 +397,6 @@ struct UploadWindowView: View {
     }
 
     private var shouldPreferOnDeviceForVideo: Bool {
-        // Use VideoFrameService's long video detection (> 2 min)
-        // This routes long videos to on-device model automatically
         videoService.isLongVideo() || videoDuration >= 60
     }
 
@@ -378,8 +404,7 @@ struct UploadWindowView: View {
         let state = currentVideoDetectionState
         guard state != lastVideoDetectionState else { return }
         lastVideoDetectionState = state
-        
-        // Log to both AppModel and VideoFrameService
+
         appModel.logVideoDetectionTransition(state, at: videoService.currentTime)
         videoService.logStateTransition(state: state, at: videoService.currentTime)
     }
@@ -475,3 +500,100 @@ struct UploadWindowView: View {
     }
 }
 
+// MARK: - Continuity Camera Mini Component
+
+struct ContinuityCameraMini: View {
+    @Environment(AppModel.self) private var appModel
+    @Environment(DetectionService.self) private var detectionService
+    @Environment(ContinuityCameraService.self) private var cameraService
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            HStack {
+                Text("LIVE CAMERA")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .tracking(1.2)
+                    .foregroundStyle(.white.opacity(0.7))
+                Spacer()
+                Text(cameraService.status.label)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(cameraService.status.color)
+            }
+
+            ZStack {
+                RoundedRectangle(cornerRadius: SPAIRadius.small)
+                    .fill(.white.opacity(0.05))
+                    .frame(height: 140)
+
+                if let img = cameraService.latestImage {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 140)
+                        .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.small))
+                } else {
+                    VStack(spacing: 6) {
+                        Image(systemName: "iphone.radiowaves.left.and.right")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.4))
+                        Text("Waiting for device...")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+            }
+
+            HStack(spacing: SPAISpacing.s) {
+                Button {
+                    cameraService.start()
+                } label: {
+                    Label("Start", systemImage: "play.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, SPAISpacing.xs + 2)
+                        .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    cameraService.stop()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, SPAISpacing.xs + 2)
+                        .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Toggle(isOn: Binding(
+                get: { cameraService.detectionEnabled },
+                set: { cameraService.detectionEnabled = $0 }
+            )) {
+                Text("Run detection on feed")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .toggleStyle(.switch)
+            .tint(SPAIColor.primary)
+        }
+        .padding(SPAISpacing.m)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+        .onAppear {
+            cameraService.onFrameForDetection = { ui in
+                await detectionService.detect(
+                    image: ui,
+                    step: SterileStep(rawValue: appModel.currentStepIndex),
+                    preferOnDevice: false
+                )
+            }
+        }
+        .onDisappear {
+            cameraService.detectionEnabled = false
+            cameraService.stop()
+        }
+    }
+}

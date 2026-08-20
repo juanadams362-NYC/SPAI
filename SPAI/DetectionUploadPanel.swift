@@ -9,6 +9,7 @@ struct DetectionUploadPanel: View {
     let service: DetectionService
     @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
@@ -17,8 +18,17 @@ struct DetectionUploadPanel: View {
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.5))
 
-            Button { openWindow(id: "upload") } label: {
-                Label("Upload test media", systemImage: "photo.badge.plus")
+            Button {
+                if appModel.isUploadWindowOpen {
+                    dismissWindow(id: "upload")
+                    appModel.isUploadWindowOpen = false
+                } else {
+                    openWindow(id: "upload")
+                    appModel.isUploadWindowOpen = true
+                }
+            } label: {
+                Label(appModel.isUploadWindowOpen ? "Close upload panel" : "Upload test media",
+                      systemImage: appModel.isUploadWindowOpen ? "xmark.circle" : "photo.badge.plus")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -54,4 +64,3 @@ struct DetectionUploadPanel: View {
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
     }
 }
-

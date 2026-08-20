@@ -128,6 +128,8 @@ class AppModel {
     var panelVisibility: [String: Bool] = ["chat": false, "history": false]
     var panelOpacity: Double = 0.85
     var panelsBillboard: Bool = true  // Panels look at you when you move
+    var isSettingsWindowOpen: Bool = false
+    var isUploadWindowOpen: Bool = false
     
     func isVisible(_ panelID: String) -> Bool { panelVisibility[panelID] ?? true }
     func toggleVisibility(_ panelID: String) { panelVisibility[panelID] = !isVisible(panelID) }

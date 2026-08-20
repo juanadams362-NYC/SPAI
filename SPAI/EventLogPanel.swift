@@ -25,7 +25,7 @@ struct EventLogPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 360)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Event log. \(events.count) events. Most recent: \(events.first?.message ?? "none").")

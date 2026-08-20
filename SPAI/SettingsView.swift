@@ -55,7 +55,7 @@ struct SettingsView: View {
                 .tint(SPAIColor.secondary)
                 .accessibilityLabel("Panel opacity")
             }
-            
+
             Toggle(isOn: Binding(
                 get: { appModel.panelsBillboard },
                 set: { appModel.panelsBillboard = $0 }
@@ -106,6 +106,12 @@ struct SettingsView: View {
         .padding(SPAISpacing.xl)
         .frame(width: 420)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        // Closing via the system's own window controls should also clear
+        // the tracked-open flag, or the next status bar tap tries to
+        // dismiss a window that's already gone.
+        .onDisappear {
+            appModel.isSettingsWindowOpen = false
+        }
     }
 
     private func settingBlock<Content: View>(

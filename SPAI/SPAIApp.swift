@@ -39,6 +39,7 @@ struct SPAIApp: App {
         }
         .windowStyle(.plain)
         .defaultSize(width: 450, height: 700)
+        .windowResizability(.contentSize)
 
         WindowGroup(id: "upload") {
             UploadWindowView()
@@ -48,6 +49,7 @@ struct SPAIApp: App {
         }
         .windowStyle(.plain)
         .defaultSize(width: 520, height: 640)
+        .windowResizability(.contentSize)
 
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
             ImmersiveView()

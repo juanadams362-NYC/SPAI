@@ -14,10 +14,65 @@ struct ImmersiveView: View {
     @State private var stationManager = StationManager()
 
     @State private var cameraService = CameraFrameService()
+    @State private var showInteractiveOnboarding: Bool = false
 
     private let arcRadius: Float = 1.25
 
     var body: some View {
+        ZStack {
+            realityContent
+            
+            // Interactive onboarding overlay
+            if showInteractiveOnboarding {
+                InteractiveOnboardingView(isActive: $showInteractiveOnboarding)
+                    .transition(.opacity)
+            }
+        }
+        .onAppear {
+            appModel.immersiveSpaceState = .open
+            
+            // Show interactive tour if first time
+            if !appModel.hasCompletedOnboarding {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation {
+                        showInteractiveOnboarding = true
+                    }
+                }
+            }
+            
+            stationManager.onEnter = { station in
+                appModel.currentStepIndex = station.step.rawValue
+                appModel.stepStarted = false
+                appModel.logStationEntry(station.name, step: station.step)
+            }
+            #if !targetEnvironment(simulator)
+            Task { await stationManager.startImageTracking() }
+            #endif
+        }
+
+        #if !targetEnvironment(simulator)
+        .task {
+            // Legacy ARKit camera path (requires special entitlements). Disabled by default
+            // now that Continuity Camera is integrated. Leave in place for reference.
+            // If you do enable this, ensure you are not also running ContinuityCameraService.
+            /*
+            cameraService.onFrameForDetection = { readOnlyBuffer in
+                guard let image = UIImage.from(readOnlyBuffer: readOnlyBuffer) else { return }
+                Task { await detectionService.detect(image: image, step: SterileStep(rawValue: appModel.currentStepIndex)) }
+            }
+            await cameraService.start()
+            */
+        }
+        #endif
+        .onDisappear {
+            appModel.immersiveSpaceState = .closed
+            #if !targetEnvironment(simulator)
+            cameraService.stop()
+            #endif
+        }
+    }
+    
+    private var realityContent: some View {
         RealityView { content, attachments in
             if let env = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
                 content.add(env)
@@ -31,7 +86,8 @@ struct ImmersiveView: View {
             place("guided",    angle:  16, height: 1.15, radius: 1.15, content, attachments)
 
             place("workflow",  angle:  0,  height: 0.85, radius: 1.1, content, attachments)
-            place("camera",    angle: -16, height: 1.15, radius: 1.15, content, attachments)
+            // Removed: camera panel (merged into upload window)
+            // place("camera",    angle: -16, height: 1.15, radius: 1.15, content, attachments)
 
             place("actions",   angle:  52, height: 1.25, radius: 1.3, content, attachments)
             place("chat",      angle:  48, height: 1.7,  radius: 1.3, content, attachments)
@@ -48,7 +104,8 @@ struct ImmersiveView: View {
             setEnabled("detection", attachments)
             setEnabled("eventLog",  attachments)
             setEnabled("workflow",  attachments)
-            setEnabled("camera", attachments)
+            // Removed: camera panel
+            // setEnabled("camera", attachments)
             setEnabled("chat", attachments)
             setEnabled("history", attachments)
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
@@ -59,7 +116,8 @@ struct ImmersiveView: View {
             updateBillboard("detection", attachments)
             updateBillboard("eventLog", attachments)
             updateBillboard("workflow", attachments)
-            updateBillboard("camera", attachments)
+            // Removed: camera panel
+            // updateBillboard("camera", attachments)
             updateBillboard("guided", attachments)
             updateBillboard("actions", attachments)
             updateBillboard("chat", attachments)
@@ -74,7 +132,8 @@ struct ImmersiveView: View {
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
             Attachment(id: "eventLog")  { EventLogPanel() }
             Attachment(id: "workflow")  { WorkflowProgressPanel() }
-            Attachment(id: "camera")    { ContinuityCameraPanel() }
+            // Removed: camera panel (functionality merged into upload window)
+            // Attachment(id: "camera")    { ContinuityCameraPanel() }
             #if true
             Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
             Attachment(id: "stations") { StationPickerPanel(manager: stationManager) }
@@ -105,38 +164,6 @@ struct ImmersiveView: View {
             Attachment(id: "report") { SessionReportPanel() }
             Attachment(id: "guided") { GuidedStepPanel() }
             Attachment(id: "history") { SessionHistoryPanel() }
-        }
-        .onAppear {
-            appModel.immersiveSpaceState = .open
-            stationManager.onEnter = { station in
-                appModel.currentStepIndex = station.step.rawValue
-                appModel.stepStarted = false
-                appModel.logStationEntry(station.name, step: station.step)
-            }
-            #if !targetEnvironment(simulator)
-            Task { await stationManager.startImageTracking() }
-            #endif
-        }
-
-        #if !targetEnvironment(simulator)
-        .task {
-            // Legacy ARKit camera path (requires special entitlements). Disabled by default
-            // now that Continuity Camera is integrated. Leave in place for reference.
-            // If you do enable this, ensure you are not also running ContinuityCameraService.
-            /*
-            cameraService.onFrameForDetection = { readOnlyBuffer in
-                guard let image = UIImage.from(readOnlyBuffer: readOnlyBuffer) else { return }
-                Task { await detectionService.detect(image: image, step: SterileStep(rawValue: appModel.currentStepIndex)) }
-            }
-            await cameraService.start()
-            */
-        }
-        #endif
-        .onDisappear {
-            appModel.immersiveSpaceState = .closed
-            #if !targetEnvironment(simulator)
-            cameraService.stop()
-            #endif
         }
     }
 
