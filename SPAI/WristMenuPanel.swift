@@ -5,7 +5,7 @@ import simd
 /// A floating quick-action menu that follows the user's wrist on device, with a simulator fallback.
 struct WristMenuPanel: View {
     @Environment(AppModel.self) private var appModel
-    @Environment(\ .openWindow) private var openWindow
+    @Environment(\.openWindow) private var openWindow
 
     // Hand tracking service is assumed to exist in the environment elsewhere in the app.
     // We avoid importing or referencing specific types that may not be visible here; instead we
@@ -18,6 +18,9 @@ struct WristMenuPanel: View {
 
     // Simulator fallback placement in immersive space (lower-left-ish, facing user).
     var simulatorFallbackPosition: SIMD3<Float> = SIMD3<Float>(x: -0.6, y: -0.3, z: -1.0)
+
+    @State private var lastVisibleAt: Date = .distantPast
+    private let visibilityHoldSeconds: TimeInterval = 0.3
 
     var body: some View {
         // The visual content of the panel
@@ -41,7 +44,9 @@ struct WristMenuPanel: View {
 
     private var shouldShowPanel: Bool {
         if isSimulator { return true }
-        return isHandVisibleProvider()
+        let visible = isHandVisibleProvider()
+        if visible { lastVisibleAt = Date() }
+        return visible || Date().timeIntervalSince(lastVisibleAt) < visibilityHoldSeconds
     }
 
     private var currentTransform: WristSpatialTransformModifier.Transform {
@@ -130,7 +135,7 @@ struct WristSpatialTransformModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .environment(\ .wristPanelTransform, transform)
+            .environment(\.wristPanelTransform, transform)
     }
 }
 
@@ -162,3 +167,4 @@ extension EnvironmentValues {
     .background(.black)
 }
 #endif
+
