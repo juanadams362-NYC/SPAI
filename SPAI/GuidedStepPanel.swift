@@ -9,6 +9,8 @@ struct GuidedStepPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(DetectionService.self) private var detectionService
     @State private var consecutiveVerifiedSamples = 0
+    @State private var voiceConfirm = VoiceInputManager()
+    @State private var voiceListenEnabled = false
 
     private let requiredVerifiedSamples = 3
 
@@ -20,6 +22,7 @@ struct GuidedStepPanel: View {
 
     private var step: GuidedStep { script[guidedIndex] }
     private var isLast: Bool { guidedIndex == script.count - 1 }
+    private var isManualStep: Bool { step.condition == .manual }
 
     private var canVerify: Bool {
         step.condition != .manual
@@ -99,14 +102,57 @@ struct GuidedStepPanel: View {
         .onChange(of: detectionService.resultRevision) { _, _ in
             recordVerificationSample()
         }
+        // MARK: Voice-confirm (manual steps only)
+        // Owns a separate VoiceInputManager; starts when a manual step is active,
+        // auto-restarts after recognizer timeout, stops cleanly on advance or disappear.
+        // voiceListenEnabled gates the restart watcher so an intentional stop (keyword
+        // detected) doesn't immediately re-arm the listener before the step advances.
+        .task(id: "\(appModel.currentStepIndex)-\(guidedIndex)") {
+            voiceListenEnabled = false
+            voiceConfirm.stopListening()
+            guard isManualStep, appModel.stepStarted, !appModel.isHalted else { return }
+            voiceListenEnabled = true
+            voiceConfirm.transcript = ""
+            await voiceConfirm.startListening()
+        }
+        .onChange(of: voiceConfirm.isListening) { _, listening in
+            // Auto-restart if the recognizer timed out or errored mid-step.
+            guard !listening, voiceListenEnabled,
+                  isManualStep, appModel.stepStarted, !appModel.isHalted else { return }
+            voiceConfirm.transcript = ""
+            Task { await voiceConfirm.startListening() }
+        }
+        .onChange(of: voiceConfirm.transcript) { _, newTranscript in
+            let words = newTranscript.lowercased()
+                .components(separatedBy: .whitespacesAndNewlines)
+            guard isManualStep, voiceListenEnabled,
+                  words.contains("done") || words.contains("confirmed") else { return }
+            voiceListenEnabled = false   // block isListening restart before step advances
+            voiceConfirm.stopListening()
+            advanceStep()
+        }
         .onChange(of: appModel.guidedStepIndex) { _, _ in
             resetVerificationSamples()
         }
         .onChange(of: appModel.currentStepIndex) { _, _ in
             resetVerificationSamples()
+            voiceListenEnabled = false
+            voiceConfirm.stopListening()
         }
-        .onChange(of: appModel.stepStarted) { _, _ in
+        .onChange(of: appModel.stepStarted) { _, started in
             resetVerificationSamples()
+            if started && isManualStep && !appModel.isHalted {
+                voiceListenEnabled = true
+                voiceConfirm.transcript = ""
+                Task { await voiceConfirm.startListening() }
+            } else {
+                voiceListenEnabled = false
+                voiceConfirm.stopListening()
+            }
+        }
+        .onDisappear {
+            voiceListenEnabled = false
+            voiceConfirm.stopListening()
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Guided step \(guidedIndex + 1) of \(script.count), \(appModel.currentStep.title). \(step.instruction) \(verificationText)")
@@ -139,6 +185,14 @@ struct GuidedStepPanel: View {
         consecutiveVerifiedSamples = 0
     }
 
+    private func advanceStep() {
+        if isLast {
+            appModel.completeStep()
+        } else {
+            appModel.advanceGuidedStep()
+        }
+    }
+
     private var verificationIcon: String {
         if step.condition == .manual { return "hand.tap.fill" }
         if !canVerify { return "icloud.slash" }
@@ -146,7 +200,7 @@ struct GuidedStepPanel: View {
     }
 
     private var verificationText: String {
-        if step.condition == .manual { return "Confirm when done" }
+        if step.condition == .manual { return "Say \"done\" or tap to confirm" }
         if !canVerify { return "Can't verify offline — confirm manually" }
         if satisfied {
             return "Verified \(min(consecutiveVerifiedSamples, requiredVerifiedSamples))/\(requiredVerifiedSamples)"
