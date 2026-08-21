@@ -16,6 +16,7 @@ struct QuickAction: Identifiable {
 struct ActionPanel: View {
     let actions: [QuickAction]
 
+    @Environment(AppModel.self) private var appModel
     @State private var expandedID: UUID?
 
     var body: some View {
@@ -25,7 +26,7 @@ struct ActionPanel: View {
             }
         }
         .padding(SPAISpacing.s + 4)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Quick actions")

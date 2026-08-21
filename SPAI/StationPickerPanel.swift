@@ -9,6 +9,7 @@ import SwiftUI
 
 struct StationPickerPanel: View {
     let manager: StationManager
+    @Environment(AppModel.self) private var appModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
@@ -44,7 +45,7 @@ struct StationPickerPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 280)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
     }
 }

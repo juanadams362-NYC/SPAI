@@ -16,6 +16,8 @@ struct EnvironmentReading: Identifiable {
 }
 
 struct CompliancePanel: View {
+    @Environment(AppModel.self) private var appModel
+
     private let readings: [EnvironmentReading] = [
         EnvironmentReading(label: "Temperature", value: "68°F", icon: "thermometer.medium", inRange: true),
         EnvironmentReading(label: "Humidity",    value: "44%",  icon: "humidity",           inRange: true),
@@ -43,7 +45,7 @@ struct CompliancePanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 360)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
     }
 
