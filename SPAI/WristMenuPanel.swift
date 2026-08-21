@@ -91,7 +91,7 @@ struct WristMenuPanel: View {
                 }
             }
         }
-        .padding(SPAISpacing.s + 4)
+        .padding(SPAISpacing.s)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
@@ -100,22 +100,18 @@ struct WristMenuPanel: View {
 
     private func quickButton(label: String, systemImage: String, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 52, height: 52)
-                    .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SPAIRadius.medium)
-                            .stroke(tint.opacity(0.5), lineWidth: 1)
-                    }
-                Text(label)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white)
-            }
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                .overlay {
+                    RoundedRectangle(cornerRadius: SPAIRadius.small)
+                        .stroke(tint.opacity(0.5), lineWidth: 1)
+                }
         }
         .buttonStyle(.plain)
+        .help(label)
         .accessibilityLabel(label)
     }
 }

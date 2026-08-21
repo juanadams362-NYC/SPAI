@@ -101,7 +101,6 @@ struct ImmersiveView: View {
 
             #if true
             place("upload",    angle: -52, height: 1.0,  radius: 1.3, content, attachments)
-            place("stations",  angle: -30, height: 0.85, radius: 1.2, content, attachments)
             #endif
         } update: { _, attachments in
             setEnabled("statusBar", attachments)
@@ -131,7 +130,6 @@ struct ImmersiveView: View {
             updateBillboard("report", attachments)
             #if true
             updateBillboard("upload", attachments)
-            updateBillboard("stations", attachments)
             #endif
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
@@ -142,7 +140,6 @@ struct ImmersiveView: View {
             // Attachment(id: "camera")    { ContinuityCameraPanel() }
             #if true
             Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
-            Attachment(id: "stations") { StationPickerPanel(manager: stationManager) }
             #endif
             Attachment(id: "chat") { ChatPanel() }
             Attachment(id: "actions") {
@@ -171,17 +168,17 @@ struct ImmersiveView: View {
             Attachment(id: "guided") { GuidedStepPanel() }
             Attachment(id: "history") { SessionHistoryPanel() }
             Attachment(id: "wristMenu") {
-                // Determine which wrist is currently active
                 let rightActive = handTracking.rightWristPose != nil
                 let leftActive  = handTracking.leftWristPose  != nil
-
-                // Chirality-aware offset (mirrors X for left wrist)
                 let offset = rightActive
-                    ? SIMD3<Float>(x: 0.06, y: 0.025, z: -0.02)  // right wrist
-                    : SIMD3<Float>(x: -0.06, y: 0.025, z: -0.02) // left wrist
+                    ? SIMD3<Float>(x: 0.06, y: 0.025, z: -0.02)
+                    : SIMD3<Float>(x: -0.06, y: 0.025, z: -0.02)
 
-                ZStack {
-                    // Base panel follows the wrist pose and provides the styled frame
+                if leftActive && !rightActive {
+                    // Left wrist: compact station picker
+                    StationPickerPanel(manager: stationManager, compact: true)
+                } else {
+                    // Right wrist (or simulator fallback): quick-action menu
                     WristMenuPanel(
                         wristPoseProvider: {
                             if rightActive, let pose = handTracking.rightWristPose {
@@ -197,64 +194,6 @@ struct ImmersiveView: View {
                         },
                         wristOffsetLocal: offset
                     )
-
-                    // Content layer: right wrist shows quick actions (already inside WristMenuPanel),
-                    // left wrist shows station shortcuts in place of quick actions.
-                    if leftActive && !rightActive {
-                        VStack(spacing: SPAISpacing.s + 4) {
-                            HStack(spacing: SPAISpacing.s) {
-                                Button {
-                                    stationManager.onEnter?(Station(id: "marker_decon", name: "Decontamination", step: .decontamination))
-                                } label: {
-                                    Label("Decon", systemImage: "drop.fill")
-                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, SPAISpacing.m)
-                                        .padding(.vertical, SPAISpacing.s)
-                                        .background(SPAIColor.primary.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                                }
-                                .buttonStyle(.plain)
-
-                                Button {
-                                    stationManager.onEnter?(Station(id: "marker_inspect", name: "Inspection", step: .inspection))
-                                } label: {
-                                    Label("Inspect", systemImage: "magnifyingglass")
-                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, SPAISpacing.m)
-                                        .padding(.vertical, SPAISpacing.s)
-                                        .background(SPAIColor.secondary.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                                }
-                                .buttonStyle(.plain)
-
-                                Button {
-                                    stationManager.onEnter?(Station(id: "marker_assembly", name: "Tray Assembly", step: .trayAssembly))
-                                } label: {
-                                    Label("Assembly", systemImage: "tray.full.fill")
-                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, SPAISpacing.m)
-                                        .padding(.vertical, SPAISpacing.s)
-                                        .background(SPAIColor.accent.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                                }
-                                .buttonStyle(.plain)
-
-                                Button {
-                                    stationManager.onEnter?(Station(id: "marker_prep_pack", name: "Packaging", step: .packaging))
-                                } label: {
-                                    Label("Packaging", systemImage: "shippingbox.fill")
-                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, SPAISpacing.m)
-                                        .padding(.vertical, SPAISpacing.s)
-                                        .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, SPAISpacing.s)
-                        .allowsHitTesting(true)
-                    }
                 }
             }
         }
