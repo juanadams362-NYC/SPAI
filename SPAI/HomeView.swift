@@ -88,6 +88,7 @@ struct HomeView: View {
                         .shadow(color: SPAIColor.primary.opacity(0.4), radius: 20, y: 8)
                     }
                     .buttonStyle(.plain)
+                    .spaiHitTarget()
                 }
                 .padding(SPAISpacing.xxl)
             }

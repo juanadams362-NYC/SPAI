@@ -6,12 +6,19 @@
 //
 
 import AVFoundation
+import RealityKit
 
 @MainActor
 final class SoundManager {
     static let shared = SoundManager()
 
     private var players: [String: AVAudioPlayer] = [:]
+
+    /// RealityKit entity the contamination alert is spatialized from — set by ImmersiveView
+    /// to the detection panel's attachment entity so the alert audibly comes from its direction.
+    var contaminationAnchor: Entity?
+    private var contaminationResource: AudioFileResource?
+    private var contaminationController: AudioPlaybackController?
 
     private init() {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
@@ -41,6 +48,28 @@ final class SoundManager {
     }
 
     func playContaminationAlert() {
-        play("error_fx", ext: "mp3")
+        guard let anchor = contaminationAnchor else {
+            play("error_fx", ext: "mp3")
+            return
+        }
+        do {
+            let resource = try contaminationResource ?? loadContaminationResource()
+            contaminationResource = resource
+            contaminationController = anchor.playAudio(resource)
+        } catch {
+            print("[SoundManager] spatial playback failed, falling back to flat audio: \(error)")
+            play("error_fx", ext: "mp3")
+        }
     }
+
+    private func loadContaminationResource() throws -> AudioFileResource {
+        guard let url = Bundle.main.url(forResource: "error_fx", withExtension: "mp3") else {
+            throw SoundManagerError.missingResource
+        }
+        return try AudioFileResource.load(contentsOf: url, configuration: .init(loadingStrategy: .preload, shouldLoop: false))
+    }
+}
+
+enum SoundManagerError: Error {
+    case missingResource
 }

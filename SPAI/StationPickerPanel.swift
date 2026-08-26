@@ -42,6 +42,7 @@ struct StationPickerPanel: View {
                     .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
+                .spaiHitTarget()
             }
         }
         .padding(compact ? SPAISpacing.m : SPAISpacing.l)

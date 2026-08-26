@@ -66,6 +66,7 @@ struct ActionPanel: View {
                     }
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
             // Icon-only buttons read as nothing to VoiceOver, and this one
             // needs two taps, so say what each tap does.
             .accessibilityLabel(action.label)

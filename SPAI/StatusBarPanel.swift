@@ -92,6 +92,7 @@ struct StatusBarPanel: View {
             }
         }
         .buttonStyle(.plain)
+        .spaiHitTarget()
     }
 
     private var modeBlock: some View {
@@ -117,6 +118,7 @@ struct StatusBarPanel: View {
                 barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             Button {
                 if appModel.isSettingsWindowOpen {
@@ -130,6 +132,7 @@ struct StatusBarPanel: View {
                 barButtonLabel("Settings", icon: "gearshape.fill", tint: SPAIColor.secondary)
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             Button {
                 Task {
@@ -141,6 +144,7 @@ struct StatusBarPanel: View {
                 barButtonLabel("End Session", icon: "xmark.circle.fill", tint: SPAIColor.critical)
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
         }
     }
 

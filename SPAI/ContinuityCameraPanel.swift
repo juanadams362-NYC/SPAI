@@ -137,6 +137,7 @@ struct ContinuityCameraPanel: View {
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             Button {
                 cameraService.stop()
@@ -149,6 +150,7 @@ struct ContinuityCameraPanel: View {
                     .background(SPAIColor.secondary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
         }
     }
     
@@ -173,6 +175,7 @@ struct ContinuityCameraPanel: View {
                     .background(SPAIColor.accent.opacity(0.3), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
             
             Text("Tip: Take a photo on your iPhone, AirDrop it to your Mac, then load it here")
                 .font(.system(size: 11))

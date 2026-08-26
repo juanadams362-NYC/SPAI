@@ -12,6 +12,7 @@ struct SPAIApp: App {
     @State private var appModel = AppModel()
     @State private var detectionService = DetectionService()
     @State private var continuityCamera = ContinuityCameraService()
+    @State private var immersionStyle: ImmersionStyle = .progressive
 
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
 
@@ -57,6 +58,6 @@ struct SPAIApp: App {
                 .environment(detectionService)
                 .environment(continuityCamera)
         }
-        .immersionStyle(selection: .constant(.mixed), in: .mixed)
+        .immersionStyle(selection: $immersionStyle, in: .progressive)
     }
 }

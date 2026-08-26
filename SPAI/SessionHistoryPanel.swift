@@ -11,13 +11,19 @@ struct SessionHistoryPanel: View {
     @Environment(AppModel.self) private var appModel
     @State private var selected: SessionRecord?
     @State private var replayIndex: Int = 0
+    @State private var isComparing = false
+    @State private var compareSelectionIDs: [UUID] = []
+    @State private var comparePair: ComparisonPair?
 
     private var isObserver: Bool { appModel.role == .observer }
     private var isSupervisor: Bool { appModel.role == .supervisor }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            if let record = selected {
+            if let pair = comparePair {
+                comparisonHeader
+                comparisonView(pair)
+            } else if let record = selected {
                 detailHeader
                 if isObserver {
                     replayView(record)
@@ -29,10 +35,11 @@ struct SessionHistoryPanel: View {
             }
         }
         .padding(SPAISpacing.l)
-        .frame(width: 400)
+        .frame(width: comparePair != nil ? 520 : 400)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.2), value: selected != nil)
+        .animation(.easeInOut(duration: 0.2), value: comparePair != nil)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Session history. \(appModel.history.records.count) saved sessions.")
     }
@@ -48,6 +55,25 @@ struct SessionHistoryPanel: View {
                     .foregroundStyle(.white.opacity(0.9))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
+            .accessibilityLabel("Back to session list")
+            Spacer()
+        }
+    }
+
+    private var comparisonHeader: some View {
+        HStack {
+            Button {
+                comparePair = nil
+                isComparing = false
+                compareSelectionIDs.removeAll()
+            } label: {
+                Label("Back", systemImage: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            .spaiHitTarget()
             .accessibilityLabel("Back to session list")
             Spacer()
         }
@@ -76,6 +102,10 @@ struct SessionHistoryPanel: View {
                     .foregroundStyle(SPAIColor.accent)
             }
 
+            if appModel.history.records.count >= 2 {
+                compareToggleRow
+            }
+
             if appModel.history.records.isEmpty {
                 Text("No sessions yet. Complete a workflow to save one.")
                     .font(.system(size: 14))
@@ -90,7 +120,69 @@ struct SessionHistoryPanel: View {
                     }
                 }
                 .frame(maxHeight: 300)
+
+                if isComparing {
+                    compareSelectedButton
+                }
             }
+        }
+    }
+
+    private var compareToggleRow: some View {
+        HStack {
+            Button {
+                isComparing.toggle()
+                compareSelectionIDs.removeAll()
+            } label: {
+                Label(isComparing ? "Cancel Compare" : "Compare Sessions",
+                      systemImage: "square.split.2x1")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isComparing ? SPAIColor.warning : SPAIColor.accent)
+            }
+            .buttonStyle(.plain)
+            .spaiHitTarget()
+            .accessibilityLabel(isComparing ? "Cancel comparing sessions" : "Compare two sessions")
+            Spacer()
+            if isComparing {
+                Text("\(compareSelectionIDs.count)/2 selected")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+    }
+
+    private var compareSelectedButton: some View {
+        let ready = compareSelectionIDs.count == 2
+        return Button {
+            guard ready else { return }
+            let records = compareSelectionIDs.compactMap { id in
+                appModel.history.records.first { $0.id == id }
+            }
+            guard records.count == 2 else { return }
+            comparePair = ComparisonPair(a: records[0], b: records[1])
+        } label: {
+            Text("Compare Selected")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, SPAISpacing.s + 2)
+                .background(ready ? SPAIColor.primary : SPAIColor.neutralMid.opacity(0.3),
+                            in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        }
+        .buttonStyle(.plain)
+        .spaiHitTarget()
+        .disabled(!ready)
+        .accessibilityLabel(ready ? "Compare selected sessions" : "Select two sessions to compare")
+    }
+
+    private func toggleCompareSelection(_ record: SessionRecord) {
+        if let index = compareSelectionIDs.firstIndex(of: record.id) {
+            compareSelectionIDs.remove(at: index)
+        } else {
+            if compareSelectionIDs.count == 2 {
+                compareSelectionIDs.removeFirst()
+            }
+            compareSelectionIDs.append(record.id)
         }
     }
 
@@ -168,6 +260,7 @@ struct SessionHistoryPanel: View {
                                         in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
                     .buttonStyle(.plain)
+                    .spaiHitTarget()
                     .disabled(safeIndex == 0)
                     .accessibilityLabel("Previous event")
 
@@ -183,6 +276,7 @@ struct SessionHistoryPanel: View {
                                         in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
                     .buttonStyle(.plain)
+                    .spaiHitTarget()
                     .disabled(safeIndex >= events.count - 1)
                     .accessibilityLabel("Next event")
 
@@ -206,11 +300,21 @@ struct SessionHistoryPanel: View {
     }
 
     private func row(_ record: SessionRecord) -> some View {
-        Button {
-            selected = record
-            replayIndex = 0
+        let isSelected = compareSelectionIDs.contains(record.id)
+        return Button {
+            if isComparing {
+                toggleCompareSelection(record)
+            } else {
+                selected = record
+                replayIndex = 0
+            }
         } label: {
             HStack(spacing: SPAISpacing.m) {
+                if isComparing {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16))
+                        .foregroundStyle(isSelected ? SPAIColor.accent : .white.opacity(0.4))
+                }
                 Image(systemName: record.passed ? "checkmark.seal.fill" : "xmark.seal.fill")
                     .foregroundStyle(record.passed ? SPAIColor.safe : SPAIColor.critical)
                 VStack(alignment: .leading, spacing: 2) {
@@ -222,15 +326,76 @@ struct SessionHistoryPanel: View {
                         .foregroundStyle(.white.opacity(0.75))
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.6))
+                if !isComparing {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
             }
             .padding(SPAISpacing.m)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            .background(isSelected ? SPAIColor.accent.opacity(0.18) : .white.opacity(0.06),
+                        in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(record.dateText). \(record.passed ? "Passed" : "Failed"). \(record.contaminationCount) contamination events. Duration \(record.durationText). Run as \(record.role). \(isObserver ? "Opens replay." : "Opens report.")")
+        .spaiHitTarget()
+        .accessibilityLabel("\(record.dateText). \(record.passed ? "Passed" : "Failed"). \(record.contaminationCount) contamination events. Duration \(record.durationText). Run as \(record.role). \(isComparing ? (isSelected ? "Selected for comparison." : "Tap to select for comparison.") : (isObserver ? "Opens replay." : "Opens report."))")
+    }
+
+    private func comparisonView(_ pair: ComparisonPair) -> some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.l) {
+            Text("SESSION COMPARISON")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .tracking(1.5)
+                .foregroundStyle(.white.opacity(0.85))
+
+            HStack(alignment: .top, spacing: SPAISpacing.l) {
+                comparisonColumn(pair.a)
+                Rectangle().fill(.white.opacity(0.15)).frame(width: 1)
+                comparisonColumn(pair.b)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Comparing session from \(pair.a.dateText) against session from \(pair.b.dateText).")
+    }
+
+    private func comparisonColumn(_ record: SessionRecord) -> some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            Text(record.dateText)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.75))
+
+            Label(record.passed ? "Passed" : "Failed",
+                  systemImage: record.passed ? "checkmark.seal.fill" : "xmark.seal.fill")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(record.passed ? SPAIColor.safe : SPAIColor.critical)
+
+            comparisonStat("Contamination", "\(record.contaminationCount)")
+            comparisonStat("Duration", record.durationText)
+            comparisonStat("Role", record.role)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(record.dateText). \(record.passed ? "Passed" : "Failed"). \(record.contaminationCount) contamination events. Duration \(record.durationText). Run as \(record.role).")
+    }
+
+    private func comparisonStat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.6))
+            Text(value)
+                .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white)
+        }
+    }
+}
+
+private struct ComparisonPair: Equatable {
+    let a: SessionRecord
+    let b: SessionRecord
+
+    static func == (lhs: ComparisonPair, rhs: ComparisonPair) -> Bool {
+        lhs.a.id == rhs.a.id && lhs.b.id == rhs.b.id
     }
 }
 

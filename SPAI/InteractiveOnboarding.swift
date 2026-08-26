@@ -171,6 +171,7 @@ struct InteractiveOnboardingView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white.opacity(0.8))
                     .buttonStyle(.plain)
+                    .spaiHitTarget()
                 }
                 
                 Spacer()
@@ -199,6 +200,7 @@ struct InteractiveOnboardingView: View {
                 .padding(.vertical, SPAISpacing.s)
                 .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 .buttonStyle(.plain)
+                .spaiHitTarget()
             }
         }
         .padding(SPAISpacing.l)

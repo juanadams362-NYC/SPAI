@@ -205,6 +205,7 @@ struct OnboardingView: View {
                 Button("Back") { withAnimation { page -= 1 } }
                     .foregroundStyle(.white.opacity(0.7))
                     .buttonStyle(.plain)
+                    .spaiHitTarget()
             }
 
             Spacer()
@@ -232,6 +233,7 @@ struct OnboardingView: View {
             .padding(.vertical, SPAISpacing.m)
             .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
             .buttonStyle(.plain)
+            .spaiHitTarget()
         }
     }
 }

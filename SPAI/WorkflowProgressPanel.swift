@@ -183,6 +183,7 @@ struct WorkflowProgressPanel: View {
                 .background(tint, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
         .buttonStyle(.plain)
+        .spaiHitTarget()
     }
 }
 

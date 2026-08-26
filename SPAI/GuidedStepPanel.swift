@@ -89,6 +89,7 @@ struct GuidedStepPanel: View {
                                     in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
+                .spaiHitTarget()
                 .disabled(!satisfied)
                 .accessibilityLabel(isLast ? "Finish station" : "Next step")
                 .accessibilityHint(satisfied ? "Ready" : "Waiting for detection to confirm this step")

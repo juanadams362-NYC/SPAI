@@ -129,6 +129,7 @@ struct ChatPanel: View {
                         .foregroundStyle(voiceInput.isListening ? SPAIColor.warning : SPAIColor.accent)
                 }
                 .buttonStyle(.plain)
+                .spaiHitTarget()
                 .disabled(isWaiting)
                 .accessibilityLabel(voiceInput.isListening ? "Stop voice input" : "Start voice input")
 
@@ -137,6 +138,7 @@ struct ChatPanel: View {
                         .font(.system(size: 26))
                 }
                 .buttonStyle(.plain)
+                .spaiHitTarget()
                 .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || isWaiting)
                 .accessibilityLabel("Send question")
             }

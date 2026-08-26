@@ -8,9 +8,8 @@ import SwiftUI
 struct DetectionPanel: View {
     @Environment(AppModel.self) private var appModel
     let service: DetectionService
+    private let environment = EnvironmentService.shared
 
-    private let temperatureF = 70
-    private let humidityPct = 44
     private let positivePressure = true
 
     private var contaminationRisk: Double { service.contaminationRisk }
@@ -46,10 +45,12 @@ struct DetectionPanel: View {
             if old < 0.5 && new >= 0.5 && appModel.shouldHaltOnBareHand {
                 SoundManager.shared.playContaminationAlert()
                 // force: a safety alert speaks whether or not the user
-                // turned spoken guidance on.
+                // turned spoken guidance on. Anchored to the same panel as the
+                // alert tone so the whole warning comes from one direction.
                 SpeechManager.shared.speak(
                     "Contamination detected. Bare hand visible. Workflow halted.",
-                    force: true
+                    force: true,
+                    anchor: SoundManager.shared.contaminationAnchor
                 )
                 if !appModel.isHalted {
                     appModel.raiseContamination()
@@ -58,6 +59,7 @@ struct DetectionPanel: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Detection. Contamination risk \(service.hasResult ? "\(Int(contaminationRisk * 100)) percent" : "not measured"). \(ppeText).")
+        .onAppear { environment.start() }
     }
 
     private var header: some View {
@@ -106,19 +108,29 @@ struct DetectionPanel: View {
 
     private var environmentSection: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.s) {
-            Text("ENVIRONMENT (SIMULATED)")
+            Text("ENVIRONMENT (LIVE)")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .tracking(1.2)
                 .foregroundStyle(.white.opacity(0.75))
-            environmentRow(icon: "thermometer.medium", label: "Temperature",
-                           value: "\(temperatureF)°F", ok: (68...73).contains(temperatureF))
-            environmentRow(icon: "humidity.fill", label: "Humidity",
-                           value: "\(humidityPct)%", ok: (30...60).contains(humidityPct))
+            if let temperatureF = environment.temperatureF {
+                environmentRow(icon: "thermometer.medium", label: "Temperature",
+                               value: "\(temperatureF)°F", ok: (68...73).contains(temperatureF))
+            } else {
+                environmentRow(icon: "thermometer.medium", label: "Temperature",
+                               value: environment.errorMessage == nil ? "…" : "—", ok: true)
+            }
+            if let humidityPct = environment.humidityPct {
+                environmentRow(icon: "humidity.fill", label: "Humidity",
+                               value: "\(humidityPct)%", ok: (30...60).contains(humidityPct))
+            } else {
+                environmentRow(icon: "humidity.fill", label: "Humidity",
+                               value: environment.errorMessage == nil ? "…" : "—", ok: true)
+            }
             environmentRow(icon: "wind", label: "Air pressure",
                            value: positivePressure ? "Positive" : "Negative", ok: positivePressure)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Simulated environment. Temperature \(temperatureF) degrees. Humidity \(humidityPct) percent. Air pressure \(positivePressure ? "positive" : "negative").")
+        .accessibilityLabel("Environment. Temperature \(environment.temperatureF.map(String.init) ?? "unavailable") degrees. Humidity \(environment.humidityPct.map(String.init) ?? "unavailable") percent. Air pressure \(positivePressure ? "positive" : "negative").")
     }
 
     private func environmentRow(icon: String, label: String, value: String, ok: Bool) -> some View {

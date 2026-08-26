@@ -37,6 +37,7 @@ struct DetectionUploadPanel: View {
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             if service.isLoading {
                 Text("Detecting…")

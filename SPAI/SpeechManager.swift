@@ -6,6 +6,7 @@
 //
 
 import AVFoundation
+import RealityKit
 import Speech
 import SwiftUI
 
@@ -15,6 +16,15 @@ final class SpeechManager {
     static let shared = SpeechManager()
 
     private let synthesizer = AVSpeechSynthesizer()
+    /// Dedicated synthesizer for offline buffer rendering, kept separate from `synthesizer` so
+    /// spatial rendering never fights the flat-fallback speak path for playback state.
+    private let renderSynthesizer = AVSpeechSynthesizer()
+
+    /// RealityKit entity guided-step narration is spatialized from — set by ImmersiveView to the
+    /// guided-step panel's attachment entity so instructions audibly come from its direction.
+    var guidedAnchor: Entity?
+    private var playbackController: AudioPlaybackController?
+    private var speechToken = 0
 
     var isEnabled: Bool {
         get { UserDefaults.standard.bool(forKey: "speakSteps") }
@@ -25,16 +35,69 @@ final class SpeechManager {
 
     private static let preferredVoice: AVSpeechSynthesisVoice? = bestEnglishVoice()
 
-        func speak(_ text: String, force: Bool = false) {
+        /// Speaks `text` spatially from `anchor` (or `guidedAnchor` if omitted). Falls back to
+        /// flat, non-positional speech if no anchor is available yet.
+        func speak(_ text: String, force: Bool = false, anchor: Entity? = nil) {
             guard isEnabled || force else { return }
             stop()
+            speechToken += 1
+            let token = speechToken
+
             let utterance = AVSpeechUtterance(string: text)
             utterance.voice = Self.preferredVoice
             utterance.rate = 0.46
             utterance.pitchMultiplier = 0.98
             utterance.volume = 1.0
             utterance.preUtteranceDelay = 0.1
-            synthesizer.speak(utterance)
+
+            guard let target = anchor ?? guidedAnchor else {
+                synthesizer.speak(utterance)
+                return
+            }
+
+            Task {
+                do {
+                    let fileURL = try await renderToFile(utterance)
+                    let resource = try AudioFileResource.load(contentsOf: fileURL, configuration: .init(loadingStrategy: .preload, shouldLoop: false))
+                    guard self.speechToken == token else { return }
+                    self.playbackController = target.playAudio(resource)
+                } catch {
+                    print("[Speech] spatial render failed, falling back to flat audio: \(error)")
+                    guard self.speechToken == token else { return }
+                    self.synthesizer.speak(utterance)
+                }
+            }
+        }
+
+        /// Renders `utterance` to a temporary .caf file via the offline buffer callback API.
+        private func renderToFile(_ utterance: AVSpeechUtterance) async throws -> URL {
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".caf")
+            return try await withCheckedThrowingContinuation { continuation in
+                var audioFile: AVAudioFile?
+                var didFinish = false
+                renderSynthesizer.write(utterance) { buffer in
+                    guard !didFinish else { return }
+                    guard let pcmBuffer = buffer as? AVAudioPCMBuffer else {
+                        didFinish = true
+                        continuation.resume(throwing: SpeechManagerError.unsupportedBuffer)
+                        return
+                    }
+                    if pcmBuffer.frameLength == 0 {
+                        didFinish = true
+                        continuation.resume(returning: tempURL)
+                        return
+                    }
+                    do {
+                        if audioFile == nil {
+                            audioFile = try AVAudioFile(forWriting: tempURL, settings: pcmBuffer.format.settings)
+                        }
+                        try audioFile?.write(from: pcmBuffer)
+                    } catch {
+                        didFinish = true
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
         }
 
         private static func bestEnglishVoice() -> AVSpeechSynthesisVoice? {
@@ -54,10 +117,17 @@ final class SpeechManager {
         }
 
     func stop() {
+        speechToken += 1
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
+        playbackController?.stop()
+        playbackController = nil
     }
+}
+
+enum SpeechManagerError: Error {
+    case unsupportedBuffer
 }
 
 @MainActor

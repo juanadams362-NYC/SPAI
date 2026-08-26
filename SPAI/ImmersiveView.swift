@@ -72,6 +72,8 @@ struct ImmersiveView: View {
             #if !targetEnvironment(simulator)
             cameraService.stop()
             #endif
+            SoundManager.shared.contaminationAnchor = nil
+            SpeechManager.shared.guidedAnchor = nil
         }
     }
     
@@ -85,8 +87,16 @@ struct ImmersiveView: View {
 
             place("detection", angle: -30, height: 1.45, radius: 1.2, content, attachments)
             place("eventLog",  angle:  30, height: 1.45, radius: 1.2, content, attachments)
+            if let detectionEntity = attachments.entity(for: "detection") {
+                detectionEntity.spatialAudio = SpatialAudioComponent()
+                SoundManager.shared.contaminationAnchor = detectionEntity
+            }
 
             place("guided",    angle:  16, height: 1.15, radius: 1.15, content, attachments)
+            if let guidedEntity = attachments.entity(for: "guided") {
+                guidedEntity.spatialAudio = SpatialAudioComponent()
+                SpeechManager.shared.guidedAnchor = guidedEntity
+            }
 
             place("workflow",  angle:  0,  height: 0.85, radius: 1.1, content, attachments)
             // Removed: camera panel (merged into upload window)
@@ -96,6 +106,7 @@ struct ImmersiveView: View {
             place("chat",      angle:  48, height: 1.7,  radius: 1.3, content, attachments)
             place("history",   angle: -52, height: 1.55, radius: 1.3, content, attachments)
             place("wristMenu", angle: -70, height: 0.9, radius: 1.2, content, attachments)
+            place("stationPicker", angle: -30, height: 0.85, radius: 1.2, content, attachments)
 
             place("report",    angle:  0,  height: 1.4,  radius: 1.05, content, attachments)
 
@@ -112,6 +123,24 @@ struct ImmersiveView: View {
             setEnabled("chat", attachments)
             setEnabled("history", attachments)
             // setEnabled("wristMenu", attachments) // Not explicitly enabled here, but not changed per instructions
+            #if targetEnvironment(simulator)
+            attachments.entity(for: "stationPicker")?.isEnabled = true
+            #else
+            attachments.entity(for: "stationPicker")?.isEnabled = handTracking.leftWristPose != nil
+            #endif
+
+            updateWristAnchor(
+                "wristMenu", attachments,
+                pose: handTracking.rightWristPose,
+                offset: SIMD3<Float>(x: 0.06, y: 0.025, z: -0.02),
+                fallback: arcPosition(angle: -70, height: 0.9, radius: 1.2)
+            )
+            updateWristAnchor(
+                "stationPicker", attachments,
+                pose: handTracking.leftWristPose,
+                offset: SIMD3<Float>(x: -0.06, y: 0.025, z: -0.02),
+                fallback: arcPosition(angle: -30, height: 0.85, radius: 1.2)
+            )
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
             attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
             
@@ -127,6 +156,7 @@ struct ImmersiveView: View {
             updateBillboard("chat", attachments)
             updateBillboard("history", attachments)
             // Removed updateBillboard("wristMenu", attachments)
+            updateBillboard("stationPicker", attachments)
             updateBillboard("report", attachments)
             #if true
             updateBillboard("upload", attachments)
@@ -168,33 +198,16 @@ struct ImmersiveView: View {
             Attachment(id: "guided") { GuidedStepPanel() }
             Attachment(id: "history") { SessionHistoryPanel() }
             Attachment(id: "wristMenu") {
-                let rightActive = handTracking.rightWristPose != nil
-                let leftActive  = handTracking.leftWristPose  != nil
-                let offset = rightActive
-                    ? SIMD3<Float>(x: 0.06, y: 0.025, z: -0.02)
-                    : SIMD3<Float>(x: -0.06, y: 0.025, z: -0.02)
-
-                if leftActive && !rightActive {
-                    // Left wrist: compact station picker
-                    StationPickerPanel(manager: stationManager, compact: true)
-                } else {
-                    // Right wrist (or simulator fallback): quick-action menu
-                    WristMenuPanel(
-                        wristPoseProvider: {
-                            if rightActive, let pose = handTracking.rightWristPose {
-                                return (pose.position, pose.forward, pose.up)
-                            } else if let pose = handTracking.leftWristPose {
-                                return (pose.position, pose.forward, pose.up)
-                            } else {
-                                return nil
-                            }
-                        },
-                        isHandVisibleProvider: {
-                            handTracking.rightWristPosition != nil || handTracking.leftWristPosition != nil
-                        },
-                        wristOffsetLocal: offset
-                    )
-                }
+                // Right wrist (or simulator fallback): quick-action menu
+                WristMenuPanel(
+                    isHandVisibleProvider: {
+                        handTracking.rightWristPosition != nil
+                    }
+                )
+            }
+            Attachment(id: "stationPicker") {
+                // Left wrist: compact station picker
+                StationPickerPanel(manager: stationManager, compact: true)
             }
         }
     }
@@ -227,6 +240,29 @@ struct ImmersiveView: View {
 
     private func setEnabled(_ id: String, _ attachments: RealityViewAttachments) {
         attachments.entity(for: id)?.isEnabled = appModel.isVisible(id)
+    }
+
+    /// Re-anchors a wrist panel to the live tracked wrist pose each frame. Falls back to a fixed
+    /// room position (used at `place()` time too) whenever there's no pose to track — in the
+    /// simulator, where hand tracking never runs, or on device before/between hand detections.
+    private func updateWristAnchor(
+        _ id: String,
+        _ attachments: RealityViewAttachments,
+        pose: (position: SIMD3<Float>, forward: SIMD3<Float>, up: SIMD3<Float>)?,
+        offset: SIMD3<Float>,
+        fallback: SIMD3<Float>
+    ) {
+        guard let panel = attachments.entity(for: id) else { return }
+        #if targetEnvironment(simulator)
+        panel.position = fallback
+        #else
+        guard let pose else {
+            panel.position = fallback
+            return
+        }
+        let right = normalize(cross(pose.up, pose.forward))
+        panel.position = pose.position + right * offset.x + pose.up * offset.y + pose.forward * offset.z
+        #endif
     }
     
     private func updateBillboard(_ id: String, _ attachments: RealityViewAttachments) {

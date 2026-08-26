@@ -70,6 +70,7 @@ struct UploadWindowView: View {
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             Button {
                 isFileImporterPresented = true
@@ -82,6 +83,7 @@ struct UploadWindowView: View {
                     .background(SPAIColor.secondary.opacity(0.8), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             #if !targetEnvironment(simulator)
             Button {
@@ -95,6 +97,7 @@ struct UploadWindowView: View {
                     .background(SPAIColor.accent.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             if showContinuityCamera {
                 Divider().padding(.vertical, SPAISpacing.s)
@@ -317,6 +320,7 @@ struct UploadWindowView: View {
                     .font(.title2).foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
         }
     }
 
@@ -372,6 +376,7 @@ struct UploadWindowView: View {
                             .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
                     .buttonStyle(.plain)
+                    .spaiHitTarget()
                 }
             } else {
                 Button {
@@ -385,6 +390,7 @@ struct UploadWindowView: View {
                         .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
+                .spaiHitTarget()
 
                 if videoService.framesProcessed > 0 {
                     Text("\(videoService.framesProcessed) frames processed, \(videoService.framesSkipped) skipped. Watch the detection and workflow panels.")
@@ -555,6 +561,7 @@ struct ContinuityCameraMini: View {
                         .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
+                .spaiHitTarget()
 
                 Button {
                     cameraService.stop()
@@ -567,6 +574,7 @@ struct ContinuityCameraMini: View {
                         .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
+                .spaiHitTarget()
             }
 
             Toggle(isOn: Binding(

@@ -65,6 +65,16 @@ extension View {
         modifier(SPAIGlass(mode: mode, radius: radius))
     }
 
+    /// Guarantees a control meets the platform minimum hit-target size and shows a visible
+    /// gaze-hover highlight, regardless of how small its visual content is. The extra hit area
+    /// is invisible — it only widens what counts as "on" the control, it doesn't resize it.
+    func spaiHitTarget(minSize: CGFloat = 44) -> some View {
+        self
+            .frame(minWidth: minSize, minHeight: minSize)
+            .contentShape(Rectangle())
+            .hoverEffect(.highlight)
+    }
+
     func spaiPanelBackground(opacity: Double, cornerRadius: CGFloat = SPAIRadius.large) -> some View {
         self.background(
             ZStack {
