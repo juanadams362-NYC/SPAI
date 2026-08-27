@@ -2,6 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SPAI uses the microphone to let you ask workflow questions by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SPAI uses speech recognition to transcribe voice questions for Ask SPAI.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>SPAI uses your location to show live temperature and humidity conditions on the environment panel.</string>
+	<key>NSHandsTrackingUsageDescription</key>
+	<string>SPAI uses hand tracking to monitor sterile processing technique.</string>
+	<key>NSWorldSensingUsageDescription</key>
+	<string>SPAI uses world sensing to place compliance panels in your workspace.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>Allow local networking</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationPreferredDefaultSceneSessionRole</key>
@@ -14,15 +29,10 @@
 			<array>
 				<dict>
 					<key>UISceneInitialImmersionStyle</key>
-					<string>UIImmersionStyleMixed</string>
+					<string>UIImmersionStyleProgressive</string>
 				</dict>
 			</array>
 		</dict>
-	</dict>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>Allow local networking</key>
-		<true/>
 	</dict>
 </dict>
 </plist>

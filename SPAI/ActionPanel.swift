@@ -1,23 +1,10 @@
 //
-//  QuickAction.swift
-//  SPAI
-//
-//  Created by Juan Adams on 6/7/26.
-//
-
-
-//
 //  ActionPanel.swift
 //  SPAI
-//
-//  A compact vertical cluster of quick actions (the floating button
-//  stack from the Figma). Each action is an icon button that reveals
-//  its label, and triggers a callback so the parent can respond.
 //
 
 import SwiftUI
 
-/// One quick action in the cluster.
 struct QuickAction: Identifiable {
     let id = UUID()
     let label: String
@@ -29,7 +16,7 @@ struct QuickAction: Identifiable {
 struct ActionPanel: View {
     let actions: [QuickAction]
 
-    // Which action's label is currently expanded (tap to reveal).
+    @Environment(AppModel.self) private var appModel
     @State private var expandedID: UUID?
 
     var body: some View {
@@ -39,27 +26,28 @@ struct ActionPanel: View {
             }
         }
         .padding(SPAISpacing.s + 4)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Quick actions")
     }
 
     private func actionButton(_ action: QuickAction) -> some View {
         let isExpanded = expandedID == action.id
 
         return HStack(spacing: SPAISpacing.s) {
-            // The label slides in when expanded.
             if isExpanded {
                 Text(action.label)
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.white)
                     .padding(.horizontal, SPAISpacing.m)
                     .padding(.vertical, SPAISpacing.s)
-                    .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                    .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .accessibilityHidden(true)
             }
 
             Button {
-                // Tap once to reveal the label; tap again to fire the action.
                 if isExpanded {
                     action.action()
                     withAnimation(.easeOut(duration: 0.2)) { expandedID = nil }
@@ -71,13 +59,18 @@ struct ActionPanel: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(action.tint)
                     .frame(width: 52, height: 52)
-                    .background(action.tint.opacity(0.18), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+                    .background(action.tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
                     .overlay {
                         RoundedRectangle(cornerRadius: SPAIRadius.medium)
-                            .stroke(action.tint.opacity(0.4), lineWidth: 1)
+                            .stroke(action.tint.opacity(0.5), lineWidth: 1)
                     }
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
+            // Icon-only buttons read as nothing to VoiceOver, and this one
+            // needs two taps, so say what each tap does.
+            .accessibilityLabel(action.label)
+            .accessibilityHint(isExpanded ? "Double tap to run" : "Double tap to confirm, then again to run")
         }
     }
 }

@@ -2,9 +2,6 @@
 //  DemoView.swift
 //  SPAI
 //
-//  SCRUM-44: Demo page. Pick an image, send to backend /detect,
-//  draw the returned bounding boxes over the image.
-//
 
 import SwiftUI
 import PhotosUI
@@ -90,8 +87,6 @@ struct DemoView: View {
     }
 
     private func imageWithBoxes(_ uiImage: UIImage) -> some View {
-        // GeometryReader gives us the actual displayed width, so we can
-        // scale the backend's pixel-coordinate boxes to match.
         GeometryReader { geo in
             let displayWidth = geo.size.width
             let scale = displayWidth / uiImage.size.width

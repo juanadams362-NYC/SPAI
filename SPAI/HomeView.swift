@@ -6,10 +6,8 @@
 import SwiftUI
 
 struct HomeView: View {
-    // Shared app state injected from SPAIApp.
     @Environment(AppModel.self) private var appModel
 
-    // System actions for entering immersive spaces and managing windows.
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -60,8 +58,6 @@ struct HomeView: View {
 
                     Spacer()
 
-                    // Opens the immersive workflow and dismisses this window so
-                    // only the spatial content remains — the room becomes the interface.
                     Button {
                         Task {
                             guard appModel.immersiveSpaceState == .closed else { return }
@@ -92,6 +88,7 @@ struct HomeView: View {
                         .shadow(color: SPAIColor.primary.opacity(0.4), radius: 20, y: 8)
                     }
                     .buttonStyle(.plain)
+                    .spaiHitTarget()
                 }
                 .padding(SPAISpacing.xxl)
             }

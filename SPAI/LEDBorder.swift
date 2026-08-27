@@ -5,22 +5,11 @@
 //  Created by Juan Adams on 6/5/26.
 //
 
-
-//
-//  LEDBorder.swift
-//  SPAI
-//
-//  An animated "LED strip" border. Instead of a static stroke, an angular
-//  gradient of accent colors rotates continuously around the panel edge,
-//  giving panels a living, AI-active feel. Used on detection / AI panels.
-//
-
 import SwiftUI
 
 enum BorderState {
     case normal, warning, critical
 
-    // Swap these for your DesignTokens colors (e.g. Tokens.accentBlue)
     var colors: [Color] {
         switch self {
         case .normal:   return [Color(hex: 0x4A9EFF), Color(hex: 0x9B6BFF), Color(hex: 0x6FD3FF)]
@@ -28,7 +17,7 @@ enum BorderState {
         case .critical: return [Color(hex: 0xFF5A5A), Color(hex: 0xA32D2D), Color(hex: 0xFF5A5A)]
         }
     }
-    var secondsPerLoop: Double {   // faster = more urgent
+    var secondsPerLoop: Double {
         switch self {
         case .normal: return 6;  case .warning: return 3;  case .critical: return 1.6
         }
@@ -49,7 +38,7 @@ struct LEDBorder: ViewModifier {
                     AngularGradient(
                         gradient: Gradient(colors: state.colors + [state.colors.first!]),
                         center: .center,
-                        angle: .degrees(angle)        // rotating this = band travels around
+                        angle: .degrees(angle)
                     ),
                     lineWidth: lineWidth
                 )
@@ -72,7 +61,7 @@ extension View {
     }
 }
 
-extension Color {   // delete if you already have a hex init in DesignTokens
+extension Color {
     init(hex: UInt) {
         self.init(.sRGB, red: Double((hex >> 16) & 0xFF)/255,
                   green: Double((hex >> 8) & 0xFF)/255,

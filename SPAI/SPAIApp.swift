@@ -10,7 +10,9 @@ import SwiftUI
 @main
 struct SPAIApp: App {
     @State private var appModel = AppModel()
-    @State private var detectionService = DetectionService()   // shared everywhere now
+    @State private var detectionService = DetectionService()
+    @State private var continuityCamera = ContinuityCameraService()
+    @State private var immersionStyle: ImmersionStyle = .progressive
 
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
 
@@ -25,31 +27,37 @@ struct SPAIApp: App {
             }
             .environment(appModel)
             .environment(detectionService)
+            .environment(continuityCamera)
         }
         .windowStyle(.plain)
+        .defaultSize(width: 800, height: 600)
 
         WindowGroup(id: "settings") {
             SettingsView()
                 .environment(appModel)
                 .environment(detectionService)
+                .environment(continuityCamera)
         }
         .windowStyle(.plain)
+        .defaultSize(width: 450, height: 700)
+        .windowResizability(.contentSize)
 
-        // Sim-only upload window. PhotosPicker presents a sheet, which can't
-        // appear inside an ImmersiveSpace — so the picker lives here.
         WindowGroup(id: "upload") {
             UploadWindowView()
                 .environment(appModel)
                 .environment(detectionService)
+                .environment(continuityCamera)
         }
         .windowStyle(.plain)
         .defaultSize(width: 520, height: 640)
+        .windowResizability(.contentSize)
 
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
             ImmersiveView()
                 .environment(appModel)
                 .environment(detectionService)
+                .environment(continuityCamera)
         }
-        .immersionStyle(selection: .constant(.mixed), in: .mixed)
+        .immersionStyle(selection: $immersionStyle, in: .progressive)
     }
 }

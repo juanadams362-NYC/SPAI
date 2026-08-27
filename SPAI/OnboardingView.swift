@@ -2,9 +2,6 @@
 //  OnboardingView.swift
 //  SPAI
 //
-//  First-launch guided walkthrough. Introduces what SPAI does and how
-//  stations work, then enters the workspace.
-//
 
 import SwiftUI
 
@@ -13,6 +10,7 @@ struct OnboardingView: View {
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
 
     @State private var page = 0
+    private let totalPages = 5
 
     var body: some View {
         ZStack {
@@ -22,11 +20,14 @@ struct OnboardingView: View {
                 Group {
                     switch page {
                     case 0: welcomePage
-                    case 1: howItWorksPage
-                    default: stationsPage
+                    case 1: panelsPage
+                    case 2: detectionPage
+                    case 3: workflowPage
+                    case 4: testingPage
+                    default: welcomePage
                     }
                 }
-                .frame(maxWidth: 620)
+                .frame(maxWidth: 700)
 
                 Spacer()
 
@@ -51,40 +52,130 @@ struct OnboardingView: View {
             Text("Your spatial assistant for sterile processing. SPAI watches your workflow, checks PPE and compliance, and guides you step by step — all in the room around you.")
                 .font(.title3)
                 .foregroundStyle(.white.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    // MARK: - Page 1: how it works
+    // MARK: - Page 1: Panels
 
-    private var howItWorksPage: some View {
+    private var panelsPage: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.l) {
-            Text("How it works")
+            Text("Panels Around You")
                 .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(.white)
 
-            onboardingPoint(icon: "rectangle.3.group", title: "Panels around you",
-                            detail: "Your workflow, detection, and event log appear as panels at the edges of your view, keeping the center clear for your hands and the tray.")
-            onboardingPoint(icon: "viewfinder", title: "Live detection",
-                            detail: "SPAI watches for PPE and contamination risk as you work, and flags issues in real time.")
-            onboardingPoint(icon: "checklist", title: "Guided steps",
-                            detail: "SPAI tracks the current sterile-processing step, what's next, and enforces the correct order.")
-        }
-    }
-
-    // MARK: - Page 2: stations
-
-    private var stationsPage: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.l) {
-            Text("Walk between stations")
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(.white)
-
-            Text("SPAI follows the real layout of your department. When you move to a station — decontamination, inspection, assembly, packaging, or seal validation — SPAI loads that step's workspace around you.")
+            Text("Your workspace includes several floating panels positioned in a comfortable arc:")
                 .font(.title3)
                 .foregroundStyle(.white.opacity(0.75))
 
-            onboardingPoint(icon: "figure.walk", title: "Move to begin",
-                            detail: "Step into a station's area and SPAI sets the workflow to that step automatically.")
+            VStack(alignment: .leading, spacing: SPAISpacing.m) {
+                onboardingPoint(icon: "rectangle.3.group", title: "Status Bar (Top)",
+                                detail: "Shows session time, your role, detection mode, and quick actions")
+                onboardingPoint(icon: "viewfinder", title: "Detection (Left)",
+                                detail: "Live PPE check, contamination risk, and environment stats")
+                onboardingPoint(icon: "waveform.path.ecg", title: "Event Log (Right)",
+                                detail: "Real-time feed of workflow events and alerts")
+                onboardingPoint(icon: "checklist", title: "Workflow Progress (Bottom)",
+                                detail: "Shows all 5 steps and your current position")
+            }
+        }
+    }
+
+    // MARK: - Page 2: Detection
+
+    private var detectionPage: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.l) {
+            Text("Live Detection")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(.white)
+
+            Text("SPAI continuously monitors for:")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.75))
+
+            VStack(alignment: .leading, spacing: SPAISpacing.m) {
+                onboardingPoint(icon: "hand.raised.fill", title: "PPE Compliance",
+                                detail: "Detects gloves vs. bare hands in real-time")
+                onboardingPoint(icon: "exclamationmark.triangle.fill", title: "Contamination Risk",
+                                detail: "Alerts when bare skin is detected during sterile steps")
+                onboardingPoint(icon: "tray.full.fill", title: "Instrument Detection",
+                                detail: "Verifies surgical trays are loaded correctly")
+                onboardingPoint(icon: "clock.arrow.circlepath", title: "Auto-Advance",
+                                detail: "Moves to next step after 3 consecutive successful detections")
+            }
+        }
+    }
+
+    // MARK: - Page 3: Workflow
+
+    private var workflowPage: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.l) {
+            Text("Guided Workflow")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(.white)
+
+            Text("SPAI guides you through all 5 sterile processing steps:")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.75))
+
+            VStack(alignment: .leading, spacing: SPAISpacing.s + 2) {
+                stepRow("1", "Decontamination", "Remove visible soil")
+                stepRow("2", "Inspection", "Check for damage")
+                stepRow("3", "Tray Assembly", "Organize instruments")
+                stepRow("4", "Packaging", "Prepare for sterilization")
+                stepRow("5", "Seal Validation", "Verify packaging integrity")
+            }
+
+            Text("Tap 'Start Step' to begin. SPAI will give voice instructions and watch for completion.")
+                .font(.callout)
+                .foregroundStyle(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Page 4: Testing
+
+    private var testingPage: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.l) {
+            Text("Testing Features")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(.white)
+
+            Text("In the 'SIM TEST' panel, you can:")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.75))
+
+            VStack(alignment: .leading, spacing: SPAISpacing.m) {
+                onboardingPoint(icon: "photo.badge.plus", title: "Upload Test Media",
+                                detail: "Test detection with images or videos from your library")
+                onboardingPoint(icon: "iphone", title: "Use iPhone Camera (Real Device)",
+                                detail: "Connect your iPhone via Continuity Camera for live testing")
+                onboardingPoint(icon: "slider.horizontal.3", title: "Adjust Settings",
+                                detail: "Change panel opacity, billboard mode, and confidence thresholds")
+            }
+
+            Text("Ready to begin your spatial sterile processing journey!")
+                .font(.title3.bold())
+                .foregroundStyle(SPAIColor.primary)
+        }
+    }
+
+    private func stepRow(_ number: String, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: SPAISpacing.m) {
+            Text(number)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(SPAIColor.primary)
+                .frame(width: 28, height: 28)
+                .background(SPAIColor.primary.opacity(0.2), in: Circle())
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
         }
     }
 
@@ -101,6 +192,7 @@ struct OnboardingView: View {
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -112,13 +204,14 @@ struct OnboardingView: View {
             if page > 0 {
                 Button("Back") { withAnimation { page -= 1 } }
                     .foregroundStyle(.white.opacity(0.7))
+                    .buttonStyle(.plain)
+                    .spaiHitTarget()
             }
 
             Spacer()
 
             HStack(spacing: 8) {
-                ForEach(0..<3) { i in
-                    Circle()
+                ForEach(0..<totalPages, id: \.self) { i in                    Circle()
                         .fill(i == page ? SPAIColor.primary : .white.opacity(0.25))
                         .frame(width: 8, height: 8)
                 }
@@ -126,12 +219,10 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button(page < 2 ? "Next" : "Get Started") {
-                if page < 2 {
+            Button(page < totalPages - 1 ? "Next" : "Get Started") {
+                if page < totalPages - 1 {
                     withAnimation { page += 1 }
                 } else {
-                    // Finish onboarding. Turn off the testing flag so we
-                    // actually leave, and mark it complete.
                     alwaysShowOnboarding = false
                     appModel.hasCompletedOnboarding = true
                 }
@@ -142,6 +233,7 @@ struct OnboardingView: View {
             .padding(.vertical, SPAISpacing.m)
             .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
             .buttonStyle(.plain)
+            .spaiHitTarget()
         }
     }
 }
