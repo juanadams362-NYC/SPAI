@@ -2,10 +2,6 @@
 //  WorkflowProgressPanel.swift
 //  SPAI
 //
-//  The horizontal 5-step sterile-processing tracker. Reads its step
-//  state from AppModel now (single source of truth) instead of local
-//  @State, so the event log and FSM can stay in sync with it.
-//
 
 import SwiftUI
 
@@ -16,12 +12,10 @@ struct WorkflowProgressPanel: View {
     private var currentStepIndex: Int { appModel.currentStepIndex }
     private var stepStarted: Bool { appModel.stepStarted }
 
-    // A failed step can only be sent back if we're past Decontamination.
     private var canSendBack: Bool {
         stepStarted && currentStepIndex > 0
     }
 
-    // Trainees get a Redo affordance to repeat the current step.
     private var canRedo: Bool {
         appModel.role == .trainee && stepStarted
     }
@@ -43,13 +37,8 @@ struct WorkflowProgressPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 760)
-        // Use the shared panel background so this matches DetectionPanel and
-        // the rest of the panels instead of a raw material (which looked
-        // inconsistent — different blur/opacity from everything else).
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
-        // Animate whenever the step or started-state changes — nodes,
-        // connectors, and the count all glide instead of snapping.
         .animation(.spring(response: 0.45, dampingFraction: 0.7), value: currentStepIndex)
         .animation(.easeInOut(duration: 0.3), value: stepStarted)
     }
@@ -61,12 +50,68 @@ struct WorkflowProgressPanel: View {
             Text("WORKFLOW PROGRESS")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.7))
+
             Spacer()
+
             Text("\(currentStepIndex)/\(SterileStep.allCases.count)")
-                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
-                .contentTransition(.numericText())   // the count rolls up
+        }
+    }
+
+    private var controls: some View {
+        HStack(spacing: SPAISpacing.m) {
+            if appModel.isHalted {
+                Label("CONTAMINATION — WORKFLOW HALTED", systemImage: "exclamationmark.octagon.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(SPAIColor.critical)
+
+                Spacer()
+
+                if appModel.canRunWorkflow {
+                    actionButton("Acknowledge & Resume", icon: "checkmark.shield.fill", tint: SPAIColor.critical) {
+                        appModel.acknowledgeContamination()
+                    }
+                }
+            } else if !appModel.canRunWorkflow {
+                Label("Viewing as \(appModel.role.rawValue) — read only",
+                      systemImage: appModel.role == .observer ? "eye.fill" : "checkmark.seal.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+
+                Spacer()
+
+                Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready: \(currentStep.title)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.5))
+            } else {
+                Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
+
+                Spacer()
+
+                if !stepStarted {
+                    actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
+                        appModel.startStep()
+                    }
+                } else {
+                    if canRedo {
+                        actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
+                            appModel.redoStep()
+                        }
+                    }
+                    if canSendBack {
+                        actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
+                            appModel.failStep()
+                        }
+                    }
+                    actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
+                        appModel.completeStep()
+                    }
+                }
+            }
         }
     }
 
@@ -81,7 +126,6 @@ struct WorkflowProgressPanel: View {
                 Circle()
                     .fill(nodeFill(isCurrent: isCurrent, isComplete: isComplete))
                     .frame(width: 44, height: 44)
-                    // Current step gently pulses bigger; completed/upcoming sit normal.
                     .scaleEffect(isCurrent ? 1.12 : 1.0)
                     .shadow(
                         color: isCurrent ? SPAIColor.primary.opacity(0.6) : .clear,
@@ -124,38 +168,6 @@ struct WorkflowProgressPanel: View {
             .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Controls
-
-    private var controls: some View {
-        HStack(spacing: SPAISpacing.m) {
-            Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.7))
-
-            Spacer()
-
-            if !stepStarted {
-                actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
-                    appModel.startStep()
-                }
-            } else {
-                if canRedo {
-                    actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
-                        appModel.redoStep()
-                    }
-                }
-                if canSendBack {
-                    actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
-                        appModel.failStep()
-                    }
-                }
-                actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
-                    appModel.completeStep()
-                }
-            }
-        }
-    }
-
     private func actionButton(
         _ label: String,
         icon: String,
@@ -171,6 +183,7 @@ struct WorkflowProgressPanel: View {
                 .background(tint, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
         .buttonStyle(.plain)
+        .spaiHitTarget()
     }
 }
 

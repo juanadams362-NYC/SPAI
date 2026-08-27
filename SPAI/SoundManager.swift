@@ -5,35 +5,29 @@
 //  Created by Juan Adams on 6/24/26.
 //
 
-
-//
-//  SoundManager.swift
-//  SPAI
-//
-
 import AVFoundation
+import RealityKit
 
 @MainActor
 final class SoundManager {
-    /// Shared instance — one player, reused app-wide.
     static let shared = SoundManager()
 
-    /// Cached players keyed by file name, so each sound loads from disk once.
     private var players: [String: AVAudioPlayer] = [:]
 
+    /// RealityKit entity the contamination alert is spatialized from — set by ImmersiveView
+    /// to the detection panel's attachment entity so the alert audibly comes from its direction.
+    var contaminationAnchor: Entity?
+    private var contaminationResource: AudioFileResource?
+    private var contaminationController: AudioPlaybackController?
+
     private init() {
-        // Make sure our sounds play even if the device is on silent / mixes
-        // politely with other audio. Failing this isn't fatal — the sound
-        // just might not play in some states — so we don't crash on it.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
     }
 
-    /// Play a bundled sound by file name + extension (e.g. "error_fx", "mp3").
-    /// Loads and caches the player on first use, then just replays after that.
     func play(_ name: String, ext: String = "mp3") {
         if let player = players[name] {
-            player.currentTime = 0   // rewind so rapid re-triggers still sound
+            player.currentTime = 0
             player.play()
             return
         }
@@ -53,8 +47,29 @@ final class SoundManager {
         }
     }
 
-    /// Convenience for the contamination alert specifically.
     func playContaminationAlert() {
-        play("error_fx", ext: "mp3")
+        guard let anchor = contaminationAnchor else {
+            play("error_fx", ext: "mp3")
+            return
+        }
+        do {
+            let resource = try contaminationResource ?? loadContaminationResource()
+            contaminationResource = resource
+            contaminationController = anchor.playAudio(resource)
+        } catch {
+            print("[SoundManager] spatial playback failed, falling back to flat audio: \(error)")
+            play("error_fx", ext: "mp3")
+        }
     }
+
+    private func loadContaminationResource() throws -> AudioFileResource {
+        guard let url = Bundle.main.url(forResource: "error_fx", withExtension: "mp3") else {
+            throw SoundManagerError.missingResource
+        }
+        return try AudioFileResource.load(contentsOf: url, configuration: .init(loadingStrategy: .preload, shouldLoop: false))
+    }
+}
+
+enum SoundManagerError: Error {
+    case missingResource
 }

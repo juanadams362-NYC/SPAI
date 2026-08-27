@@ -85,3 +85,9 @@ datasets/
 
 # macOS
 .DS_Store
+
+# Core ML packages are folders. The weights/ and *.mlmodel rules above match
+# their internals, which silently kept the real model out of the repo.
+!SPAI/best.mlpackage/
+!SPAI/best.mlpackage/**
+backend/model/*.mlpackage/

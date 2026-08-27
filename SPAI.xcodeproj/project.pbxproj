@@ -236,11 +236,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z8T4LR58T5;
+				DEVELOPMENT_TEAM = 8G5QV8XKWU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "SPAI uses hand tracking to monitor sterile processing technique.";
+				INFOPLIST_KEY_NSWorldSensingUsageDescription = "SPAI uses world sensing to place compliance panels in your workspace.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -266,11 +267,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z8T4LR58T5;
+				DEVELOPMENT_TEAM = 8G5QV8XKWU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "SPAI uses hand tracking to monitor sterile processing technique.";
+				INFOPLIST_KEY_NSWorldSensingUsageDescription = "SPAI uses world sensing to place compliance panels in your workspace.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

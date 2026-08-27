@@ -2,16 +2,15 @@
 //  StatusBarPanel.swift
 //  SPAI
 //
-//  Top HUD status bar: Sterile Node logo, identity, session time, role,
-//  and the session actions — Ask SPAI, Settings, End Session.
-//
 
 import SwiftUI
 internal import Combine
 
 struct StatusBarPanel: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(DetectionService.self) private var detectionService
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openWindow) private var openWindow
 
     @State private var sessionSeconds: Int = 0
@@ -24,12 +23,14 @@ struct StatusBarPanel: View {
             sessionTimeBlock
             divider
             roleBlock
-            Spacer()
+            divider
+            modeBlock
+            Spacer(minLength: SPAISpacing.xl)
             controlButtons
         }
         .padding(.horizontal, SPAISpacing.l)
         .padding(.vertical, SPAISpacing.m)
-        .frame(width: 1100)
+        .frame(width: 1200)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .onReceive(timer) { _ in sessionSeconds += 1 }
@@ -91,23 +92,47 @@ struct StatusBarPanel: View {
             }
         }
         .buttonStyle(.plain)
+        .spaiHitTarget()
+    }
+
+    private var modeBlock: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(detectionService.mode == .cloud ? SPAIColor.safe :
+                      detectionService.mode == .onDevice ? SPAIColor.warning : SPAIColor.critical)
+                .frame(width: 8, height: 8)
+            Text(detectionService.mode.rawValue.uppercased())
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .padding(.horizontal, SPAISpacing.m)
+        .padding(.vertical, SPAISpacing.s)
+        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
     }
 
     private var controlButtons: some View {
-        HStack(spacing: SPAISpacing.s + 4) {
+        HStack(spacing: SPAISpacing.m) {
             Button {
-                // TODO: invoke SPAI assistant (dynamic-island presence)
+                appModel.toggleVisibility("chat")
             } label: {
                 barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             Button {
-                openWindow(id: "settings")
+                if appModel.isSettingsWindowOpen {
+                    dismissWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = false
+                } else {
+                    openWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = true
+                }
             } label: {
                 barButtonLabel("Settings", icon: "gearshape.fill", tint: SPAIColor.secondary)
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             Button {
                 Task {
@@ -119,6 +144,7 @@ struct StatusBarPanel: View {
                 barButtonLabel("End Session", icon: "xmark.circle.fill", tint: SPAIColor.critical)
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
         }
     }
 
@@ -146,8 +172,6 @@ struct StatusBarPanel: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 }
-
-// MARK: - Sterile Node logo mark
 
 struct SterileNodeMark: View {
     var size: CGFloat = 38
@@ -206,6 +230,7 @@ struct SPAIHexagon: Shape {
 #Preview {
     StatusBarPanel()
         .environment(AppModel())
+        .environment(DetectionService())
         .padding(60)
         .background(.black)
 }

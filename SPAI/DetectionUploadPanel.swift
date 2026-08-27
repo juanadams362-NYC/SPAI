@@ -2,17 +2,14 @@
 //  DetectionUploadPanel.swift
 //  SPAI
 //
-//  Sim-only launcher. The picker can't live in the immersive space
-//  (PhotosPicker presents a sheet, which visionOS won't show inside an
-//  ImmersiveSpace), so this just opens the upload window and shows the
-//  latest result here.
-//
 
 import SwiftUI
 
 struct DetectionUploadPanel: View {
     let service: DetectionService
+    @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
@@ -21,8 +18,17 @@ struct DetectionUploadPanel: View {
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.5))
 
-            Button { openWindow(id: "upload") } label: {
-                Label("Upload test image", systemImage: "photo.badge.plus")
+            Button {
+                if appModel.isUploadWindowOpen {
+                    dismissWindow(id: "upload")
+                    appModel.isUploadWindowOpen = false
+                } else {
+                    openWindow(id: "upload")
+                    appModel.isUploadWindowOpen = true
+                }
+            } label: {
+                Label(appModel.isUploadWindowOpen ? "Close upload panel" : "Upload test media",
+                      systemImage: appModel.isUploadWindowOpen ? "xmark.circle" : "photo.badge.plus")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -31,6 +37,7 @@ struct DetectionUploadPanel: View {
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .spaiHitTarget()
 
             if service.isLoading {
                 Text("Detecting…")
@@ -45,11 +52,16 @@ struct DetectionUploadPanel: View {
                 Text("\(service.detections.count) detection(s)")
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.5))
+                if let tray = service.trayState?.capitalized {
+                    Text("Tray: \(tray)\(service.instrumentCount.map { " (\($0))" } ?? "")")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
             }
         }
         .padding(SPAISpacing.l)
         .frame(width: 260)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
     }
 }

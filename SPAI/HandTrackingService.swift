@@ -2,10 +2,6 @@
 //  HandTrackingService.swift
 //  SPAI
 //
-//  SCRUM-50 spike: confirm we can read hand joint positions from ARKit
-//  on visionOS and print them. Proves the data is available for future
-//  contamination / hand-pose logic.
-//
 
 import ARKit
 import SwiftUI
@@ -16,14 +12,24 @@ final class HandTrackingService {
     private let session = ARKitSession()
     private let handTracking = HandTrackingProvider()
 
-    // Latest readings, exposed so a view could display them later.
     var leftWristPosition: SIMD3<Float>?
     var rightWristPosition: SIMD3<Float>?
+    var leftWristPose: (position: SIMD3<Float>, forward: SIMD3<Float>, up: SIMD3<Float>)?
+    var rightWristPose: (position: SIMD3<Float>, forward: SIMD3<Float>, up: SIMD3<Float>)?
     var isTracking = false
 
-    /// Request authorization and start the ARKit session.
+    private let smoothingAlpha: Float = 0.25
+
+    private func mix(_ a: SIMD3<Float>, _ b: SIMD3<Float>, t: Float) -> SIMD3<Float> {
+        a + (b - a) * t
+    }
+
+    private func smooth(_ new: SIMD3<Float>, with current: SIMD3<Float>?) -> SIMD3<Float> {
+        guard let current else { return new }
+        return mix(current, new, t: smoothingAlpha)
+    }
+
     func start() async {
-        // Hand tracking needs explicit authorization on visionOS.
         guard HandTrackingProvider.isSupported else {
             print("[hand-tracking] not supported on this device")
             return
@@ -39,34 +45,48 @@ final class HandTrackingService {
         }
     }
 
-    /// Listen for hand anchor updates and print joint positions.
     private func processUpdates() async {
         for await update in handTracking.anchorUpdates {
             let anchor = update.anchor
 
-            // Only use tracked hands (skip when hand leaves view).
             guard anchor.isTracked else { continue }
 
-            // The wrist joint is a good single reference point for the spike.
             if let wrist = anchor.handSkeleton?.joint(.wrist) {
-                // Joint transform is relative to the anchor; combine with
-                // the anchor's world transform for a world-space position.
                 let worldTransform = anchor.originFromAnchorTransform
                 let wristTransform = wrist.anchorFromJointTransform
                 let combined = worldTransform * wristTransform
-                let position = SIMD3<Float>(
+
+                let rawPosition = SIMD3<Float>(
                     combined.columns.3.x,
                     combined.columns.3.y,
                     combined.columns.3.z
                 )
+                let rawUp = normalize(SIMD3<Float>(
+                    combined.columns.1.x,
+                    combined.columns.1.y,
+                    combined.columns.1.z
+                ))
+                let rawForward = normalize(SIMD3<Float>(
+                    combined.columns.2.x,
+                    combined.columns.2.y,
+                    combined.columns.2.z
+                ))
 
                 switch anchor.chirality {
                 case .left:
-                    leftWristPosition = position
-                    print("[hand-tracking] LEFT wrist: \(position)")
+                    let pos = smooth(rawPosition, with: leftWristPose?.position)
+                    let up = normalize(smooth(rawUp, with: leftWristPose?.up))
+                    let fwd = normalize(smooth(rawForward, with: leftWristPose?.forward))
+                    leftWristPose = (pos, fwd, up)
+                    leftWristPosition = pos
+                    print("[hand-tracking] LEFT wrist: \(pos)")
                 case .right:
-                    rightWristPosition = position
-                    print("[hand-tracking] RIGHT wrist: \(position)")
+                    let pos = smooth(rawPosition, with: rightWristPose?.position)
+                    let up = normalize(smooth(rawUp, with: rightWristPose?.up))
+                    let fwd = normalize(smooth(rawForward, with: rightWristPose?.forward))
+                    rightWristPose = (pos, fwd, up)
+                    rightWristPosition = pos
+                    print("[hand-tracking] RIGHT wrist: \(pos)")
                 }
             }
         }

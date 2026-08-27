@@ -6,6 +6,9 @@ python-multipart==0.0.9
 # ML
 ultralytics==8.3.0
 
+# LLM call in llm_client.py
+requests==2.32.3
+
 # Utilities
 pillow==10.4.0
 numpy==1.26.4
