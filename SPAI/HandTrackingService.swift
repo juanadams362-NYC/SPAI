@@ -18,7 +18,8 @@ final class HandTrackingService {
     var rightWristPose: (position: SIMD3<Float>, forward: SIMD3<Float>, up: SIMD3<Float>)?
     var isTracking = false
 
-    private let smoothingAlpha: Float = 0.25
+    // Lower alpha = more smoothing (less jitter). 0.15 gives ~7-frame lag at 90fps.
+    private let smoothingAlpha: Float = 0.15
 
     private func mix(_ a: SIMD3<Float>, _ b: SIMD3<Float>, t: Float) -> SIMD3<Float> {
         a + (b - a) * t
@@ -79,14 +80,12 @@ final class HandTrackingService {
                     let fwd = normalize(smooth(rawForward, with: leftWristPose?.forward))
                     leftWristPose = (pos, fwd, up)
                     leftWristPosition = pos
-                    print("[hand-tracking] LEFT wrist: \(pos)")
                 case .right:
                     let pos = smooth(rawPosition, with: rightWristPose?.position)
                     let up = normalize(smooth(rawUp, with: rightWristPose?.up))
                     let fwd = normalize(smooth(rawForward, with: rightWristPose?.forward))
                     rightWristPose = (pos, fwd, up)
                     rightWristPosition = pos
-                    print("[hand-tracking] RIGHT wrist: \(pos)")
                 }
             }
         }
