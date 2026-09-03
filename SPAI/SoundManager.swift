@@ -48,17 +48,28 @@ final class SoundManager {
     }
 
     func playContaminationAlert() {
-        guard let anchor = contaminationAnchor else {
-            play("error_fx", ext: "mp3")
-            return
-        }
-        do {
-            let resource = try contaminationResource ?? loadContaminationResource()
+        // Always play flat audio at full volume — the spatial anchor is directionally attenuated
+        // so relying on it alone makes the safety-critical alarm too quiet.
+        playLoud("error_fx", ext: "mp3")
+
+        // Also fire from the spatial anchor so the user knows which direction to look.
+        if let anchor = contaminationAnchor,
+           let resource = try? (contaminationResource ?? loadContaminationResource()) {
             contaminationResource = resource
             contaminationController = anchor.playAudio(resource)
+        }
+    }
+
+    private func playLoud(_ name: String, ext: String) {
+        guard let url = Bundle.main.url(forResource: name, withExtension: ext) else { return }
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.volume = 1.0
+            player.prepareToPlay()
+            players["__loud_\(name)"] = player
+            player.play()
         } catch {
-            print("[SoundManager] spatial playback failed, falling back to flat audio: \(error)")
-            play("error_fx", ext: "mp3")
+            print("[SoundManager] loud playback failed: \(error)")
         }
     }
 

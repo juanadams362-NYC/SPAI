@@ -68,31 +68,31 @@ struct StatusBarPanel: View {
     }
 
     private var roleBlock: some View {
-        Menu {
+        HStack(spacing: 4) {
             ForEach(TechRole.allCases) { role in
                 Button {
                     appModel.role = role
                 } label: {
-                    if appModel.role == role {
-                        Label(role.rawValue, systemImage: "checkmark")
-                    } else {
-                        Text(role.rawValue)
-                    }
+                    Text(role.rawValue)
+                        .font(.system(size: 12, weight: appModel.role == role ? .bold : .regular))
+                        .foregroundStyle(appModel.role == role ? .white : .white.opacity(0.5))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            appModel.role == role ? SPAIColor.accent.opacity(0.3) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: SPAIRadius.small)
+                        )
+                        .overlay {
+                            if appModel.role == role {
+                                RoundedRectangle(cornerRadius: SPAIRadius.small)
+                                    .stroke(SPAIColor.accent.opacity(0.6), lineWidth: 1)
+                            }
+                        }
                 }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Circle().fill(SPAIColor.accent).frame(width: 8, height: 8)
-                Text(appModel.role.rawValue)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.95))
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                .buttonStyle(.plain)
+                .spaiHitTarget()
             }
         }
-        .buttonStyle(.plain)
-        .spaiHitTarget()
     }
 
     private var modeBlock: some View {

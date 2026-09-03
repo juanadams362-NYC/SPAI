@@ -101,9 +101,9 @@ final class BackendClient {
     var baseURL: URL {
         let stored = UserDefaults.standard.string(forKey: "backendURL")
         return stored.flatMap { URL(string: $0) }
-            ?? URL(string: "http://127.0.0.1:8000")!
+            ?? URL(string: "http://10.10.208.36:8000")!
     }
-
+    
     // MARK: Detection
 
     func detect(image: UIImage) async throws -> DetectResponse {

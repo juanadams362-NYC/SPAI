@@ -83,7 +83,19 @@ struct ImmersiveView: View {
                 content.add(env)
             }
 
-            place("statusBar", angle: 0, height: 1.9, radius: 1.3, content, attachments)
+            // Hospital room environment — imported via Reality Composer Pro into the rkassets bundle.
+            // Falls back to a direct USDZ load if not yet in the bundle.
+            // Scale/position can be set in Reality Composer Pro instead of here.
+            if let room = try? await Entity(named: "HospitalRoom", in: realityKitContentBundle) {
+                content.add(room)
+            } else if let roomURL = Bundle.main.url(forResource: "HospitalRoom", withExtension: "usdz"),
+                      let room = try? await Entity(contentsOf: roomURL) {
+                room.scale    = SIMD3(repeating: 0.01)
+                room.position = SIMD3(x: 0, y: -0.1, z: 0)
+                content.add(room)
+            }
+
+            place("statusBar", angle: 0, height: 1.65, radius: 1.1, content, attachments)
 
             place("detection", angle: -30, height: 1.45, radius: 1.2, content, attachments)
             place("eventLog",  angle:  30, height: 1.45, radius: 1.2, content, attachments)
@@ -104,7 +116,7 @@ struct ImmersiveView: View {
 
             place("actions",   angle:  52, height: 1.25, radius: 1.3, content, attachments)
             place("chat",      angle:  48, height: 1.7,  radius: 1.3, content, attachments)
-            place("history",   angle: -52, height: 1.55, radius: 1.3, content, attachments)
+            place("history",   angle:  55, height: 1.55, radius: 1.3, content, attachments)
             place("wristMenu", angle: -70, height: 0.9, radius: 1.2, content, attachments)
             place("stationPicker", angle: -30, height: 0.85, radius: 1.2, content, attachments)
 
@@ -122,25 +134,29 @@ struct ImmersiveView: View {
             // setEnabled("camera", attachments)
             setEnabled("chat", attachments)
             setEnabled("history", attachments)
-            // setEnabled("wristMenu", attachments) // Not explicitly enabled here, but not changed per instructions
-            #if targetEnvironment(simulator)
-            attachments.entity(for: "stationPicker")?.isEnabled = true
-            #else
-            attachments.entity(for: "stationPicker")?.isEnabled = handTracking.leftWristPose != nil
-            #endif
+            // Right wrist: float 13cm above wrist in world Y (watch-face style, clears the arm)
+            if let panel = attachments.entity(for: "wristMenu") {
+                #if !targetEnvironment(simulator)
+                if let pose = handTracking.rightWristPose {
+                    panel.position = pose.position + SIMD3<Float>(0, 0.13, 0)
+                } else {
+                    panel.position = arcPosition(angle: -70, height: 0.9, radius: 1.2)
+                }
+                #endif
+                panel.components.set(BillboardComponent())
+            }
 
-            updateWristAnchor(
-                "wristMenu", attachments,
-                pose: handTracking.rightWristPose,
-                offset: SIMD3<Float>(x: 0.06, y: 0.025, z: -0.02),
-                fallback: arcPosition(angle: -70, height: 0.9, radius: 1.2)
-            )
-            updateWristAnchor(
-                "stationPicker", attachments,
-                pose: handTracking.leftWristPose,
-                offset: SIMD3<Float>(x: -0.06, y: 0.025, z: -0.02),
-                fallback: arcPosition(angle: -30, height: 0.85, radius: 1.2)
-            )
+            // Left wrist: float 13cm above the arm using world Y so it clears the arm regardless of wrist rotation
+            if let panel = attachments.entity(for: "stationPicker") {
+                #if !targetEnvironment(simulator)
+                if let pose = handTracking.leftWristPose {
+                    panel.position = pose.position + SIMD3<Float>(0, 0.13, 0)
+                } else {
+                    panel.position = arcPosition(angle: -30, height: 0.85, radius: 1.2)
+                }
+                #endif
+                panel.components.set(BillboardComponent())
+            }
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
             attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
             
@@ -199,11 +215,7 @@ struct ImmersiveView: View {
             Attachment(id: "history") { SessionHistoryPanel() }
             Attachment(id: "wristMenu") {
                 // Right wrist (or simulator fallback): quick-action menu
-                WristMenuPanel(
-                    isHandVisibleProvider: {
-                        handTracking.rightWristPosition != nil
-                    }
-                )
+                WristMenuPanel(isHandVisible: handTracking.rightWristPosition != nil)
             }
             Attachment(id: "stationPicker") {
                 // Left wrist: compact station picker

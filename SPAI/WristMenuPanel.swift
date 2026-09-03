@@ -9,68 +9,86 @@ import simd
 struct WristMenuPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
-    let isHandVisibleProvider: () -> Bool
+    let isHandVisible: Bool
 
-    @State private var lastVisibleAt: Date = .distantPast
-    private let visibilityHoldSeconds: TimeInterval = 0.3
+    @State private var fadingOut = false
+    @State private var fadeTask: Task<Void, Never>?
 
     var body: some View {
         panelContent
             .opacity(shouldShowPanel ? 1 : 0)
-            .animation(.easeInOut(duration: 0.2), value: shouldShowPanel)
+            .animation(SPAIAnimation.panelTransition, value: shouldShowPanel)
+            .onChange(of: isHandVisible) { _, visible in
+                if visible {
+                    fadeTask?.cancel()
+                    fadeTask = nil
+                    fadingOut = false
+                } else {
+                    // Grace period: keep panel visible for 2 s then fade out
+                    fadeTask = Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(2))
+                        guard !Task.isCancelled else { return }
+                        fadingOut = true
+                    }
+                }
+            }
     }
 
     // MARK: - Derived State
 
-    private var isSimulator: Bool {
+    private var shouldShowPanel: Bool {
         #if targetEnvironment(simulator)
         return true
         #else
-        return false
+        return isHandVisible || !fadingOut
         #endif
-    }
-
-    private var shouldShowPanel: Bool {
-        if isSimulator { return true }
-        let visible = isHandVisibleProvider()
-        if visible { lastVisibleAt = Date() }
-        return visible || Date().timeIntervalSince(lastVisibleAt) < visibilityHoldSeconds
     }
 
     // MARK: - Panel Content
 
     @ViewBuilder
     private var panelContent: some View {
-        VStack(spacing: SPAISpacing.s + 4) {
-            HStack(spacing: SPAISpacing.s) {
-                quickButton(label: "Reset", systemImage: "arrow.counterclockwise", tint: SPAIColor.primary) {
-                    appModel.resetWorkflow()
-                }
-                quickButton(label: "History", systemImage: "clock.arrow.circlepath", tint: SPAIColor.accent) {
-                    appModel.toggleVisibility("history")
-                }
-                quickButton(label: "Chat", systemImage: "bubble.left.and.bubble.right.fill", tint: SPAIColor.safe) {
-                    appModel.toggleVisibility("chat")
-                }
-                quickButton(label: "Settings", systemImage: "gearshape.fill", tint: .white) {
+        HStack(spacing: SPAISpacing.s) {
+            quickButton(label: "Reset", systemImage: "arrow.counterclockwise", tint: SPAIColor.critical, size: 40) {
+                appModel.resetWorkflow()
+            }
+            quickButton(label: "History", systemImage: "clock.arrow.circlepath", tint: SPAIColor.accent) {
+                appModel.toggleVisibility("history")
+            }
+            quickButton(label: "Chat", systemImage: "bubble.left.and.bubble.right.fill", tint: SPAIColor.safe) {
+                appModel.toggleVisibility("chat")
+            }
+            quickButton(label: "Settings", systemImage: "gearshape.fill", tint: .white) {
+                if appModel.isSettingsWindowOpen {
+                    dismissWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = false
+                } else {
                     openWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = true
                 }
             }
         }
-        .padding(SPAISpacing.s)
+        .padding(SPAISpacing.m)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Wrist quick actions")
     }
 
-    private func quickButton(label: String, systemImage: String, tint: Color, action: @escaping () -> Void) -> some View {
+    private func quickButton(
+        label: String,
+        systemImage: String,
+        tint: Color,
+        size: CGFloat = 34,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: SPAITextSize.body, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 30, height: 30)
+                .frame(width: size, height: size)
                 .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 .overlay {
                     RoundedRectangle(cornerRadius: SPAIRadius.small)
@@ -86,7 +104,7 @@ struct WristMenuPanel: View {
 
 // MARK: - Preview
 #Preview("Wrist Menu Panel") {
-    WristMenuPanel(isHandVisibleProvider: { true })
+    WristMenuPanel(isHandVisible: true)
         .padding(40)
         .background(.black)
 }

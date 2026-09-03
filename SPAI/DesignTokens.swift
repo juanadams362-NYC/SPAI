@@ -25,13 +25,50 @@ enum SPAIRadius {
     static let pill: CGFloat    = 999
 }
 
+// Spacing tuned for headset viewing (~1–1.5 m working distance).
+// All values increased ~25 % over typical screen defaults.
 enum SPAISpacing {
-    static let xs: CGFloat  = 4
-    static let s: CGFloat   = 8
-    static let m: CGFloat   = 16
-    static let l: CGFloat   = 24
-    static let xl: CGFloat  = 32
-    static let xxl: CGFloat = 40
+    static let xs: CGFloat  = 6
+    static let s: CGFloat   = 10
+    static let m: CGFloat   = 20
+    static let l: CGFloat   = 28
+    static let xl: CGFloat  = 40
+    static let xxl: CGFloat = 48
+}
+
+// Minimum legible font sizes at headset viewing distance.
+// Below SPAITextSize.caption, text is hard to read from 1 m+.
+enum SPAITextSize {
+    static let micro: CGFloat       = 11   // decorative / monospaced status labels only
+    static let caption: CGFloat     = 14   // absolute minimum for readable body text
+    static let footnote: CGFloat    = 15
+    static let body: CGFloat        = 17
+    static let subheadline: CGFloat = 19
+    static let headline: CGFloat    = 22
+    static let title: CGFloat       = 28
+    static let largeTitle: CGFloat  = 36
+}
+
+// Consistent animation values. Use these instead of inline durations so every
+// button and panel transition feels like the same product.
+enum SPAIAnimation {
+    // Scale factor applied when a button is looked at (spaiLookAtScale).
+    static let hoverScale: CGFloat        = 1.06
+    // Spring used for the look-at pop.
+    static let hover: Animation           = .spring(response: 0.18, dampingFraction: 0.72)
+    // Easing used for panel appear/disappear transitions.
+    static let panelTransition: Animation = .easeInOut(duration: 0.22)
+}
+
+private struct LookAtScaleModifier: ViewModifier {
+    @State private var hovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(hovered ? SPAIAnimation.hoverScale : 1.0)
+            .animation(SPAIAnimation.hover, value: hovered)
+            .onHover { hovered = $0 }
+    }
 }
 
 struct SPAIGlass: ViewModifier {
@@ -65,14 +102,20 @@ extension View {
         modifier(SPAIGlass(mode: mode, radius: radius))
     }
 
-    /// Guarantees a control meets the platform minimum hit-target size and shows a visible
-    /// gaze-hover highlight, regardless of how small its visual content is. The extra hit area
-    /// is invisible — it only widens what counts as "on" the control, it doesn't resize it.
-    func spaiHitTarget(minSize: CGFloat = 44) -> some View {
+    /// Guarantees a control meets the minimum visionOS hit-target size (60 pt) and shows a
+    /// lift hover effect so the tester can tell the control is interactive. The extra hit area
+    /// is invisible — it only widens what counts as "on" the control.
+    func spaiHitTarget(minSize: CGFloat = 60) -> some View {
         self
             .frame(minWidth: minSize, minHeight: minSize)
             .contentShape(Rectangle())
-            .hoverEffect(.highlight)
+            .hoverEffect(.lift)
+    }
+
+    /// Adds a subtle scale-up animation when the control is looked at, on top of any
+    /// system hover effect. Use on non-Button controls that need interactive affordance.
+    func spaiLookAtScale() -> some View {
+        modifier(LookAtScaleModifier())
     }
 
     func spaiPanelBackground(opacity: Double, cornerRadius: CGFloat = SPAIRadius.large) -> some View {
