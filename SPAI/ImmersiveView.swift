@@ -20,6 +20,8 @@ private struct PanelSlot {
 
 struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
 
     @Environment(DetectionService.self) private var detectionService
     @State private var stationManager = StationManager()
@@ -102,6 +104,17 @@ struct ImmersiveView: View {
             */
         }
         #endif
+        // Entering the workflow dismisses the "home" window, which takes RootSceneView — and
+        // its scene-phase observer — with it. Without this, the main path into the app is
+        // exactly the path where nothing is left to tear the immersive space down, which is
+        // how immersive content ended up outliving the app during testing.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .background else { return }
+            Task { @MainActor in
+                await dismissImmersiveSpace()
+                appModel.immersiveSpaceState = .closed
+            }
+        }
         .onDisappear {
             appModel.immersiveSpaceState = .closed
             #if !targetEnvironment(simulator)
@@ -122,6 +135,13 @@ struct ImmersiveView: View {
 
             for id in Self.layout.keys {
                 place(id, content, attachments)
+            }
+
+            // The tour card has no fixed slot — it moves to whichever panel is being
+            // explained — so it is not in `layout` and has to be added to the scene here.
+            if let tourCard = attachments.entity(for: "tour") {
+                tourCard.isEnabled = false
+                content.add(tourCard)
             }
 
             if let detectionEntity = attachments.entity(for: "detection") {
