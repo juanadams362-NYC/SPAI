@@ -12,7 +12,9 @@ struct SPAIApp: App {
     @State private var appModel = AppModel()
     @State private var detectionService = DetectionService()
     @State private var continuityCamera = ContinuityCameraService()
-    @State private var immersionStyle: ImmersionStyle = .progressive
+    /// Starts at full passthrough. This is an app for handling real instruments on a real
+    /// bench — the workspace belongs over the room, not instead of it.
+    @State private var immersionStyle: ImmersionStyle = .mixed
 
     var body: some Scene {
         WindowGroup(id: "home") {
@@ -54,7 +56,17 @@ struct SPAIApp: App {
                 .environment(detectionService)
                 .environment(continuityCamera)
         }
-        .immersionStyle(selection: $immersionStyle, in: .progressive)
+        // All three styles, not just .progressive.
+        //
+        // SCRUM-117 set this to `in: .progressive` alone. Bare `.progressive` leaves
+        // ProgressiveImmersionStyle.minimumImmersionAmount nil, so the Digital Crown is clamped
+        // to the system's default floor and can never reach 0 — dialling all the way down still
+        // left you part-immersed, and pushing up snapped to full. That is the "only goes halfway
+        // out" behaviour, and it is why the environment got pulled.
+        //
+        // Offering .mixed and .full alongside it lets the crown travel the whole way: out to
+        // .mixed for unobstructed passthrough, in to .full when someone wants the room gone.
+        .immersionStyle(selection: $immersionStyle, in: .mixed, .progressive, .full)
     }
 }
 
