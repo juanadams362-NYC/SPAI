@@ -184,6 +184,17 @@ struct ImmersiveView: View {
                 fallback: arcPosition(for: "stationPicker")
             )
 
+            // Panels are positioned once in `make`, but the eye-height sample lands a moment
+            // later — so without this the calibration would compute a correct arc that
+            // nothing ever moved to. Reposition once, when the measured height actually
+            // changes, rather than every frame (which would fight the entrance animation).
+            if entranceLog.appliedEyeHeight != headAnchor.eyeHeight {
+                entranceLog.appliedEyeHeight = headAnchor.eyeHeight
+                for id in Self.layout.keys where id != "wristMenu" && id != "stationPicker" {
+                    attachments.entity(for: id)?.position = arcPosition(for: id)
+                }
+            }
+
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
             attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
 
@@ -438,6 +449,8 @@ final class PanelEntranceLog {
     var handledAt: Date?
     /// Anchor the tour card was last moved to, so it only animates when the subject changes.
     var tourAnchor: String?
+    /// Eye height the arc was last laid out against, so calibration is applied exactly once.
+    var appliedEyeHeight: Float?
 }
 
 #Preview(immersionStyle: .mixed) {
