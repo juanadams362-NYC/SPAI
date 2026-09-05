@@ -12,7 +12,28 @@ struct StationPickerPanel: View {
     @Environment(AppModel.self) private var appModel
     var compact: Bool = false
 
+    /// Whether the wrist this panel rides on is currently tracked. Drives a fade rather than
+    /// the entity being switched off, so the panel eases out when the arm drops instead of
+    /// vanishing between frames.
+    var isHandVisible: Bool = true
+
+    private var shouldShow: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return isHandVisible
+        #endif
+    }
+
     var body: some View {
+        panelContent
+            .opacity(shouldShow ? 1 : 0)
+            .scaleEffect(shouldShow ? 1 : 0.9)
+            .animation(.easeInOut(duration: 0.22), value: shouldShow)
+            .allowsHitTesting(shouldShow)
+    }
+
+    private var panelContent: some View {
         VStack(alignment: .leading, spacing: compact ? SPAISpacing.s : SPAISpacing.m) {
             Text(compact ? "STATIONS" : "STATIONS (SIM)")
                 .font(.system(size: compact ? 9 : 12, weight: .bold, design: .monospaced))

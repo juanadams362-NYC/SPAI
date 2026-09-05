@@ -162,14 +162,11 @@ struct ImmersiveView: View {
             setEnabled("upload", attachments)
             setEnabled("actions", attachments)
 
-            // The wrist panels track a live pose, so they follow the arm rather than the arc.
-            #if targetEnvironment(simulator)
+            // The wrist panels stay enabled and fade themselves out when tracking drops.
+            // Disabling the entity the moment the pose went nil would cut the fade off
+            // mid-animation and read as the same abrupt pop the freeze did.
             attachments.entity(for: "stationPicker")?.isEnabled = true
             attachments.entity(for: "wristMenu")?.isEnabled = true
-            #else
-            attachments.entity(for: "stationPicker")?.isEnabled = handTracking.leftWristPose != nil
-            attachments.entity(for: "wristMenu")?.isEnabled = handTracking.rightWristPose != nil
-            #endif
 
             updateWristAnchor(
                 "wristMenu", attachments,
@@ -246,7 +243,11 @@ struct ImmersiveView: View {
             }
             Attachment(id: "stationPicker") {
                 // Left wrist: compact station picker
-                StationPickerPanel(manager: stationManager, compact: true)
+                StationPickerPanel(
+                    manager: stationManager,
+                    compact: true,
+                    isHandVisible: handTracking.leftWristPose != nil
+                )
             }
             Attachment(id: "tour") { TourCoachmark() }
         }
@@ -349,7 +350,10 @@ struct ImmersiveView: View {
         panel.position = fallback
         #else
         guard let pose else {
-            panel.position = fallback
+            // Hold the last position while the panel fades out. Snapping back to the fixed
+            // fallback would send it flying across the room mid-fade; the fallback is only
+            // for the very first frame, before either wrist has ever been seen.
+            if panel.position == .zero { panel.position = fallback }
             return
         }
         let right = normalize(cross(pose.up, pose.forward))
@@ -368,7 +372,12 @@ struct ImmersiveView: View {
         guard let card = attachments.entity(for: "tour") else { return }
 
         card.isEnabled = appModel.tour.isVisible
-        guard appModel.tour.isVisible else { return }
+        guard appModel.tour.isVisible else {
+            // Forget the anchor so a replayed tour re-runs its entrance and picks up a
+            // fresh eye-height calibration rather than reusing a stale position.
+            entranceLog.tourAnchor = nil
+            return
+        }
 
         // The card must always face the user, whatever the panel billboard setting is —
         // it is a piece of instruction, not a workspace panel.
