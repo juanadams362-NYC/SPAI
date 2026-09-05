@@ -22,6 +22,7 @@ struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @Environment(DetectionService.self) private var detectionService
     @State private var stationManager = StationManager()
@@ -73,6 +74,9 @@ struct ImmersiveView: View {
                 appModel.logStationEntry(station.name, step: station.step)
             }
             #if !targetEnvironment(simulator)
+            // The wrist gestures are about the wrist *relative to the face*, so hand tracking
+            // needs a live head position to test against.
+            handTracking.headPositionProvider = { [headAnchor] in headAnchor.currentHeadPosition() }
             Task { await stationManager.startImageTracking() }
             Task { await handTracking.start() }
             #endif
@@ -87,7 +91,7 @@ struct ImmersiveView: View {
             // at. It is opt-in and skippable — see AppTour.
             guard !appModel.hasCompletedTour else { return }
             try? await Task.sleep(for: .seconds(1.2))
-            appModel.tour.offer()
+            appModel.tour.offer(wristMenusEnabled: appModel.wristMenusEnabled)
         }
 
         #if !targetEnvironment(simulator)
@@ -172,15 +176,18 @@ struct ImmersiveView: View {
                 "wristMenu", attachments,
                 pose: handTracking.rightWristPose,
                 // Out to the side of the forearm, not hovering over it. 0.06 m put the panel
-                // physically in the way of the user's hands while they worked.
+                // physically in the way of the user's hands while they worked. With the 2×2
+                // tile being ~8 cm across, a 0.16 m centre leaves its inner edge ~12 cm clear
+                // of the arm and its outer edge ~20 cm out.
                 offset: SIMD3<Float>(x: 0.16, y: 0.03, z: -0.03),
                 fallback: arcPosition(for: "wristMenu")
             )
             updateWristAnchor(
                 "stationPicker", attachments,
                 pose: handTracking.leftWristPose,
-                // Above the forearm. At y = 0.025 the panel visually fused into the arm.
-                offset: SIMD3<Float>(x: -0.05, y: 0.15, z: -0.03),
+                // Above the forearm — the ~13 cm the test plan called for. At y = 0.025 the
+                // panel visually fused into the arm.
+                offset: SIMD3<Float>(x: -0.04, y: 0.13, z: -0.03),
                 fallback: arcPosition(for: "stationPicker")
             )
 
@@ -249,15 +256,15 @@ struct ImmersiveView: View {
             Attachment(id: "guided") { GuidedStepPanel() }
             Attachment(id: "history") { SessionHistoryPanel() }
             Attachment(id: "wristMenu") {
-                // Right wrist (or simulator fallback): quick-action menu
-                WristMenuPanel(isHandVisible: handTracking.rightWristPose != nil)
+                // Right wrist: quick actions, summoned by turning the wrist toward you.
+                WristMenuPanel(isPresented: handTracking.rightWristPresented)
             }
             Attachment(id: "stationPicker") {
-                // Left wrist: compact station picker
+                // Left forearm: station picker, summoned by holding the forearm level.
                 StationPickerPanel(
                     manager: stationManager,
                     compact: true,
-                    isHandVisible: handTracking.leftWristPose != nil
+                    isPresented: handTracking.leftWristPresented
                 )
             }
             Attachment(id: "tour") { TourCoachmark() }
@@ -324,6 +331,15 @@ struct ImmersiveView: View {
     private func animateEntrance(_ id: String, _ attachments: RealityViewAttachments) {
         guard let panel = attachments.entity(for: id) else { return }
         let home = arcPosition(for: id)
+
+        // Reduce Motion: land the panel in place. The wrist menu's written confirmation
+        // ("History opened") still says what happened, so nothing is lost but the flight.
+        guard !reduceMotion else {
+            panel.position = home
+            panel.scale = .one
+            return
+        }
+
         let source = attachments.entity(for: "wristMenu")?.position ?? home
 
         panel.position = source
@@ -403,7 +419,10 @@ struct ImmersiveView: View {
             let isFirstPlacement = entranceLog.tourAnchor == nil
             entranceLog.tourAnchor = anchorKey
 
-            if isFirstPlacement {
+            if reduceMotion {
+                card.position = target
+                card.scale = .one
+            } else if isFirstPlacement {
                 card.position = target
                 card.scale = SIMD3<Float>(repeating: 0.3)
                 card.move(

@@ -26,9 +26,12 @@ struct SettingsView: View {
         .scrollIndicators(.visible)
         .frame(width: 420)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
-        // Closing via the system's own window controls should also clear
-        // the tracked-open flag, or the next status bar tap tries to
-        // dismiss a window that's already gone.
+        // The window itself is the authority on whether it is open. Opening or closing it by
+        // any other route — the system's own window controls, a scene restore — keeps the
+        // flag honest, so the next toggle press does the thing the user expects.
+        .onAppear {
+            appModel.isSettingsWindowOpen = true
+        }
         .onDisappear {
             appModel.isSettingsWindowOpen = false
         }
@@ -89,7 +92,25 @@ struct SettingsView: View {
                     .foregroundStyle(.white.opacity(0.95))
             }
             .tint(SPAIColor.accent)
-            .accessibilityHint("When enabled, panels follow your gaze and rotate to face you")
+            .accessibilityHint("When enabled, panels rotate to face you as you move around them")
+
+            VStack(alignment: .leading, spacing: SPAISpacing.s) {
+                Toggle(isOn: Binding(
+                    get: { appModel.wristMenusEnabled },
+                    set: { appModel.wristMenusEnabled = $0 }
+                )) {
+                    Text("Wrist menus")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white.opacity(0.95))
+                }
+                .tint(SPAIColor.accent)
+                .accessibilityHint("When off, no panels ride on your arms. Everything they do is also available from the status bar and quick actions.")
+
+                Text("Turn your right wrist toward you, like checking the time, for quick actions. Hold your left forearm level, as if a book were resting on it, for the station list. Turn this off to keep your arms clear.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             // Reads each guided step out loud as it comes up. Contamination
             // alerts speak regardless of this setting.

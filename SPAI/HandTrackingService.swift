@@ -18,6 +18,15 @@ final class HandTrackingService {
     var rightWristPose: (position: SIMD3<Float>, forward: SIMD3<Float>, up: SIMD3<Float>)?
     var isTracking = false
 
+    /// Whether each wrist is currently held in its summoning posture — see `WristGesture`.
+    /// The panels key off these rather than off raw tracking, so they appear when asked for
+    /// instead of whenever a hand happens to be in frame.
+    private(set) var leftWristPresented = false
+    private(set) var rightWristPresented = false
+
+    /// Supplies the head position the gesture test needs. Set by ImmersiveView.
+    var headPositionProvider: (() -> SIMD3<Float>?)?
+
     // Lower alpha = more smoothing (less jitter). 0.15 gives ~7-frame lag at 90fps.
     private let smoothingAlpha: Float = 0.15
 
@@ -58,9 +67,11 @@ final class HandTrackingService {
                 case .left:
                     leftWristPose = nil
                     leftWristPosition = nil
+                    leftWristPresented = false
                 case .right:
                     rightWristPose = nil
                     rightWristPosition = nil
+                    rightWristPresented = false
                 }
                 continue
             }
@@ -86,19 +97,37 @@ final class HandTrackingService {
                     combined.columns.2.z
                 ))
 
+                let head = headPositionProvider?()
+
                 switch anchor.chirality {
                 case .left:
                     let pos = smooth(rawPosition, with: leftWristPose?.position)
                     let up = normalize(smooth(rawUp, with: leftWristPose?.up))
                     let fwd = normalize(smooth(rawForward, with: leftWristPose?.forward))
-                    leftWristPose = (pos, fwd, up)
+                    let pose = (position: pos, forward: fwd, up: up)
+                    leftWristPose = pose
                     leftWristPosition = pos
+                    // "Book resting along the inner forearm": held level and turned to face you.
+                    leftWristPresented = WristGesture.isPresented(
+                        pose: pose,
+                        headPosition: head,
+                        wasPresented: leftWristPresented,
+                        requireLevelForearm: true
+                    )
                 case .right:
                     let pos = smooth(rawPosition, with: rightWristPose?.position)
                     let up = normalize(smooth(rawUp, with: rightWristPose?.up))
                     let fwd = normalize(smooth(rawForward, with: rightWristPose?.forward))
-                    rightWristPose = (pos, fwd, up)
+                    let pose = (position: pos, forward: fwd, up: up)
+                    rightWristPose = pose
                     rightWristPosition = pos
+                    // "Checking the time": turned to face you, at any comfortable arm angle.
+                    rightWristPresented = WristGesture.isPresented(
+                        pose: pose,
+                        headPosition: head,
+                        wasPresented: rightWristPresented,
+                        requireLevelForearm: false
+                    )
                 }
             }
         }

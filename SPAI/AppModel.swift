@@ -95,6 +95,7 @@ class AppModel {
 
     private let onboardingKey = "hasCompletedOnboarding"
     private let tourKey = "hasCompletedTour"
+    private let wristMenusKey = "wristMenusEnabled"
     private let client = BackendClient()
 
     /// The pre-launch welcome pages.
@@ -120,7 +121,7 @@ class AppModel {
     /// Replays the tour from Settings.
     func restartTour() {
         hasCompletedTour = false
-        tour.start()
+        tour.start(wristMenusEnabled: wristMenusEnabled)
     }
 
     var role: TechRole = .technician {
@@ -157,6 +158,101 @@ class AppModel {
         }
     }
     var isUploadWindowOpen: Bool = false
+
+    /// Whether the wrist-anchored menus are available at all. Some users would rather not have
+    /// anything riding on their arms while they work.
+    var wristMenusEnabled: Bool {
+        didSet { UserDefaults.standard.set(wristMenusEnabled, forKey: wristMenusKey) }
+    }
+
+    // MARK: - Window toggles
+
+    enum WindowToggle { case open, close, ignore }
+
+    /// Debounce window for the auxiliary-window toggles.
+    ///
+    /// A gaze-pinch can register twice, and each extra press used to mint another Settings
+    /// window. The scene is a singleton now so duplicates are impossible, but without this a
+    /// double press still reads as open-then-immediately-close, which looks like the button
+    /// did nothing.
+    private var lastWindowToggleAt: Date = .distantPast
+    private let windowToggleDebounce: TimeInterval = 0.5
+
+    /// Single decision point for "the user pressed the Settings button", shared by the wrist
+    /// menu and the status bar so the two can't drift apart again.
+    func requestSettingsToggle() -> WindowToggle {
+        requestWindowToggle(
+            isOpen: { $0.isSettingsWindowOpen },
+            setOpen: { $0.isSettingsWindowOpen = $1 },
+            name: "Settings",
+            icon: "gearshape.fill"
+        )
+    }
+
+    /// Same treatment for the upload window, which is opened from three different places.
+    func requestUploadToggle() -> WindowToggle {
+        requestWindowToggle(
+            isOpen: { $0.isUploadWindowOpen },
+            setOpen: { $0.isUploadWindowOpen = $1 },
+            name: "Upload",
+            icon: "photo.badge.plus"
+        )
+    }
+
+    private func requestWindowToggle(
+        isOpen: (AppModel) -> Bool,
+        setOpen: (AppModel, Bool) -> Void,
+        name: String,
+        icon: String
+    ) -> WindowToggle {
+        let now = Date()
+        guard now.timeIntervalSince(lastWindowToggleAt) > windowToggleDebounce else {
+            return .ignore
+        }
+        lastWindowToggleAt = now
+
+        if isOpen(self) {
+            setOpen(self, false)
+            announce("\(name) closed", icon: icon)
+            return .close
+        } else {
+            setOpen(self, true)
+            announce("\(name) opened", icon: icon)
+            return .open
+        }
+    }
+
+    // MARK: - Action feedback
+
+    /// A short confirmation of what the last tap actually did.
+    ///
+    /// Testing found the buttons had feedback that they'd been *hit*, but nothing said what
+    /// happened or where it happened — so a panel opening off to one side read as nothing at
+    /// all. This is shown right where the user is already looking.
+    struct ActionFeedback: Equatable {
+        let message: String
+        let icon: String
+        let at: Date
+    }
+
+    private(set) var lastAction: ActionFeedback?
+
+    func announce(_ message: String, icon: String) {
+        lastAction = ActionFeedback(message: message, icon: icon, at: Date())
+    }
+
+    /// Human-readable names for the toggleable panels, used in confirmations.
+    static func panelDisplayName(_ id: String) -> String {
+        switch id {
+        case "chat":      return "Chat"
+        case "history":   return "History"
+        case "detection": return "Detection"
+        case "eventLog":  return "Event Log"
+        case "workflow":  return "Workflow"
+        case "upload":    return "Upload"
+        default:          return id.capitalized
+        }
+    }
     
     func isVisible(_ panelID: String) -> Bool { panelVisibility[panelID] ?? true }
     func showAllPanels() { panelVisibility.removeAll() }
@@ -169,6 +265,13 @@ class AppModel {
     func toggleVisibility(_ panelID: String) {
         let nowVisible = !isVisible(panelID)
         panelVisibility[panelID] = nowVisible
+
+        let name = Self.panelDisplayName(panelID)
+        announce(
+            nowVisible ? "\(name) opened" : "\(name) closed",
+            icon: nowVisible ? "rectangle.on.rectangle" : "rectangle.slash"
+        )
+
         guard nowVisible else { return }
         lastOpenedPanel = (panelID, Date())
         switch panelID {
@@ -341,6 +444,9 @@ class AppModel {
     init() {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
         self.hasCompletedTour = UserDefaults.standard.bool(forKey: tourKey)
+        // Defaults on: `bool(forKey:)` returns false for a key that was never written, which
+        // would silently ship the feature disabled to everyone who has not opened Settings.
+        self.wristMenusEnabled = UserDefaults.standard.object(forKey: wristMenusKey) as? Bool ?? true
         Task { _ = try? await client.resetCompliance() }
         log("Session started", kind: .info)
     }

@@ -8,6 +8,9 @@ import SwiftUI
 struct GuidedStepPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(DetectionService.self) private var detectionService
+    @Environment(ContinuityCameraService.self) private var continuityCamera
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var consecutiveVerifiedSamples = 0
     @State private var voiceConfirm = VoiceInputManager()
     @State private var voiceListenEnabled = false
@@ -63,6 +66,8 @@ struct GuidedStepPanel: View {
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if needsDetectionInput { detectionInputCallout }
+
             HStack(spacing: SPAISpacing.s) {
                 Image(systemName: verificationIcon)
                     .foregroundStyle(satisfied ? SPAIColor.safe : SPAIColor.warning)
@@ -99,7 +104,8 @@ struct GuidedStepPanel: View {
         .frame(width: 380)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
-        .animation(.easeInOut(duration: 0.25), value: appModel.guidedStepIndex)
+        .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: appModel.guidedStepIndex)
+        .animation(reduceMotion ? .none : .spring(response: 0.4, dampingFraction: 0.8), value: needsDetectionInput)
         .onChange(of: detectionService.resultRevision) { _, _ in
             recordVerificationSample()
         }
@@ -159,6 +165,66 @@ struct GuidedStepPanel: View {
         .accessibilityLabel("Guided step \(guidedIndex + 1) of \(script.count), \(appModel.currentStep.title). \(step.instruction) \(verificationText)")
     }
 
+    // MARK: - "SPAI can't see anything yet"
+
+    /// Whether SPAI has any way of seeing the user's work right now.
+    private var hasDetectionInput: Bool {
+        continuityCamera.isRunning || detectionService.hasResult
+    }
+
+    /// This step is blocked on a detection that can never arrive, because nothing is feeding
+    /// the detector.
+    ///
+    /// Testers started a step and stalled here: the panel said "Waiting for detection…" and
+    /// they had no idea that meant *they* had to supply a photo, a video, or a phone camera.
+    /// It reads as the app thinking, not as the app waiting on them.
+    private var needsDetectionInput: Bool {
+        appModel.stepStarted && canVerify && !satisfied && !hasDetectionInput
+    }
+
+    private var detectionInputCallout: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+            HStack(spacing: SPAISpacing.s) {
+                Image(systemName: "eye.trianglebadge.exclamationmark.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SPAIColor.warning)
+                Text("SPAI can't see your work yet")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            Text("This step is confirmed by what the camera sees. Give SPAI something to look at — upload a photo or video, or connect your iPhone as a camera.")
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.8))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                openWindow(id: "upload")
+                appModel.isUploadWindowOpen = true
+                appModel.announce("Upload opened", icon: "photo.badge.plus")
+            } label: {
+                Label("Show SPAI an image or video", systemImage: "photo.badge.plus")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, SPAISpacing.m)
+                    .padding(.vertical, SPAISpacing.s)
+                    .background(SPAIColor.warning.opacity(0.9), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            }
+            .buttonStyle(.plain)
+            .spaiHitTarget(pop: 1.10)
+            .accessibilityLabel("Show SPAI an image or video")
+            .accessibilityHint("Opens the upload window so this step can be verified")
+        }
+        .padding(SPAISpacing.m)
+        .background(SPAIColor.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        .overlay(
+            RoundedRectangle(cornerRadius: SPAIRadius.small)
+                .stroke(SPAIColor.warning.opacity(0.45), lineWidth: 1)
+        )
+        .transition(reduceMotion ? .opacity : .scale(scale: 0.94).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+    }
+
     private func recordVerificationSample() {
         guard appModel.stepStarted,
               !appModel.isHalted,
@@ -206,7 +272,10 @@ struct GuidedStepPanel: View {
         if satisfied {
             return "Verified \(min(consecutiveVerifiedSamples, requiredVerifiedSamples))/\(requiredVerifiedSamples)"
         }
-        return "Waiting for detection…"
+        // Say who is being waited on. "Waiting for detection…" sounds like the app is busy;
+        // it actually means the user has not shown it anything yet.
+        if !hasDetectionInput { return "Waiting for you to show SPAI something" }
+        return "Looking… hold the view steady"
     }
 }
 

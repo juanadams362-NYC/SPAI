@@ -41,6 +41,14 @@ struct DetectionPanel: View {
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.4), value: riskHigh)
+        .accessibilityElement(children: .contain)
+        // Risk is conveyed visually by the border colour alone, which is invisible to
+        // VoiceOver and to anyone who cannot distinguish the colours — so it is stated here.
+        .accessibilityLabel(
+            service.hasResult
+                ? "Detection. \(ppeText). Contamination risk \(Int(contaminationRisk * 100)) percent."
+                : "Detection. Nothing detected yet — show SPAI an image, video, or live camera."
+        )
         .onChange(of: service.contaminationRisk) { old, new in
             if old < 0.5 && new >= 0.5 && appModel.shouldHaltOnBareHand {
                 SoundManager.shared.playContaminationAlert()

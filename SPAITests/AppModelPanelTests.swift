@@ -95,6 +95,88 @@ final class AppModelPanelTests: XCTestCase {
         XCTAssertTrue(model.isVisible("history"))
     }
 
+    // MARK: - Window toggles
+
+    func testSettingsTogglesOpenThenClosed() async throws {
+        let model = AppModel()
+
+        XCTAssertEqual(model.requestSettingsToggle(), .open)
+        XCTAssertTrue(model.isSettingsWindowOpen)
+
+        // Past the debounce window, the next press must close it.
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(model.requestSettingsToggle(), .close)
+        XCTAssertFalse(model.isSettingsWindowOpen)
+    }
+
+    func testRapidSecondPressIsIgnored() {
+        // The reported bug: repeated presses spawned window after window. A gaze-pinch can
+        // register twice, and without debouncing that reads as open-then-instantly-close.
+        let model = AppModel()
+
+        XCTAssertEqual(model.requestSettingsToggle(), .open)
+        XCTAssertEqual(model.requestSettingsToggle(), .ignore)
+        XCTAssertEqual(model.requestSettingsToggle(), .ignore)
+        XCTAssertTrue(model.isSettingsWindowOpen, "the window should still be open, exactly once")
+    }
+
+    func testUploadAndSettingsShareTheDebounce() {
+        let model = AppModel()
+
+        XCTAssertEqual(model.requestSettingsToggle(), .open)
+        XCTAssertEqual(model.requestUploadToggle(), .ignore,
+                       "a single mis-registered pinch must not open two different windows")
+    }
+
+    // MARK: - Action feedback
+
+    func testTogglingAPanelAnnouncesWhatHappened() {
+        let model = AppModel()
+
+        model.toggleVisibility("history")
+        XCTAssertEqual(model.lastAction?.message, "History opened")
+
+        model.toggleVisibility("history")
+        XCTAssertEqual(model.lastAction?.message, "History closed")
+    }
+
+    // MARK: - Wrist menus
+
+    func testWristMenusDefaultOn() {
+        // `bool(forKey:)` returns false for an unwritten key, which would ship the feature off.
+        UserDefaults.standard.removeObject(forKey: "wristMenusEnabled")
+        XCTAssertTrue(AppModel().wristMenusEnabled)
+    }
+
+    func testTourDropsWristInstructionsWhenWristMenusAreOff() {
+        let withWrists = AppTour.script(wristMenusEnabled: true)
+        let without = AppTour.script(wristMenusEnabled: false)
+
+        XCTAssertTrue(withWrists.contains { $0.anchor == .wristMenu })
+        XCTAssertFalse(
+            without.contains { $0.anchor == .wristMenu },
+            "the tour must not tell the user to tap a menu that cannot appear"
+        )
+        XCTAssertFalse(
+            without.contains { ($0.callToAction ?? "").localizedCaseInsensitiveContains("wrist") },
+            "no call to action should reference the wrist when wrist menus are disabled"
+        )
+    }
+
+    func testTourStepIDsStaySequentialAfterFiltering() {
+        let without = AppTour.script(wristMenusEnabled: false)
+        XCTAssertEqual(without.map(\.id), Array(0..<without.count))
+    }
+
+    func testEveryWaitingStepIsStillReachableWithoutWristMenus() {
+        // Each action the tour waits on has to be performable from somewhere else.
+        let without = AppTour.script(wristMenusEnabled: false)
+        for step in without where step.advanceOn != nil {
+            XCTAssertNotNil(step.callToAction, "step \(step.id) waits with no instruction")
+            XCTAssertNotEqual(step.anchor, .wristMenu)
+        }
+    }
+
     // MARK: - Roles
 
     func testObserverAndSupervisorCannotRunTheWorkflow() {

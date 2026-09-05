@@ -89,6 +89,9 @@ struct HomeView: View {
                     }
                     .buttonStyle(.plain)
                     .spaiHitTarget()
+                    .accessibilityLabel("Enter sterile prep workflow")
+                    .accessibilityHint("Opens the spatial workspace and starts a session")
+                    .disabled(appModel.immersiveSpaceState != .closed)
                 }
                 .padding(SPAISpacing.xxl)
             }

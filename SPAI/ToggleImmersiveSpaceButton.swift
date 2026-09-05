@@ -49,5 +49,9 @@ struct ToggleImmersiveSpaceButton: View {
         .disabled(appModel.immersiveSpaceState == .inTransition)
         .animation(.none, value: 0)
         .fontWeight(.semibold)
+        .accessibilityLabel(appModel.immersiveSpaceState == .open ? "Hide immersive space" : "Show immersive space")
+        .accessibilityHint(appModel.immersiveSpaceState == .open
+            ? "Closes the spatial workspace and its panels"
+            : "Opens the spatial workspace with passthrough")
     }
 }

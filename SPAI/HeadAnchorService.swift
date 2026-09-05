@@ -35,6 +35,23 @@ final class HeadAnchorService {
     /// Eye height to lay the panel arc out against.
     var eyeHeight: Float { calibratedEyeHeight ?? Self.defaultEyeHeight }
 
+    /// Live head position, queried on demand. Wrist gestures need it every frame — "am I
+    /// holding my wrist up to look at it" is a question about the wrist *relative to the
+    /// face*, not about the wrist alone.
+    ///
+    /// Returns `nil` in the simulator and before world tracking has a fix.
+    func currentHeadPosition() -> SIMD3<Float>? {
+        #if targetEnvironment(simulator)
+        return nil
+        #else
+        guard isRunning,
+              let anchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime())
+        else { return nil }
+        let m = anchor.originFromAnchorTransform
+        return SIMD3<Float>(m.columns.3.x, m.columns.3.y, m.columns.3.z)
+        #endif
+    }
+
     #if !targetEnvironment(simulator)
     private let session = ARKitSession()
     private let worldTracking = WorldTrackingProvider()

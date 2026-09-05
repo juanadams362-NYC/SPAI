@@ -35,6 +35,8 @@ struct StatusBarPanel: View {
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .onReceive(timer) { _ in sessionSeconds += 1 }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Status bar. Session time \(formattedTime). Role \(appModel.role.rawValue). Detection \(detectionService.mode.rawValue).")
     }
 
     private var identityBlock: some View {
@@ -126,20 +128,27 @@ struct StatusBarPanel: View {
             }
             .buttonStyle(.plain)
             .spaiHitTarget()
+            .accessibilityLabel("Ask SPAI")
+            .accessibilityValue(appModel.isVisible("chat") ? "Open" : "Closed")
+            .accessibilityHint("Opens the assistant, which knows your current step")
+            .accessibilityAddTraits(appModel.isVisible("chat") ? [.isSelected] : [])
 
             Button {
-                if appModel.isSettingsWindowOpen {
-                    dismissWindow(id: "settings")
-                    appModel.isSettingsWindowOpen = false
-                } else {
-                    openWindow(id: "settings")
-                    appModel.isSettingsWindowOpen = true
+                // Same debounced decision the wrist menu uses, so the two cannot disagree
+                // about whether Settings is open.
+                switch appModel.requestSettingsToggle() {
+                case .open:   openWindow(id: "settings")
+                case .close:  dismissWindow(id: "settings")
+                case .ignore: break
                 }
             } label: {
                 barButtonLabel("Settings", icon: "gearshape.fill", tint: SPAIColor.secondary)
             }
             .buttonStyle(.plain)
             .spaiHitTarget()
+            .accessibilityLabel("Settings")
+            .accessibilityValue(appModel.isSettingsWindowOpen ? "Open" : "Closed")
+            .accessibilityAddTraits(appModel.isSettingsWindowOpen ? [.isSelected] : [])
 
             Button {
                 Task {
@@ -152,6 +161,8 @@ struct StatusBarPanel: View {
             }
             .buttonStyle(.plain)
             .spaiHitTarget()
+            .accessibilityLabel("End session")
+            .accessibilityHint("Closes the immersive workspace and returns to the home window")
         }
     }
 

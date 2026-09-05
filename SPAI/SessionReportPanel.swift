@@ -82,6 +82,8 @@ struct SessionReportPanel: View {
         .frame(width: 420)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Session report. \(passed ? "Passed" : "Failed"). Duration \(duration). \(appModel.contaminationCount) contamination events.")
     }
 
     private func reportRow(icon: String, label: String, value: String, valueColor: Color = .white) -> some View {

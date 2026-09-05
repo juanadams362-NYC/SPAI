@@ -19,12 +19,10 @@ struct DetectionUploadPanel: View {
                 .foregroundStyle(.white.opacity(0.5))
 
             Button {
-                if appModel.isUploadWindowOpen {
-                    dismissWindow(id: "upload")
-                    appModel.isUploadWindowOpen = false
-                } else {
-                    openWindow(id: "upload")
-                    appModel.isUploadWindowOpen = true
+                switch appModel.requestUploadToggle() {
+                case .open:   openWindow(id: "upload")
+                case .close:  dismissWindow(id: "upload")
+                case .ignore: break
                 }
             } label: {
                 Label(appModel.isUploadWindowOpen ? "Close upload panel" : "Upload test media",
@@ -38,6 +36,10 @@ struct DetectionUploadPanel: View {
             }
             .buttonStyle(.plain)
             .spaiHitTarget()
+            .accessibilityLabel("Upload test media")
+            .accessibilityValue(appModel.isUploadWindowOpen ? "Open" : "Closed")
+            .accessibilityHint("Give SPAI a photo or video to run detection against")
+            .accessibilityAddTraits(appModel.isUploadWindowOpen ? [.isSelected] : [])
 
             if service.isLoading {
                 Text("Detecting…")
@@ -63,5 +65,7 @@ struct DetectionUploadPanel: View {
         .frame(width: 260)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Test media upload")
     }
 }

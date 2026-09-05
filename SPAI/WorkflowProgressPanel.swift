@@ -39,6 +39,11 @@ struct WorkflowProgressPanel: View {
         .frame(width: 760)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .accessibilityElement(children: .contain)
+        // Leads with the step and the next action, so VoiceOver answers "what am I doing and
+        // what do I do next" in the first breath — the same question the panel now answers
+        // visually.
+        .accessibilityLabel("Workflow progress. Step \(currentStepIndex + 1) of \(SterileStep.allCases.count), \(currentStep.title). \(nextActionPrompt)")
         .animation(.spring(response: 0.45, dampingFraction: 0.7), value: currentStepIndex)
         .animation(.easeInOut(duration: 0.3), value: stepStarted)
     }
@@ -81,9 +86,9 @@ struct WorkflowProgressPanel: View {
             return "You're viewing as \(appModel.role.rawValue). Switch to Technician to run a step."
         }
         if stepStarted {
-            return "In progress — follow the guided instructions."
+            return "In progress — follow the guided instructions on the right."
         }
-        return "Tap Start Step to begin."
+        return "Tap Start Step to begin. SPAI will need to see your work through the camera or an uploaded image."
     }
 
     private var controls: some View {

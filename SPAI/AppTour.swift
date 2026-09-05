@@ -107,12 +107,14 @@ final class AppTour {
 
     // MARK: - Control
 
-    func offer() {
+    func offer(wristMenusEnabled: Bool = true) {
         guard phase == .idle else { return }
+        steps = Self.script(wristMenusEnabled: wristMenusEnabled)
         phase = .offered
     }
 
-    func start() {
+    func start(wristMenusEnabled: Bool = true) {
+        steps = Self.script(wristMenusEnabled: wristMenusEnabled)
         stepIndex = 0
         justSatisfied = false
         phase = .running
@@ -172,7 +174,83 @@ final class AppTour {
 
     /// Ordered so the user reaches a real result early — a started step with live guidance —
     /// before the tour branches out into the supporting panels.
-    let steps: [TourStep] = [
+    ///
+    /// Rebuilt whenever the tour starts, because the script depends on whether the wrist menus
+    /// are switched on: with them off, "tap Chat on your wrist" is an instruction the user
+    /// cannot follow, and the step explaining the wrist menu has nothing to explain.
+    private(set) var steps: [TourStep] = AppTour.script(wristMenusEnabled: true)
+
+    static func script(wristMenusEnabled: Bool) -> [TourStep] {
+        var steps = baseSteps(wristMenusEnabled: wristMenusEnabled)
+        // IDs double as the ordering contract, so renumber after any filtering.
+        steps = steps.enumerated().map { index, step in
+            TourStep(
+                id: index,
+                title: step.title,
+                message: step.message,
+                anchor: step.anchor,
+                advanceOn: step.advanceOn,
+                callToAction: step.callToAction
+            )
+        }
+        return steps
+    }
+
+    private static func baseSteps(wristMenusEnabled: Bool) -> [TourStep] {
+        let wristSteps: [TourStep] = wristMenusEnabled ? [
+            TourStep(
+                id: 0,
+                title: "Your wrist menus",
+                message: "Turn your right wrist toward you, like checking the time, and a menu appears beside it: Reset, History, Chat, Settings. Hold your left forearm level, as if a book were lying on it, for the station list. Both fade the moment you lower your arm.",
+                anchor: .wristMenu
+            )
+        ] : []
+
+        let chatCTA = wristMenusEnabled ? "Tap Chat on your wrist" : "Tap \"Ask SPAI\" in the status bar"
+        let historyCTA = wristMenusEnabled ? "Tap History on your wrist" : "Tap History in the quick actions"
+        let settingsCTA = wristMenusEnabled ? "Tap Settings on your wrist" : "Tap Settings in the status bar"
+        let chatAnchor: TourAnchor = wristMenusEnabled ? .wristMenu : .statusBar
+        let historyAnchor: TourAnchor = wristMenusEnabled ? .wristMenu : .eventLog
+        let settingsAnchor: TourAnchor = wristMenusEnabled ? .wristMenu : .statusBar
+
+        return coreSteps
+            + wristSteps
+            + [
+                TourStep(
+                    id: 0,
+                    title: "Ask SPAI anything",
+                    message: "Chat opens an assistant that knows your current step. Ask it out loud or by typing — it's the fastest way to get unstuck.",
+                    anchor: chatAnchor,
+                    advanceOn: .openedChat,
+                    callToAction: chatCTA
+                ),
+                TourStep(
+                    id: 0,
+                    title: "Past sessions",
+                    message: "History holds every completed session, and lets you compare two side by side to see what changed.",
+                    anchor: historyAnchor,
+                    advanceOn: .openedHistory,
+                    callToAction: historyCTA
+                ),
+                TourStep(
+                    id: 0,
+                    title: "Feed it images",
+                    message: "Upload a photo or video, or connect your iPhone as a camera, and SPAI runs detection against it. Useful for testing without a full tray in front of you.",
+                    anchor: .upload
+                ),
+                TourStep(
+                    id: 0,
+                    title: "Make it yours",
+                    message: "Settings holds the backend URL, the confidence threshold, panel opacity, whether panels turn to face you, and whether the wrist menus are on at all.",
+                    anchor: settingsAnchor,
+                    advanceOn: .openedSettings,
+                    callToAction: settingsCTA
+                )
+            ]
+    }
+
+    /// The part of the script that is the same however the app is configured.
+    private static let coreSteps: [TourStep] = [
         TourStep(
             id: 0,
             title: "Your status bar",
@@ -230,42 +308,6 @@ final class AppTour {
             title: "Everything is logged",
             message: "Every step, alert, and acknowledgement lands here with a timestamp, and gets saved as a session report you can export.",
             anchor: .eventLog
-        ),
-        TourStep(
-            id: 9,
-            title: "Your wrist menu",
-            message: "Raise your right wrist and a menu follows your arm: Reset, History, Chat, and Settings. It fades away when you lower your arm.",
-            anchor: .wristMenu
-        ),
-        TourStep(
-            id: 10,
-            title: "Ask SPAI anything",
-            message: "Chat opens an assistant that knows your current step. Ask it out loud or by typing — it's the fastest way to get unstuck.",
-            anchor: .wristMenu,
-            advanceOn: .openedChat,
-            callToAction: "Tap Chat on your wrist"
-        ),
-        TourStep(
-            id: 11,
-            title: "Past sessions",
-            message: "History holds every completed session, and lets you compare two side by side to see what changed.",
-            anchor: .wristMenu,
-            advanceOn: .openedHistory,
-            callToAction: "Tap History on your wrist"
-        ),
-        TourStep(
-            id: 12,
-            title: "Feed it images",
-            message: "Upload a photo or video, or connect your iPhone as a camera, and SPAI runs detection against it. Useful for testing without a full tray in front of you.",
-            anchor: .upload
-        ),
-        TourStep(
-            id: 13,
-            title: "Make it yours",
-            message: "Settings holds the backend URL, the confidence threshold, panel opacity, and whether panels turn to face you. \"Always show onboarding\" replays this tour on every launch — leave it off once you're comfortable.",
-            anchor: .wristMenu,
-            advanceOn: .openedSettings,
-            callToAction: "Tap Settings on your wrist"
         )
     ]
 }

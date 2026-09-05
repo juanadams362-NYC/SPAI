@@ -54,7 +54,7 @@ struct TourCoachmark: View {
                     }
                     Spacer()
                     primaryButton("Show me") {
-                        tour.start()
+                        tour.start(wristMenusEnabled: appModel.wristMenusEnabled)
                     }
                 }
             }
@@ -209,6 +209,7 @@ struct TourCoachmark: View {
         }
         .buttonStyle(.plain)
         .spaiHitTarget(pop: 1.10)
+        .accessibilityLabel(title)
     }
 
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -222,6 +223,7 @@ struct TourCoachmark: View {
         }
         .buttonStyle(.plain)
         .spaiHitTarget()
+        .accessibilityLabel(title)
     }
 }
 

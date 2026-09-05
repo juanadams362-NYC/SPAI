@@ -34,6 +34,30 @@ enum SPAISpacing {
     static let xxl: CGFloat = 40
 }
 
+/// Minimum hit target plus a gaze response.
+///
+/// A separate modifier rather than an inline chain so it can read the environment: with Reduce
+/// Motion on, the control still highlights under gaze but does not scale or lift. Motion is the
+/// affordance here, so it has to degrade to something rather than to nothing.
+struct SPAIHitTarget: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let minSize: CGFloat
+    let pop: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .frame(minWidth: minSize, minHeight: minSize)
+            .contentShape(Rectangle())
+            .hoverEffect { effect, isActive, _ in
+                effect
+                    .scaleEffect(isActive && !reduceMotion ? pop : 1.0)
+                    .offset(y: isActive && !reduceMotion ? -2 : 0)
+            }
+            .hoverEffect(.highlight)
+    }
+}
+
 struct SPAIGlass: ViewModifier {
     enum Mode { case light, dark }
     let mode: Mode
@@ -72,15 +96,7 @@ extension View {
     /// The highlight alone read as too subtle in testing ("nothing signals they are tappable"),
     /// so the control also lifts and scales slightly under gaze. `pop` is the scale at rest→hover.
     func spaiHitTarget(minSize: CGFloat = 44, pop: CGFloat = 1.08) -> some View {
-        self
-            .frame(minWidth: minSize, minHeight: minSize)
-            .contentShape(Rectangle())
-            .hoverEffect { effect, isActive, _ in
-                effect
-                    .scaleEffect(isActive ? pop : 1.0)
-                    .offset(y: isActive ? -2 : 0)
-            }
-            .hoverEffect(.highlight)
+        modifier(SPAIHitTarget(minSize: minSize, pop: pop))
     }
 
     /// Entrance used by every panel that can be toggled on. The panel scales up from the
