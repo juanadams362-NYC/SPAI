@@ -8,6 +8,16 @@ import RealityKit
 import RealityKitContent
 import simd
 
+/// Where a panel sits on the arc around the user.
+///
+/// `heightAboveEye` is relative to the wearer's measured eye line rather than absolute, so
+/// "status bar above eye level" stays true whether the user is tall, short, or seated.
+private struct PanelSlot {
+    let angle: Float
+    let heightAboveEye: Float
+    let radius: Float
+}
+
 struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
 
@@ -15,33 +25,46 @@ struct ImmersiveView: View {
     @State private var stationManager = StationManager()
 
     @State private var cameraService = CameraFrameService()
-    @State private var showInteractiveOnboarding: Bool = false
     @State private var handTracking = HandTrackingService()
+    @State private var headAnchor = HeadAnchorService()
+
+    /// Not `@State`: this is bookkeeping for the entrance animation, and mutating it must not
+    /// invalidate the view — doing that from inside a RealityView update closure would loop.
+    @State private var entranceLog = PanelEntranceLog()
 
     private let arcRadius: Float = 1.25
 
+    /// The full arc. Angles are degrees clockwise from straight ahead; heights are relative to
+    /// the wearer's eye line; radius is metres out.
+    private static let layout: [String: PanelSlot] = [
+        // Above the eye line and pushed further back — it is the widest panel in the scene,
+        // so at close range it dominates the view instead of reading as a header.
+        "statusBar":     PanelSlot(angle:   0, heightAboveEye:  0.40, radius: 1.55),
+
+        "detection":     PanelSlot(angle: -34, heightAboveEye: -0.05, radius: 1.25),
+        "eventLog":      PanelSlot(angle:  34, heightAboveEye: -0.05, radius: 1.25),
+        "guided":        PanelSlot(angle:  16, heightAboveEye: -0.35, radius: 1.15),
+        "workflow":      PanelSlot(angle:   0, heightAboveEye: -0.65, radius: 1.15),
+        "actions":       PanelSlot(angle:  54, heightAboveEye: -0.25, radius: 1.35),
+        "report":        PanelSlot(angle:   0, heightAboveEye: -0.10, radius: 1.05),
+
+        // Chat and history are deliberate mirror images. History used to sit lower and wider
+        // out (-52°, 1.55 m) than chat (48°, 1.7 m), which is a large part of why "tap History"
+        // read as doing nothing: the panel opened behind the user's shoulder, off to the side
+        // they were not looking at, with no motion to draw the eye.
+        "chat":          PanelSlot(angle:  46, heightAboveEye:  0.20, radius: 1.30),
+        "history":       PanelSlot(angle: -46, heightAboveEye:  0.20, radius: 1.30),
+
+        "upload":        PanelSlot(angle: -54, heightAboveEye: -0.50, radius: 1.35),
+        "wristMenu":     PanelSlot(angle: -70, heightAboveEye: -0.60, radius: 1.20),
+        "stationPicker": PanelSlot(angle: -30, heightAboveEye: -0.65, radius: 1.20)
+    ]
+
     var body: some View {
-        ZStack {
-            realityContent
-            
-            // Interactive onboarding overlay
-            if showInteractiveOnboarding {
-                InteractiveOnboardingView(isActive: $showInteractiveOnboarding)
-                    .transition(.opacity)
-            }
-        }
+        realityContent
         .onAppear {
             appModel.immersiveSpaceState = .open
-            
-            // Show interactive tour if first time
-            if !appModel.hasCompletedOnboarding {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    withAnimation {
-                        showInteractiveOnboarding = true
-                    }
-                }
-            }
-            
+
             stationManager.onEnter = { station in
                 appModel.currentStepIndex = station.step.rawValue
                 appModel.stepStarted = false
@@ -51,6 +74,18 @@ struct ImmersiveView: View {
             Task { await stationManager.startImageTracking() }
             Task { await handTracking.start() }
             #endif
+        }
+        .task {
+            // Measure the wearer's eye line before the arc settles, so panel heights are
+            // relative to them rather than to an assumed 1.5 m.
+            await headAnchor.calibrate()
+        }
+        .task {
+            // The guided tour is offered once the space is up and the panels exist to point
+            // at. It is opt-in and skippable — see AppTour.
+            guard !appModel.hasCompletedTour else { return }
+            try? await Task.sleep(for: .seconds(1.2))
+            appModel.tour.offer()
         }
 
         #if !targetEnvironment(simulator)
@@ -72,6 +107,8 @@ struct ImmersiveView: View {
             #if !targetEnvironment(simulator)
             cameraService.stop()
             #endif
+            headAnchor.stop()
+            appModel.tour.stop()
             SoundManager.shared.contaminationAnchor = nil
             SpeechManager.shared.guidedAnchor = nil
         }
@@ -83,84 +120,70 @@ struct ImmersiveView: View {
                 content.add(env)
             }
 
-            place("statusBar", angle: 0, height: 1.9, radius: 1.3, content, attachments)
+            for id in Self.layout.keys {
+                place(id, content, attachments)
+            }
 
-            place("detection", angle: -30, height: 1.45, radius: 1.2, content, attachments)
-            place("eventLog",  angle:  30, height: 1.45, radius: 1.2, content, attachments)
             if let detectionEntity = attachments.entity(for: "detection") {
                 detectionEntity.spatialAudio = SpatialAudioComponent()
                 SoundManager.shared.contaminationAnchor = detectionEntity
             }
-
-            place("guided",    angle:  16, height: 1.15, radius: 1.15, content, attachments)
             if let guidedEntity = attachments.entity(for: "guided") {
                 guidedEntity.spatialAudio = SpatialAudioComponent()
                 SpeechManager.shared.guidedAnchor = guidedEntity
             }
-
-            place("workflow",  angle:  0,  height: 0.85, radius: 1.1, content, attachments)
-            // Removed: camera panel (merged into upload window)
-            // place("camera",    angle: -16, height: 1.15, radius: 1.15, content, attachments)
-
-            place("actions",   angle:  52, height: 1.25, radius: 1.3, content, attachments)
-            place("chat",      angle:  48, height: 1.7,  radius: 1.3, content, attachments)
-            place("history",   angle: -52, height: 1.55, radius: 1.3, content, attachments)
-            place("wristMenu", angle: -70, height: 0.9, radius: 1.2, content, attachments)
-            place("stationPicker", angle: -30, height: 0.85, radius: 1.2, content, attachments)
-
-            place("report",    angle:  0,  height: 1.4,  radius: 1.05, content, attachments)
-
-            #if true
-            place("upload",    angle: -52, height: 1.0,  radius: 1.3, content, attachments)
-            #endif
         } update: { _, attachments in
             setEnabled("statusBar", attachments)
             setEnabled("detection", attachments)
             setEnabled("eventLog",  attachments)
             setEnabled("workflow",  attachments)
-            // Removed: camera panel
-            // setEnabled("camera", attachments)
             setEnabled("chat", attachments)
             setEnabled("history", attachments)
-            // setEnabled("wristMenu", attachments) // Not explicitly enabled here, but not changed per instructions
+            setEnabled("upload", attachments)
+            setEnabled("actions", attachments)
+
+            // The wrist panels track a live pose, so they follow the arm rather than the arc.
             #if targetEnvironment(simulator)
             attachments.entity(for: "stationPicker")?.isEnabled = true
+            attachments.entity(for: "wristMenu")?.isEnabled = true
             #else
             attachments.entity(for: "stationPicker")?.isEnabled = handTracking.leftWristPose != nil
+            attachments.entity(for: "wristMenu")?.isEnabled = handTracking.rightWristPose != nil
             #endif
 
             updateWristAnchor(
                 "wristMenu", attachments,
                 pose: handTracking.rightWristPose,
-                offset: SIMD3<Float>(x: 0.06, y: 0.025, z: -0.02),
-                fallback: arcPosition(angle: -70, height: 0.9, radius: 1.2)
+                // Out to the side of the forearm, not hovering over it. 0.06 m put the panel
+                // physically in the way of the user's hands while they worked.
+                offset: SIMD3<Float>(x: 0.16, y: 0.03, z: -0.03),
+                fallback: arcPosition(for: "wristMenu")
             )
             updateWristAnchor(
                 "stationPicker", attachments,
                 pose: handTracking.leftWristPose,
-                offset: SIMD3<Float>(x: -0.06, y: 0.025, z: -0.02),
-                fallback: arcPosition(angle: -30, height: 0.85, radius: 1.2)
+                // Above the forearm. At y = 0.025 the panel visually fused into the arm.
+                offset: SIMD3<Float>(x: -0.05, y: 0.15, z: -0.03),
+                fallback: arcPosition(for: "stationPicker")
             )
+
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
             attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
-            
-            // Update billboard state for all panels
-            updateBillboard("statusBar", attachments)
-            updateBillboard("detection", attachments)
-            updateBillboard("eventLog", attachments)
-            updateBillboard("workflow", attachments)
-            // Removed: camera panel
-            // updateBillboard("camera", attachments)
-            updateBillboard("guided", attachments)
-            updateBillboard("actions", attachments)
-            updateBillboard("chat", attachments)
-            updateBillboard("history", attachments)
-            // Removed updateBillboard("wristMenu", attachments)
-            updateBillboard("stationPicker", attachments)
-            updateBillboard("report", attachments)
-            #if true
-            updateBillboard("upload", attachments)
-            #endif
+
+            for id in Self.layout.keys {
+                updateBillboard(id, attachments)
+            }
+
+            // Fly a freshly-opened panel in from the wrist menu so the user can see where it
+            // went — several panels open outside the field of view they are looking at.
+            if let opened = appModel.lastOpenedPanel,
+               entranceLog.handledAt != opened.at,
+               appModel.isVisible(opened.id) {
+                entranceLog.handledAt = opened.at
+                animateEntrance(opened.id, attachments)
+            }
+
+            updateTourCard(attachments)
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
@@ -199,47 +222,96 @@ struct ImmersiveView: View {
             Attachment(id: "history") { SessionHistoryPanel() }
             Attachment(id: "wristMenu") {
                 // Right wrist (or simulator fallback): quick-action menu
-                WristMenuPanel(
-                    isHandVisibleProvider: {
-                        handTracking.rightWristPosition != nil
-                    }
-                )
+                WristMenuPanel(isHandVisible: handTracking.rightWristPose != nil)
             }
             Attachment(id: "stationPicker") {
                 // Left wrist: compact station picker
                 StationPickerPanel(manager: stationManager, compact: true)
             }
+            Attachment(id: "tour") { TourCoachmark() }
         }
     }
 
-    private func arcPosition(angle degrees: Float, height: Float, radius: Float) -> SIMD3<Float> {
-        let a = degrees * .pi / 180
-        return [radius * sin(a), height, -radius * cos(a)]
+    /// Parks the tour card just inside the panel it is describing — nearer to the user and
+    /// nudged off-centre so it never sits on top of its own subject.
+    private func tourPosition() -> SIMD3<Float> {
+        let anchor = appModel.tour.anchor
+
+        if anchor == .wristMenu {
+            // Float beside the wrist rather than at the arc slot, so "tap Chat on your wrist"
+            // is readable while the user is actually looking at their arm.
+            if let pose = handTracking.rightWristPose {
+                let right = normalize(cross(pose.up, pose.forward))
+                return pose.position + right * 0.30 + pose.up * 0.28
+            }
+            return arcPosition(for: "wristMenu") + SIMD3<Float>(0, 0.35, 0.15)
+        }
+
+        guard anchor != .center, let slot = Self.layout[anchor.rawValue] else {
+            // Straight ahead, a little below the eye line.
+            return [0, headAnchor.eyeHeight - 0.12, -1.0]
+        }
+
+        // Same bearing as the subject, pulled 0.3 m closer and dropped slightly so the card
+        // reads as sitting in front of the panel it points at.
+        let a = slot.angle * .pi / 180
+        let radius = max(slot.radius - 0.30, 0.65)
+        let y = headAnchor.eyeHeight + slot.heightAboveEye - 0.22
+        return [radius * sin(a), y, -radius * cos(a)]
+    }
+
+    /// World position for a panel's slot, with heights resolved against the wearer's measured
+    /// eye line.
+    private func arcPosition(for id: String) -> SIMD3<Float> {
+        guard let slot = Self.layout[id] else {
+            return [0, headAnchor.eyeHeight, -arcRadius]
+        }
+        let a = slot.angle * .pi / 180
+        let y = headAnchor.eyeHeight + slot.heightAboveEye
+        return [slot.radius * sin(a), y, -slot.radius * cos(a)]
     }
 
     private func place(
-        _ id: some Hashable,
-        angle: Float,
-        height: Float,
-        radius: Float? = nil,
+        _ id: String,
         _ content: RealityViewContent,
         _ attachments: RealityViewAttachments
     ) {
         guard let panel = attachments.entity(for: id) else { return }
-        panel.position = arcPosition(angle: angle, height: height, radius: radius ?? arcRadius)
-        
-        // Only add billboard if enabled in settings
-        if appModel.panelsBillboard {
-            panel.components.set(BillboardComponent())
-        } else {
-            panel.components.remove(BillboardComponent.self)
-        }
-        
+        panel.position = arcPosition(for: id)
+        applyBillboard(to: panel)
         content.add(panel)
     }
 
     private func setEnabled(_ id: String, _ attachments: RealityViewAttachments) {
         attachments.entity(for: id)?.isEnabled = appModel.isVisible(id)
+    }
+
+    /// Scales a newly-opened panel up from the wrist menu into its slot. The tester tapped
+    /// History and concluded nothing happened, because the panel simply blinked into
+    /// existence off to one side. Motion out of the button gives the eye something to follow.
+    private func animateEntrance(_ id: String, _ attachments: RealityViewAttachments) {
+        guard let panel = attachments.entity(for: id) else { return }
+        let home = arcPosition(for: id)
+        let source = attachments.entity(for: "wristMenu")?.position ?? home
+
+        panel.position = source
+        panel.scale = SIMD3<Float>(repeating: 0.2)
+
+        let target = Transform(
+            scale: .one,
+            rotation: panel.orientation,
+            translation: home
+        )
+        // Slight overshoot so the panel lands with a bit of weight rather than easing to a stop.
+        panel.move(
+            to: target,
+            relativeTo: panel.parent,
+            duration: 0.45,
+            timingFunction: .cubicBezier(
+                controlPoint1: SIMD2<Float>(0.2, 0.9),
+                controlPoint2: SIMD2<Float>(0.25, 1.06)
+            )
+        )
     }
 
     /// Re-anchors a wrist panel to the live tracked wrist pose each frame. Falls back to a fixed
@@ -267,12 +339,76 @@ struct ImmersiveView: View {
     
     private func updateBillboard(_ id: String, _ attachments: RealityViewAttachments) {
         guard let entity = attachments.entity(for: id) else { return }
+        applyBillboard(to: entity)
+    }
+
+    /// Keeps the tour card beside whatever the current step is about, gliding between subjects
+    /// so the user's eye is led from one panel to the next instead of the card teleporting.
+    private func updateTourCard(_ attachments: RealityViewAttachments) {
+        guard let card = attachments.entity(for: "tour") else { return }
+
+        card.isEnabled = appModel.tour.isVisible
+        guard appModel.tour.isVisible else { return }
+
+        // The card must always face the user, whatever the panel billboard setting is —
+        // it is a piece of instruction, not a workspace panel.
+        var billboard = BillboardComponent()
+        billboard.blendFactor = 1.0
+        card.components.set(billboard)
+
+        let target = tourPosition()
+        let anchorKey = appModel.tour.anchor.rawValue
+
+        if entranceLog.tourAnchor != anchorKey {
+            let isFirstPlacement = entranceLog.tourAnchor == nil
+            entranceLog.tourAnchor = anchorKey
+
+            if isFirstPlacement {
+                card.position = target
+                card.scale = SIMD3<Float>(repeating: 0.3)
+                card.move(
+                    to: Transform(scale: .one, rotation: card.orientation, translation: target),
+                    relativeTo: card.parent,
+                    duration: 0.45,
+                    timingFunction: .easeOut
+                )
+            } else {
+                card.move(
+                    to: Transform(scale: .one, rotation: card.orientation, translation: target),
+                    relativeTo: card.parent,
+                    duration: 0.6,
+                    timingFunction: .easeInOut
+                )
+            }
+        } else if appModel.tour.anchor == .wristMenu {
+            // The wrist moves continuously, so track it rather than animating to a fixed point.
+            card.position = target
+        }
+    }
+
+    /// `BillboardComponent` carries a `blendFactor` that controls how much of the billboard
+    /// rotation is actually applied. The old code constructed the component with `init()` and
+    /// never set it, which is why "Panels look at you" appeared wired up — the setting really
+    /// did add and remove the component — while nothing visibly turned to face the user.
+    private func applyBillboard(to entity: Entity) {
         if appModel.panelsBillboard {
-            entity.components.set(BillboardComponent())
+            var billboard = BillboardComponent()
+            billboard.blendFactor = 1.0
+            entity.components.set(billboard)
         } else {
             entity.components.remove(BillboardComponent.self)
         }
     }
+}
+
+/// Tracks which panel-open event the entrance animation has already played, so the RealityView
+/// update closure runs it exactly once. Deliberately a reference type held in `@State`: writing
+/// to it must not invalidate the view, or the update closure would retrigger itself forever.
+@MainActor
+final class PanelEntranceLog {
+    var handledAt: Date?
+    /// Anchor the tour card was last moved to, so it only animates when the subject changes.
+    var tourAnchor: String?
 }
 
 #Preview(immersionStyle: .mixed) {

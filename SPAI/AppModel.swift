@@ -94,17 +94,39 @@ class AppModel {
     var immersiveSpaceState = ImmersiveSpaceState.closed
 
     private let onboardingKey = "hasCompletedOnboarding"
+    private let tourKey = "hasCompletedTour"
     private let client = BackendClient()
 
+    /// The pre-launch welcome pages.
     var hasCompletedOnboarding: Bool {
         didSet {
             UserDefaults.standard.set(hasCompletedOnboarding, forKey: onboardingKey)
         }
     }
 
+    /// The in-app guided tour. Tracked separately from `hasCompletedOnboarding` because they
+    /// answer different questions: the welcome pages say what SPAI is, the tour teaches the
+    /// workspace. Finishing one should not silently suppress the other.
+    var hasCompletedTour: Bool {
+        didSet {
+            UserDefaults.standard.set(hasCompletedTour, forKey: tourKey)
+        }
+    }
+
+    let tour = AppTour()
+
+    func completeTour() { hasCompletedTour = true }
+
+    /// Replays the tour from Settings.
+    func restartTour() {
+        hasCompletedTour = false
+        tour.start()
+    }
+
     var role: TechRole = .technician {
         didSet {
             guard role != oldValue else { return }
+            tour.note(.changedRole)
             log("Role changed to \(role.rawValue)", kind: .info)
             if role == .observer || role == .supervisor {
                 panelVisibility["history"] = true
@@ -128,12 +150,34 @@ class AppModel {
     var panelVisibility: [String: Bool] = ["chat": false, "history": false]
     var panelOpacity: Double = 0.85
     var panelsBillboard: Bool = true  // Panels look at you when you move
-    var isSettingsWindowOpen: Bool = false
+    var isSettingsWindowOpen: Bool = false {
+        didSet {
+            guard isSettingsWindowOpen, !oldValue else { return }
+            tour.note(.openedSettings)
+        }
+    }
     var isUploadWindowOpen: Bool = false
     
     func isVisible(_ panelID: String) -> Bool { panelVisibility[panelID] ?? true }
-    func toggleVisibility(_ panelID: String) { panelVisibility[panelID] = !isVisible(panelID) }
     func showAllPanels() { panelVisibility.removeAll() }
+
+    /// Panel that most recently became visible, and when. `ImmersiveView` reads this to play
+    /// the "fly in from the button you tapped" transition, so a panel that opens off to the
+    /// side announces itself instead of silently appearing outside the user's field of view.
+    var lastOpenedPanel: (id: String, at: Date)?
+
+    func toggleVisibility(_ panelID: String) {
+        let nowVisible = !isVisible(panelID)
+        panelVisibility[panelID] = nowVisible
+        guard nowVisible else { return }
+        lastOpenedPanel = (panelID, Date())
+        switch panelID {
+        case "chat":    tour.note(.openedChat)
+        case "history": tour.note(.openedHistory)
+        case "upload":  tour.note(.openedUpload)
+        default:        break
+        }
+    }
 
     // MARK: - Event log
 
@@ -199,6 +243,7 @@ class AppModel {
         let step = currentStep
         stepStarted = true
         guidedStepIndex = 0
+        tour.note(.startedStep)
         log("Started \(step.title)", kind: .info)
         speakCurrentGuidedStep()
         Task {
@@ -295,6 +340,7 @@ class AppModel {
 
     init() {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
+        self.hasCompletedTour = UserDefaults.standard.bool(forKey: tourKey)
         Task { _ = try? await client.resetCompliance() }
         log("Session started", kind: .info)
     }

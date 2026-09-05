@@ -21,12 +21,17 @@ struct ToggleImmersiveSpaceButton: View {
                     case .open:
                         appModel.immersiveSpaceState = .inTransition
                         await dismissImmersiveSpace()
+                        // Close the state here rather than leaving it to ImmersiveView's
+                        // onDisappear. If the space is already gone (torn down by a scene
+                        // phase change, say) onDisappear never fires again, and the button
+                        // would stay disabled in .inTransition forever.
+                        appModel.immersiveSpaceState = .closed
 
                     case .closed:
                         appModel.immersiveSpaceState = .inTransition
                         switch await openImmersiveSpace(id: appModel.immersiveSpaceID) {
                             case .opened:
-                                break
+                                appModel.immersiveSpaceState = .open
 
                             case .userCancelled, .error:
                                 fallthrough

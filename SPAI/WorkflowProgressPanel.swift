@@ -45,19 +45,45 @@ struct WorkflowProgressPanel: View {
 
     // MARK: - Header
 
+    /// Names the current step and says what to do about it. The tester had to ask the
+    /// assistant what she was supposed to be doing, because the panel showed progress nodes
+    /// but never stated the step in words or gave the next action.
     private var header: some View {
-        HStack {
-            Text("WORKFLOW PROGRESS")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.7))
+        HStack(alignment: .firstTextBaseline, spacing: SPAISpacing.m) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("NOW — \(currentStep.title.uppercased())")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+
+                Text(nextActionPrompt)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
 
             Spacer()
 
-            Text("\(currentStepIndex)/\(SterileStep.allCases.count)")
+            // 1-based: this read "0/5" while standing on the first of five steps.
+            Text("STEP \(currentStepIndex + 1) OF \(SterileStep.allCases.count)")
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.55))
+                .fixedSize()
         }
+    }
+
+    private var nextActionPrompt: String {
+        if appModel.sessionComplete {
+            return "Session complete — your report is ready."
+        }
+        if appModel.isHalted {
+            return "Contamination detected. Acknowledge below to resume."
+        }
+        if !appModel.canRunWorkflow {
+            return "You're viewing as \(appModel.role.rawValue). Switch to Technician to run a step."
+        }
+        if stepStarted {
+            return "In progress — follow the guided instructions."
+        }
+        return "Tap Start Step to begin."
     }
 
     private var controls: some View {

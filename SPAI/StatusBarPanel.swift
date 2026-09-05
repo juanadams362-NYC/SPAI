@@ -30,7 +30,8 @@ struct StatusBarPanel: View {
         }
         .padding(.horizontal, SPAISpacing.l)
         .padding(.vertical, SPAISpacing.m)
-        .frame(width: 1200)
+        // Wider than before: the four inline role pills need the room the role menu didn't.
+        .frame(width: 1440)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .onReceive(timer) { _ in sessionSeconds += 1 }
@@ -67,32 +68,38 @@ struct StatusBarPanel: View {
         .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
     }
 
+    /// Roles are laid out inline rather than behind a `Menu`. A menu costs two pinches — one
+    /// to open it, one to choose — and it hid the feature entirely: the tester never worked
+    /// out that roles existed. Every role is now visible and one pinch away.
     private var roleBlock: some View {
-        Menu {
+        HStack(spacing: 4) {
+            Text("ROLE")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.55))
+                .padding(.trailing, 2)
+
             ForEach(TechRole.allCases) { role in
+                let isOn = appModel.role == role
                 Button {
                     appModel.role = role
                 } label: {
-                    if appModel.role == role {
-                        Label(role.rawValue, systemImage: "checkmark")
-                    } else {
-                        Text(role.rawValue)
-                    }
+                    Text(role.rawValue)
+                        .font(.system(size: 13, weight: isOn ? .bold : .medium))
+                        .foregroundStyle(isOn ? Color.black : .white.opacity(0.85))
+                        .padding(.horizontal, SPAISpacing.s + 2)
+                        .padding(.vertical, 6)
+                        .background(
+                            isOn ? AnyShapeStyle(SPAIColor.accent) : AnyShapeStyle(Color.white.opacity(0.10)),
+                            in: Capsule()
+                        )
                 }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Circle().fill(SPAIColor.accent).frame(width: 8, height: 8)
-                Text(appModel.role.rawValue)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.95))
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                .buttonStyle(.plain)
+                .spaiHitTarget(minSize: 40, pop: 1.10)
+                .accessibilityLabel("\(role.rawValue) role")
+                .accessibilityAddTraits(isOn ? [.isSelected] : [])
             }
         }
-        .buttonStyle(.plain)
-        .spaiHitTarget()
+        .animation(.easeOut(duration: 0.18), value: appModel.role)
     }
 
     private var modeBlock: some View {

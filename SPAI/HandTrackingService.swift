@@ -50,7 +50,20 @@ final class HandTrackingService {
         for await update in handTracking.anchorUpdates {
             let anchor = update.anchor
 
-            guard anchor.isTracked else { continue }
+            // Losing tracking used to `continue`, which left the last known pose in place —
+            // so a wrist panel froze mid-air when the arm left the camera's view instead of
+            // fading out. Clear the pose for that hand so the panel knows it's gone.
+            guard anchor.isTracked else {
+                switch anchor.chirality {
+                case .left:
+                    leftWristPose = nil
+                    leftWristPosition = nil
+                case .right:
+                    rightWristPose = nil
+                    rightWristPosition = nil
+                }
+                continue
+            }
 
             if let wrist = anchor.handSkeleton?.joint(.wrist) {
                 let worldTransform = anchor.originFromAnchorTransform
