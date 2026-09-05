@@ -58,15 +58,17 @@ struct SPAIApp: App {
     }
 }
 
-/// Root of the "home" window. Owns the onboarding-vs-home decision and, more importantly,
-/// the scene-phase teardown: an ImmersiveSpace is a separate scene from this window, so
-/// closing the app leaves its content floating in the room unless something explicitly
-/// dismisses it. Nothing did, which is why immersive content outlived the app during testing.
+/// Root of the "home" window: chooses between the welcome pages and the home screen.
+///
+/// Deliberately does **not** tear the immersive space down on its own scene phase. Entering the
+/// workflow dismisses this very window, which sends this scene to `.background` while the app is
+/// perfectly alive — so a teardown here fires the instant the user enters, killing the space they
+/// just opened. Scene phase on a dismissable window is not an app lifecycle signal.
+///
+/// `ImmersiveView` owns that teardown instead, which is correct: it is the scene that actually
+/// holds the immersive content, and it only backgrounds when the app really does.
 private struct RootSceneView: View {
     @Environment(AppModel.self) private var appModel
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
-    @Environment(\.dismissWindow) private var dismissWindow
 
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
 
@@ -77,29 +79,6 @@ private struct RootSceneView: View {
             } else {
                 HomeView()
             }
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            guard newPhase == .background else { return }
-            teardown()
-        }
-    }
-
-    private func teardown() {
-        // Auxiliary windows are singletons now, but they still need dismissing —
-        // a Window that is never closed reopens with the app on next launch.
-        if appModel.isSettingsWindowOpen {
-            dismissWindow(id: "settings")
-            appModel.isSettingsWindowOpen = false
-        }
-        if appModel.isUploadWindowOpen {
-            dismissWindow(id: "upload")
-            appModel.isUploadWindowOpen = false
-        }
-
-        guard appModel.immersiveSpaceState != .closed else { return }
-        Task { @MainActor in
-            await dismissImmersiveSpace()
-            appModel.immersiveSpaceState = .closed
         }
     }
 }

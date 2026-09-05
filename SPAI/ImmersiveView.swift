@@ -133,9 +133,10 @@ struct ImmersiveView: View {
     
     private var realityContent: some View {
         RealityView { content, attachments in
-            if let env = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
-                content.add(env)
-            }
+            // The placeholder "Immersive" environment from the RealityKitContent package is
+            // deliberately not loaded. It is an opaque skybox, so it replaces passthrough with
+            // a black room — the workspace is meant to sit over the real one. Restore this once
+            // there is a real environment authored in Reality Composer Pro.
 
             for id in Self.layout.keys {
                 place(id, content, attachments)
