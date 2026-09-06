@@ -35,9 +35,26 @@ final class SoundManager {
     private let contaminationDirectLevelDB: Double = 3
 
     private init() {
-        // `.ambient` respects the silent switch and ducks to nothing alongside other audio,
-        // which is wrong for a safety alert. `.playback` keeps the alert audible.
-        try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
+        // Stays `.ambient`, and deliberately so.
+        //
+        // This was briefly changed to `.playback` to make the contamination alert louder.
+        // `.playback` is a *primary audio* category: claiming it and activating the session
+        // takes the audio route away from the system, including MRUIFeedback — the service
+        // that plays visionOS's button press feedback. Starved of the route, that service
+        // stalled, logging:
+        //
+        //     [MRUIFeedbackTypeButtonWithoutBackgroundTouchDown]
+        //     Playback timed out before completion (after 17646 ms)
+        //
+        // and every button in the app stopped responding, because the press feedback never
+        // completed. SoundManager is first touched when the immersive space opens, so the
+        // symptom was "enter the workflow and nothing is tappable any more".
+        //
+        // The alert's loudness does not depend on this anyway — it comes from
+        // SpatialAudioComponent.gain below, which runs through RealityKit's own spatial audio
+        // path rather than the AVAudioSession category. `.ambient` + .mixWithOthers keeps this
+        // app a good citizen of the shared route.
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
     }
 
