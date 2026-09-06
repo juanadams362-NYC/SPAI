@@ -12,6 +12,18 @@ CLASS_NAMES = ["glove", "hand"]
 # Only report detections at or above this confidence. Filters out noise.
 CONFIDENCE_THRESHOLD = 0.25
 
+# Largest share of the frame a single detection may cover before we stop believing it.
+#
+# A YOLO model has no "none of the above" class: point the instrument detector at a chair and
+# it will force the chair into one of its six trained classes and report a box. What gives that
+# away is size — instruments are photographed lying in a tray and occupy a modest slice of the
+# frame, while furniture, benches and people fill it. Mirrors DetectionTuning.swift on the
+# client so both paths accept the same things.
+MAX_AREA_FRACTION = 0.35
+
+# Floor for the smallest believable box, to drop specks.
+MIN_AREA_FRACTION = 0.0005
+
 
 class Detector:
     """Wraps the YOLO model. Loaded once at startup, reused per request."""
@@ -21,6 +33,9 @@ class Detector:
         self.model_loaded: bool = False
         self.model_path: Path = MODEL_PATH
         self.confidence_threshold: float = CONFIDENCE_THRESHOLD
+        # Gloves and hands can legitimately fill a close-up frame, so the PPE detector is far
+        # more permissive about size than the instrument detector that subclasses this.
+        self.max_area_fraction: float = 0.90
 
     def load(self) -> None:
         """Load the model from disk. Called once at app startup."""
@@ -84,7 +99,11 @@ class Detector:
         elapsed_ms = int((time.time() - start) * 1000)
 
 
+        frame_w, frame_h = image.size
+        frame_area = float(frame_w * frame_h) or 1.0
+
         detections = []
+        rejected = 0
         result = results[0]
         for box in result.boxes:
             class_id = int(box.cls[0])
@@ -92,6 +111,11 @@ class Detector:
 
             coords = box.xyxy[0].tolist()
             x1, y1, x2, y2 = [int(c) for c in coords]
+
+            if not self._is_plausible(x1, y1, x2, y2, frame_area):
+                rejected += 1
+                continue
+
             detections.append({
                 "class_id": class_id,
                 "class_name": CLASS_NAMES[class_id] if class_id < len(CLASS_NAMES) else str(class_id),
@@ -99,11 +123,22 @@ class Detector:
                 "box": [x1, y1, x2, y2],
             })
 
+        if rejected:
+            print(f"[detector] rejected {rejected} implausibly sized detection(s)")
 
         return {
             "detections": detections,
             "inference_time_ms": elapsed_ms,
             "mode": "real",
         }
+
+    def _is_plausible(self, x1: int, y1: int, x2: int, y2: int, frame_area: float) -> bool:
+        """Reject boxes that are the wrong size to be what the model says they are."""
+        w = abs(x2 - x1)
+        h = abs(y2 - y1)
+        if w <= 0 or h <= 0:
+            return False
+        fraction = (w * h) / frame_area
+        return MIN_AREA_FRACTION <= fraction <= self.max_area_fraction
 
 detector = Detector()

@@ -1,0 +1,83 @@
+# PPE model v5 — colour-invariant gloves
+#
+# Problem this exists to solve
+# ----------------------------
+# v4 was trained on blue and purple gloves. White, beige and grey gloves are missed, and the
+# dangerous part is *how* they are missed: an undetected glove usually reads as a bare `hand`,
+# which fires a false contamination halt. The safety signal goes off when the technician is
+# correctly gloved, which is the fastest way to teach someone to ignore the alert.
+#
+# No inference-time threshold fixes this. The model learned "glove" partly as "blue-ish
+# region", and a white glove has none of that evidence. The fix is to stop hue from being a
+# usable feature at all, then show it the colours it is missing.
+#
+# Two changes, in order of impact:
+#   1. Aggressive HSV augmentation so hue carries no information about the class.
+#   2. New images of white / beige / grey / black gloves — see the data plan below.
+#
+# Augmentation alone will help, because it forces the model onto shape and edge cues. But it
+# cannot invent the appearance of a white glove against pale skin, which is the genuinely hard
+# case. Both halves are needed.
+
+path: ../datasets/ppe_v5
+train: images/train
+val: images/val
+
+names:
+  0: glove
+  1: hand
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+model: yolov8n.pt          # same size as v4 so results are comparable
+epochs: 120
+imgsz: 640
+batch: 16
+patience: 25               # stop early if val mAP stops improving
+seed: 0                    # reproducible — v4 was not, which made regressions hard to read
+
+# ---------------------------------------------------------------------------
+# Augmentation — the part that matters
+# ---------------------------------------------------------------------------
+
+# Hue is the whole point. YOLO's hsv_h is a fraction of the full hue wheel, so 0.5 means the
+# hue can be rotated up to half a turn in either direction — a blue glove becomes orange,
+# green, magenta. After enough epochs of that, hue stops being a feature the model can lean on
+# and it has to use shape, cuff edge, and texture instead. v4 shipped with the default 0.015,
+# which is almost no hue variation at all.
+hsv_h: 0.5
+
+# Saturation down to near-grey and up to vivid. This is what teaches it that a *desaturated*
+# glove is still a glove — the specific failure with white.
+hsv_s: 0.9
+
+# Brightness, for the lab's overhead lighting vs a window.
+hsv_v: 0.5
+
+# Geometry — gloves appear at every angle on a bench.
+degrees: 25
+translate: 0.15
+scale: 0.6
+shear: 5.0
+fliplr: 0.5
+flipud: 0.2                # top-down tray shots have no natural "up"
+
+# Occlusion robustness: hands are constantly partly hidden behind instruments and trays.
+mosaic: 1.0
+mixup: 0.15
+erasing: 0.3
+
+close_mosaic: 15           # last 15 epochs without mosaic, so it finishes on realistic frames
+
+# ---------------------------------------------------------------------------
+# Data still needed — see model-training/v5_data_plan.md
+# ---------------------------------------------------------------------------
+# Roughly 150-200 new labelled images, weighted toward:
+#   - white / cream nitrile on light skin      (the hard negative-ish case)
+#   - white glove against a stainless tray     (low contrast, very common in an SPD)
+#   - beige and grey gloves
+#   - black gloves under bright light
+#   - gloved AND bare hands in the same frame  (v4 has almost none, and this is exactly the
+#     moment compliance matters — one tech gloved, one not)
+#   - sleeves/cuffs partly covering the glove  (Gaby's hoodie question was a real signal)
