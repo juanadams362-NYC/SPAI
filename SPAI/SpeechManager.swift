@@ -170,7 +170,13 @@ final class VoiceInputManager {
         // format ("IsFormatSampleRateAndChannelCountValid").
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .allowBluetoothHFP])
+            // `.mixWithOthers` is required here. Without it, `.playAndRecord` claims the
+            // audio route exclusively — exactly what `.playback` did when it froze every
+            // button. The MRUIFeedback service that plays visionOS button press sounds
+            // can't get the route, so it times out and buttons stop responding.
+            // `.mixWithOthers` shares the route instead of stealing it, so system feedback
+            // keeps working while the microphone is open.
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .allowBluetoothHFP, .mixWithOthers])
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             errorMessage = "Couldn't configure the microphone."
@@ -231,7 +237,12 @@ final class VoiceInputManager {
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
         cleanupRecognition()
+        // Deactivate first so the system knows we're done with the route, then restore
+        // to ambient. Just changing the category while the session is still active is not
+        // enough — the route isn't released until the session deactivates.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
     }
 
     private func cleanupRecognition() {
