@@ -82,6 +82,17 @@ final class DetectionService {
         return hasGlove && !hasHand && !highRiskLatched
     }
     
+    /// Detects against a one-off image — a picked photo, a dropped file.
+    ///
+    /// Separate from `detect` because a still image is a *new subject*, not the next frame of
+    /// the current one. The held contamination alert must not carry across: showing a bare-hand
+    /// photo and then a gloved one would otherwise keep the alert up for three more detections,
+    /// which looks like the app ignoring the new image.
+    func detectStill(image: UIImage, step: SterileStep?, preferOnDevice: Bool = false) async {
+        resetStability()
+        await detect(image: image, step: step, preferOnDevice: preferOnDevice)
+    }
+
     func detect(image: UIImage, step: SterileStep?, preferOnDevice: Bool = false) async {
         guard !isLoading else { return }
         isLoading = true

@@ -194,7 +194,7 @@ struct UploadWindowView: View {
             videoDuration = 0
             image = ui
             lastVideoDetectionState = nil
-            await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
+            await service.detectStill(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
         } catch {
             loadError = "Couldn't load that image: \(error.localizedDescription)"
             print("[Upload] image load failed: \(error)")
@@ -242,7 +242,7 @@ struct UploadWindowView: View {
                 videoDuration = 0
                 image = ui
                 lastVideoDetectionState = nil
-                await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
+                await service.detectStill(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
                 print("[Upload] image imported: \(url.lastPathComponent)")
                 return
             }
@@ -253,7 +253,7 @@ struct UploadWindowView: View {
                 videoDuration = 0
                 image = ui
                 lastVideoDetectionState = nil
-                await service.detect(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
+                await service.detectStill(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
                 print("[Upload] image imported via fallback: \(url.lastPathComponent)")
             } else {
                 let destExt = ext.isEmpty ? "mov" : ext
@@ -282,6 +282,9 @@ struct UploadWindowView: View {
         if player == nil { player = AVPlayer(url: videoURL) }
         guard let player else { return }
         lastVideoDetectionState = nil
+        // A new video is a new subject — don't carry a held alert in from whatever was
+        // being looked at before.
+        service.resetStability()
 
         videoService.onFrame = { frame in
             await service.detect(
@@ -551,6 +554,8 @@ struct ContinuityCameraMini: View {
 
             HStack(spacing: SPAISpacing.s) {
                 Button {
+                    // Starting the camera is a new subject; clear any held alert.
+                    detectionService.resetStability()
                     cameraService.start()
                 } label: {
                     Label("Start", systemImage: "play.fill")

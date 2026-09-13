@@ -54,7 +54,7 @@ struct SettingsView: View {
             settingBlock(
                 title: "Confidence threshold: \(String(format: "%.0f", confidenceThreshold * 100))%",
                 // The tester asked outright what "confidence" meant. Say it in the panel.
-                explanation: "How sure SPAI must be before it reports something. Raise it for fewer false alarms, lower it to catch more."
+                explanation: "How sure SPAI must be before it reports something. Raise it for fewer false alarms, lower it to catch more. Applies to the camera, uploads and the on-device model alike. Instruments always need at least 55% regardless, or furniture starts counting as surgical tools."
             ) {
                 Slider(value: $confidenceThreshold, in: 0.05...0.95, step: 0.05)
                     .tint(SPAIColor.primary)

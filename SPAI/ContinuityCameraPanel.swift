@@ -127,6 +127,8 @@ struct ContinuityCameraPanel: View {
     private var controls: some View {
         HStack(spacing: SPAISpacing.s) {
             Button {
+                // Starting the camera is a new subject; clear any held alert.
+                detectionService.resetStability()
                 cameraService.start()
             } label: {
                 Label("Start", systemImage: "play.fill")

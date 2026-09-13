@@ -19,12 +19,26 @@ struct GuidedStepPanel: View {
 
     private var script: [GuidedStep] { StationScripts.script(for: appModel.currentStep) }
 
+    /// Clamped, and 0 for an empty script. `min(index, count - 1)` gave -1 on an empty script,
+    /// which trapped on the `script[guidedIndex]` subscript below.
     private var guidedIndex: Int {
-        min(appModel.guidedStepIndex, script.count - 1)
+        script.clampedIndex(appModel.guidedStepIndex) ?? 0
     }
 
-    private var step: GuidedStep { script[guidedIndex] }
-    private var isLast: Bool { guidedIndex == script.count - 1 }
+    /// Falls back to a manual placeholder rather than subscripting an empty script. Keeping
+    /// this non-optional avoids threading optionality through every call site for a case that
+    /// should never occur — but if a station ever ships without a script, the panel says so
+    /// instead of taking the app down.
+    private var step: GuidedStep {
+        guard let idx = script.clampedIndex(appModel.guidedStepIndex) else {
+            return GuidedStep(
+                instruction: "No guided steps are defined for this station.",
+                condition: .manual
+            )
+        }
+        return script[idx]
+    }
+    private var isLast: Bool { script.isEmpty || guidedIndex == script.count - 1 }
     private var isManualStep: Bool { step.condition == .manual }
 
     private var canVerify: Bool {

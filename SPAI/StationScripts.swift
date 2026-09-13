@@ -20,6 +20,18 @@ struct GuidedStep: Identifiable {
     let condition: StepCondition
 }
 
+extension Array where Element == GuidedStep {
+    /// Clamps an index into the script, or nil if there is no script to index.
+    ///
+    /// Call sites used to write `min(index, count - 1)`, which yields -1 on an empty array and
+    /// traps on subscript. Returning nil makes the empty case something the caller has to
+    /// handle rather than something that crashes.
+    func clampedIndex(_ index: Int) -> Int? {
+        guard !isEmpty else { return nil }
+        return Swift.min(Swift.max(index, 0), count - 1)
+    }
+}
+
 enum StationScripts {
     static func script(for step: SterileStep) -> [GuidedStep] {
         switch step {

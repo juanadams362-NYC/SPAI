@@ -321,7 +321,10 @@ class AppModel {
     var shouldHaltOnBareHand: Bool {
         guard stepStarted else { return false }
         let script = StationScripts.script(for: currentStep)
-        let idx = min(max(guidedStepIndex, 0), script.count - 1)
+        // `script.count - 1` is -1 for an empty script, which would index out of bounds and
+        // trap. Not reachable with the scripts as written, but this is on the contamination
+        // path — a crash here takes the safety check down with it.
+        guard let idx = script.clampedIndex(guidedStepIndex) else { return false }
         return script[idx].condition != .glovesOn
     }
 

@@ -172,12 +172,20 @@ struct ChatPanel: View {
     private var detectionSummary: String {
         guard detectionService.hasResult else { return "" }
         var parts: [String] = []
-        let names = detectionService.detections.map { $0.className.lowercased() }
-        parts.append(names.contains("glove") ? "gloves detected" : "no gloves detected")
-        if names.contains("hand") { parts.append("bare hand visible") }
-        let instrumentHits = names.filter { $0 == "instrument" }.count
+        // Classified through the shared helpers rather than by matching strings here.
+        // This used to test `== "instrument"` and `contains("glove")` on raw labels, which
+        // disagreed with the rest of the app: the on-device model reports names like
+        // "Adson Dressing Forceps", so the assistant told the user zero instruments were
+        // present while the detection panel showed several.
+        let detections = detectionService.detections
+        let hasGlove = detections.contains { DetectionService.isGloveClass($0.className) }
+        let hasHand = detections.contains { DetectionService.isHandClass($0.className) }
+        let instrumentHits = detections.filter { DetectionService.isInstrumentClass($0.className) }.count
+
+        parts.append(hasGlove ? "gloves detected" : "no gloves detected")
+        if hasHand { parts.append("bare hand visible") }
         if instrumentHits > 0 {
-            parts.append("\(instrumentHits) instruments detected")
+            parts.append("\(instrumentHits) instrument\(instrumentHits == 1 ? "" : "s") detected")
         }
         if let tray = detectionService.trayState {
             parts.append("tray is \(tray)")

@@ -27,9 +27,37 @@ struct DetectionPanel: View {
         service.hasResult ? (ppePassing ? "PPE check passing" : "PPE check failed") : "PPE check idle"
     }
 
+    /// Says so when detection has quietly degraded.
+    ///
+    /// The app falls back from the backend to the on-device model whenever the backend is
+    /// unreachable — a different model at a different threshold. The status bar showed
+    /// "ON-DEVICE" but nothing said *why*, so a machine with a typo in its Backend URL just
+    /// behaved differently from the one next to it with no way to tell. This is the panel the
+    /// user is already reading when they wonder why detection looks off.
+    private func degradedBanner(_ note: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(SPAIColor.warning)
+            Text(note)
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, SPAISpacing.s)
+        .padding(.vertical, 6)
+        .background(SPAIColor.warning.opacity(0.14), in: RoundedRectangle(cornerRadius: SPAIRadius.small - 4))
+        .overlay(
+            RoundedRectangle(cornerRadius: SPAIRadius.small - 4)
+                .stroke(SPAIColor.warning.opacity(0.4), lineWidth: 1)
+        )
+        .accessibilityLabel("Detection degraded. \(note)")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             header
+            if let note = service.lastPathNote { degradedBanner(note) }
             contaminationRow
             divider
             environmentSection

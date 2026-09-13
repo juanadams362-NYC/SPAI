@@ -83,8 +83,14 @@ final class ContinuityCameraService: NSObject {
         attemptDiscoveryAndStart()
         if !isRunning {
             // Poll every 2 seconds until a device appears or stop() is called
+            // Timer fires on the main run loop, but its closure is nonisolated, so calling a
+            // main-actor method straight from it is a cross-actor call the compiler only warns
+            // about. assumeIsolated states the guarantee the run loop already gives us instead
+            // of hopping through a Task, which would let discovery attempts interleave.
             discoveryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-                self?.attemptDiscoveryAndStart()
+                MainActor.assumeIsolated {
+                    self?.attemptDiscoveryAndStart()
+                }
             }
         }
         #endif

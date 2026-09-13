@@ -147,6 +147,96 @@ final class DetectionTuningTests: XCTestCase {
         XCTAssertEqual(service.contaminationRisk, 0.85, accuracy: 0.001)
     }
 
+    // MARK: - Settings slider actually applies
+
+    func testThresholdFollowsTheSettingsSlider() {
+        let key = "confidenceThreshold"
+        let original = UserDefaults.standard.object(forKey: key)
+        defer {
+            if let original { UserDefaults.standard.set(original, forKey: key) }
+            else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+
+        UserDefaults.standard.set(0.05, forKey: key)
+        XCTAssertEqual(DetectionTuning.ppeConfidence, 0.05, accuracy: 0.0001,
+                       "the slider's low end must reach the client filter, not just the backend")
+
+        UserDefaults.standard.set(0.80, forKey: key)
+        XCTAssertEqual(DetectionTuning.ppeConfidence, 0.80, accuracy: 0.0001)
+    }
+
+    func testUnsetThresholdFallsBackToTheDefault() {
+        let key = "confidenceThreshold"
+        let original = UserDefaults.standard.object(forKey: key)
+        defer {
+            if let original { UserDefaults.standard.set(original, forKey: key) }
+            else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+
+        UserDefaults.standard.removeObject(forKey: key)
+        XCTAssertEqual(DetectionTuning.ppeConfidence,
+                       DetectionTuning.defaultPPEConfidence, accuracy: 0.0001)
+    }
+
+    func testInstrumentFloorHoldsEvenAtTheSliderMinimum() {
+        let key = "confidenceThreshold"
+        let original = UserDefaults.standard.object(forKey: key)
+        defer {
+            if let original { UserDefaults.standard.set(original, forKey: key) }
+            else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+
+        UserDefaults.standard.set(0.05, forKey: key)
+        XCTAssertEqual(DetectionTuning.instrumentConfidence,
+                       DetectionTuning.instrumentFloor, accuracy: 0.0001,
+                       "dragging the slider down must not let furniture back in")
+
+        UserDefaults.standard.set(0.90, forKey: key)
+        XCTAssertEqual(DetectionTuning.instrumentConfidence, 0.90, accuracy: 0.0001,
+                       "raising it above the floor should still raise instruments")
+    }
+
+    // MARK: - Alert latch
+
+    func testHeldAlertDoesNotCarryOntoANewImage() {
+        // Showing a bare-hand photo then a gloved one must not keep the alert up: the latch is
+        // there to survive a flickery frame, not to outlive the subject entirely.
+        let service = DetectionService()
+        service.detections = [detection("hand")]
+        service.hasResult = true
+        XCTAssertEqual(service.contaminationRisk, 0.85, accuracy: 0.001)
+
+        service.resetStability()
+        service.detections = [detection("glove")]
+
+        XCTAssertEqual(service.contaminationRisk, 0.10, accuracy: 0.001)
+        XCTAssertTrue(service.ppePassing)
+    }
+
+    // MARK: - Guided script bounds
+
+    func testClampedIndexHandlesAnEmptyScript() {
+        let empty: [GuidedStep] = []
+        XCTAssertNil(empty.clampedIndex(0), "an empty script has no valid index; -1 would trap")
+    }
+
+    func testClampedIndexStaysInBounds() {
+        let script = StationScripts.script(for: .decontamination)
+        XCTAssertEqual(script.clampedIndex(-5), 0)
+        XCTAssertEqual(script.clampedIndex(999), script.count - 1)
+        XCTAssertEqual(script.clampedIndex(1), 1)
+    }
+
+    func testEveryStationHasAScript() {
+        // The clamp makes an empty script survivable; this makes it visible.
+        for step in SterileStep.allCases {
+            XCTAssertFalse(
+                StationScripts.script(for: step).isEmpty,
+                "\(step.title) has no guided steps"
+            )
+        }
+    }
+
     func testClearFrameCountIsAboveOne() {
         XCTAssertGreaterThan(
             DetectionTuning.clearFrameCount, 1,

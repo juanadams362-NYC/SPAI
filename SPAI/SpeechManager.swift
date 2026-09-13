@@ -58,7 +58,13 @@ final class SpeechManager {
             Task {
                 do {
                     let fileURL = try await renderToFile(utterance)
-                    let resource = try AudioFileResource.load(contentsOf: fileURL, configuration: .init(loadingStrategy: .preload, shouldLoop: false))
+                    // Async initialiser, not the synchronous `load`. The sync API blocks the
+                    // main actor while it reads the rendered file off disk, which stutters the
+                    // whole UI at the exact moment a guided step starts speaking.
+                    let resource = try await AudioFileResource(
+                        contentsOf: fileURL,
+                        configuration: .init(loadingStrategy: .preload, shouldLoop: false)
+                    )
                     guard self.speechToken == token else { return }
                     self.playbackController = target.playAudio(resource)
                 } catch {

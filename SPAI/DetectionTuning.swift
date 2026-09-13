@@ -18,21 +18,46 @@ enum DetectionTuning {
 
     // MARK: - Confidence
 
-    /// Floor for glove/hand detections.
+    /// Key the Settings slider writes. Read here rather than duplicated, so the one control
+    /// the user is offered actually governs every path.
+    private static let thresholdKey = "confidenceThreshold"
+
+    /// Used when the user has never touched the slider. Matches the backend's default.
+    static let defaultPPEConfidence: Double = 0.25
+
+    /// Floor for glove/hand detections, taken from the Settings slider.
     ///
     /// PPE is the safety signal, so this stays permissive: missing a bare hand is worse than
     /// briefly flagging one, and the guided step already requires several consecutive
     /// confirmations before it acts.
-    static let ppeConfidence: Double = 0.25
+    ///
+    /// This used to be a hard-coded 0.25 while the slider only ever reached the backend via
+    /// "Apply to backend". That left the control half-connected: lowering it to catch more
+    /// detections had no effect on the on-device path, and anything the backend returned below
+    /// 0.25 was then silently discarded by the client — so the slider's bottom half did
+    /// nothing at all.
+    static var ppeConfidence: Double {
+        guard let stored = UserDefaults.standard.object(forKey: thresholdKey) as? Double else {
+            return defaultPPEConfidence
+        }
+        return stored
+    }
 
-    /// Floor for instrument detections — deliberately much higher than PPE.
+    /// Lowest confidence an instrument is ever accepted at, whatever the slider says.
     ///
     /// The instrument model has six classes and no "background" class, so anything you point it
     /// at gets forced into one of them. A chair is not a near-miss for a scalpel; it is simply
     /// out of distribution, and the model answers anyway. Out-of-distribution objects tend to
-    /// come back with middling confidence, so raising the bar here is what separates "that is
-    /// really an instrument" from "that is furniture".
-    static let instrumentConfidence: Double = 0.55
+    /// come back with middling confidence, so this floor is what separates "that is really an
+    /// instrument" from "that is furniture" — and it holds even if the user drags the slider to
+    /// its minimum, because a chair satisfying an inspection step is a compliance failure
+    /// rather than a preference.
+    static let instrumentFloor: Double = 0.55
+
+    /// Floor for instrument detections: the user's threshold, but never below `instrumentFloor`.
+    static var instrumentConfidence: Double {
+        max(ppeConfidence, instrumentFloor)
+    }
 
     // MARK: - Geometry
 
