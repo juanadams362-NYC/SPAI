@@ -7,12 +7,20 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.colorScheme) private var colorScheme
 
-    @AppStorage("backendURL") private var backendURL =  "http://127.0.0.1:8000"
+    /// Adapts to the window's background: white on dark material, black on light material.
+    private var fg: Color { colorScheme == .dark ? .white : .black }
+
+    @AppStorage("backendURL") private var backendURL:String = "https://juan-builds-tech362-spai.hf.space"
+    //"http://127.0.0.1:8000"
     @AppStorage("confidenceThreshold") private var confidenceThreshold = 0.25
     @AppStorage("streamingFPS") private var streamingFPS = 5.0
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
     @AppStorage("speakSteps") private var speakSteps = false
+
+    // Key is owned by SPAILog so services can read it without reaching for a view.
+    @AppStorage(SPAILog.debugLoggingKey) private var debugLogging = true
 
     @State private var pushStatus: String?
     private let client = BackendClient()
@@ -42,7 +50,7 @@ struct SettingsView: View {
             Text("SETTINGS")
                 .font(.system(size: 15, weight: .bold, design: .monospaced))
                 .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(fg.opacity(0.8))
 
             settingBlock(title: "Backend URL") {
                 TextField( "http://127.0.0.1:8000", text: $backendURL)
@@ -89,7 +97,7 @@ struct SettingsView: View {
             )) {
                 Text("Panels look at you")
                     .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.95))
+                    .foregroundStyle(fg.opacity(0.95))
             }
             .tint(SPAIColor.accent)
             .accessibilityHint("When enabled, panels rotate to face you as you move around them")
@@ -101,14 +109,14 @@ struct SettingsView: View {
                 )) {
                     Text("Wrist menus")
                         .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.95))
+                        .foregroundStyle(fg.opacity(0.95))
                 }
                 .tint(SPAIColor.accent)
                 .accessibilityHint("When off, no panels ride on your arms. Everything they do is also available from the status bar and quick actions.")
 
                 Text("Turn your right wrist toward you, like checking the time, for quick actions. Hold your left forearm level, as if a book were resting on it, for the station list. Turn this off to keep your arms clear.")
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(fg.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -117,7 +125,7 @@ struct SettingsView: View {
             Toggle(isOn: $speakSteps) {
                 Text("Speak step instructions")
                     .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.95))
+                    .foregroundStyle(fg.opacity(0.95))
             }
             .tint(SPAIColor.primary)
             .accessibilityHint("Reads each guided step aloud when it appears")
@@ -126,13 +134,13 @@ struct SettingsView: View {
                 Toggle(isOn: $alwaysShowOnboarding) {
                     Text("Always show welcome screens")
                         .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.95))
+                        .foregroundStyle(fg.opacity(0.95))
                 }
                 .tint(SPAIColor.primary)
 
                 Text("Shows the welcome pages on every launch instead of only the first. Useful while testing.")
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(fg.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -143,7 +151,7 @@ struct SettingsView: View {
             } label: {
                 Label("Replay guided tour", systemImage: "play.circle.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(fg)
                     .padding(.horizontal, SPAISpacing.l)
                     .padding(.vertical, SPAISpacing.s + 2)
                     .background(SPAIColor.secondary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
@@ -157,7 +165,7 @@ struct SettingsView: View {
             } label: {
                 Label("Apply to backend", systemImage: "arrow.up.circle.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(fg)
                     .padding(.horizontal, SPAISpacing.l)
                     .padding(.vertical, SPAISpacing.s + 2)
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
@@ -169,10 +177,41 @@ struct SettingsView: View {
             if let pushStatus {
                 Text(pushStatus)
                     .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(fg.opacity(0.8))
             }
+
+            debugSection
         }
         .padding(SPAISpacing.xl)
+    }
+
+    /// Kept at the foot of the panel and visually separated: this is for whoever is diagnosing
+    /// the app, not for whoever is using it. Failures are logged either way — this switch only
+    /// opens up the chatty levels on top of them.
+    private var debugSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+            Divider()
+                .overlay(fg.opacity(0.15))
+                .padding(.vertical, SPAISpacing.s)
+
+            Text("DEBUG")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .tracking(1.5)
+                .foregroundStyle(fg.opacity(0.55))
+
+            Toggle(isOn: $debugLogging) {
+                Text("Verbose logging")
+                    .font(.system(size: 15))
+                    .foregroundStyle(fg.opacity(0.95))
+            }
+            .tint(SPAIColor.secondary)
+            .accessibilityHint("Emits detailed diagnostic logging for tracking, detection and uploads")
+
+            Text("Adds tracking, detection and upload detail to the system log. Errors are always recorded regardless. Read it in Console.app — filter on subsystem \"\(Bundle.main.bundleIdentifier ?? "SPAI")\" — or in Xcode while attached. Leave off for normal use; it is noisy.")
+                .font(.system(size: 12))
+                .foregroundStyle(fg.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func settingBlock<Content: View>(
@@ -183,12 +222,12 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: SPAISpacing.s) {
             Text(title)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white.opacity(0.95))
+                .foregroundStyle(fg.opacity(0.95))
             content()
             if let explanation {
                 Text(explanation)
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(fg.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

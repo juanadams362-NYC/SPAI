@@ -52,14 +52,14 @@ final class VideoFrameService {
         stateTransitions = []
         
         let isLong = isLongVideo()
-        print("[VideoFrameService] duration from asset: \(duration)s")
+        SPAILog.info(.video, "duration from asset: \(duration)s")
         if isLong {
-            print("⚠️ [VideoFrameService] Long video detected (\(Int(duration))s > \(Int(longVideoThreshold))s)")
+            SPAILog.info(.video, "Long video detected (\(Int(duration))s > \(Int(longVideoThreshold))s)")
             if preferOnDeviceForLongVideos {
-                print("💡 [VideoFrameService] Routing to on-device model to avoid excessive cloud calls")
+                SPAILog.info(.video, "Routing to on-device model to avoid excessive cloud calls")
             }
         }
-        print("[VideoFrameService] Sample interval: \(String(format: "%.2f", sampleInterval))s (max \(maxProcessedFrames) frames)")
+        SPAILog.info(.video, "Sample interval: \(String(format: "%.2f", sampleInterval))s (max \(maxProcessedFrames) frames)")
 
         let gen = AVAssetImageGenerator(asset: asset)
         gen.appliesPreferredTrackTransform = true
@@ -90,11 +90,11 @@ final class VideoFrameService {
         
         // Print summary of state transitions
         if !stateTransitions.isEmpty {
-            print("📊 [VideoFrameService] State transitions summary:")
+            SPAILog.info(.video, "State transitions summary:")
             for (timestamp, state) in stateTransitions {
                 let minutes = Int(timestamp / 60)
                 let seconds = Int(timestamp.truncatingRemainder(dividingBy: 60))
-                print("   \(String(format: "%02d:%02d", minutes, seconds)) - \(state)")
+                SPAILog.info(.video, "   \(String(format: "%02d:%02d", minutes, seconds)) - \(state)")
             }
         }
     }
@@ -106,7 +106,7 @@ final class VideoFrameService {
         
         let minutes = Int(time / 60)
         let seconds = Int(time.truncatingRemainder(dividingBy: 60))
-        print("🔄 [VideoFrameService] State change at \(String(format: "%02d:%02d", minutes, seconds)): \(state)")
+        SPAILog.debug(.video, "State change at \(String(format: "%02d:%02d", minutes, seconds)): \(state)")
     }
     
     func isLongVideo() -> Bool {
@@ -151,13 +151,13 @@ final class VideoFrameService {
 
         let total = effectiveDuration
         if total > 0 && currentTime >= total - 0.1 {
-            print("[VideoFrameService] reached end at \(currentTime)s, \(framesProcessed) frames")
+            SPAILog.info(.video, "reached end at \(currentTime)s, \(framesProcessed) frames")
             stop()
             return
         }
 
         if framesProcessed >= maxProcessedFrames {
-            print("[VideoFrameService] frame backstop hit, stopping")
+            SPAILog.info(.video, "frame backstop hit, stopping")
             stop()
             return
         }
@@ -175,7 +175,7 @@ final class VideoFrameService {
             framesProcessed += 1
             await onFrame?(frame)
         } catch {
-            print("[VideoFrameService] frame grab failed at \(currentTime)s: \(error)")
+            SPAILog.error(.video, "frame grab failed at \(currentTime)s: \(error)")
         }
     }
 

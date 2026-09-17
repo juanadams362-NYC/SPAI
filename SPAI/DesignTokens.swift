@@ -55,6 +55,19 @@ struct SPAIHitTarget: ViewModifier {
                     .offset(y: isActive && !reduceMotion ? -2 : 0)
             }
             .hoverEffect(.highlight)
+            
+            .allowsHitTesting(true)
+            // DIAGNOSTIC — gaze probe only. The tap probe was removed because in visionOS's
+            // indirect pinch model a simultaneousGesture(TapGesture()) on a .plain-style
+            // Button competes with the Button's own recognizer: once the outer TapGesture
+            // fires and calls onEnded, visionOS marks that pinch sequence as "handled" and
+            // the Button's internal recognizer can't advance to recognized state →
+            // MRUIFeedbackTypeButtonWithoutBackgroundTouchDown stalls at ~2 s → action
+            // never fires. Gaze hover alone is safe (read-only, no gesture competition).
+            .onHover { hovering in
+                guard hovering else { return }
+                SPAILog.debug(.ui, "gaze entered a control")
+            }
     }
 }
 
@@ -84,6 +97,44 @@ struct SPAIGlass: ViewModifier {
     }
 }
 
+/// Pulses a coloured ring around a button while the guided tour is waiting on exactly
+/// that action. Drives its own animation — the caller only toggles `active`.
+struct TourHighlightModifier: ViewModifier {
+    let active: Bool
+    let color: Color
+    let cornerRadius: CGFloat
+
+    @State private var glow = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .center) {
+                if active {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(color, lineWidth: 2.5)
+                        .padding(-4)
+                        .opacity(glow ? 1.0 : 0.25)
+                        .shadow(color: color, radius: glow ? 8 : 2)
+                        .allowsHitTesting(false)   // never steal a tap meant for the button
+                }
+            }
+            .onAppear {
+                guard active else { return }
+                startPulse()
+            }
+            .onChange(of: active) { _, isNowActive in
+                if isNowActive { startPulse() } else { glow = false }
+            }
+    }
+
+    private func startPulse() {
+        glow = false
+        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+            glow = true
+        }
+    }
+}
+
 extension View {
     func spaiGlass(_ mode: SPAIGlass.Mode = .dark, radius: CGFloat = SPAIRadius.large) -> some View {
         modifier(SPAIGlass(mode: mode, radius: radius))
@@ -107,6 +158,16 @@ extension View {
             .scaleEffect(isVisible ? 1.0 : 0.86)
             .opacity(isVisible ? 1 : 0)
             .animation(.spring(response: 0.42, dampingFraction: 0.72), value: isVisible)
+    }
+
+    /// Adds a pulsing glow ring to a button when the guided tour is waiting on it.
+    /// Pass the button's own `cornerRadius` to match the ring shape to the button shape.
+    func tourHighlight(
+        active: Bool,
+        color: Color = SPAIColor.primary,
+        cornerRadius: CGFloat = SPAIRadius.small
+    ) -> some View {
+        modifier(TourHighlightModifier(active: active, color: color, cornerRadius: cornerRadius))
     }
 
     func spaiPanelBackground(opacity: Double, cornerRadius: CGFloat = SPAIRadius.large) -> some View {

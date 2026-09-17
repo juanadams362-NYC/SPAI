@@ -127,6 +127,7 @@ struct WorkflowProgressPanel: View {
                     actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
                         appModel.startStep()
                     }
+//                    .tourHighlight(active: appModel.tour.currentStep?.advanceOn == .startedStep)
                 } else {
                     if canRedo {
                         actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {

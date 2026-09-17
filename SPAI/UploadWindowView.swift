@@ -149,7 +149,7 @@ struct UploadWindowView: View {
                 Task { await loadFromFileURL(url) }
             case .failure(let error):
                 loadError = "Couldn't import file: \(error.localizedDescription)"
-                print("[Upload] file import failed: \(error)")
+                SPAILog.error(.upload, "file import failed: \(error)")
             }
         }
     }
@@ -162,23 +162,23 @@ struct UploadWindowView: View {
         defer { isLoadingMedia = false }
 
         let isVideo = item.supportedContentTypes.contains { $0.conforms(to: .movie) }
-        print("[Upload] picked item, types: \(item.supportedContentTypes.map(\.identifier)), isVideo: \(isVideo)")
+        SPAILog.debug(.upload, "picked item, types: \(item.supportedContentTypes.map(\.identifier)), isVideo: \(isVideo)")
 
         if isVideo {
             do {
                 guard let movie = try await item.loadTransferable(type: PickedMovie.self) else {
                     loadError = "Video came back empty. If it's stored in iCloud it may still be downloading."
-                    print("[Upload] movie transferable was nil")
+                    SPAILog.error(.upload, "movie transferable was nil")
                     return
                 }
                 image = nil
                 videoURL = movie.url
                 videoDuration = await duration(of: movie.url)
                 lastVideoDetectionState = nil
-                print("[Upload] video loaded: \(movie.url.lastPathComponent), \(videoDuration)s")
+                SPAILog.info(.upload, "video loaded: \(movie.url.lastPathComponent), \(videoDuration)s")
             } catch {
                 loadError = "Couldn't load that video: \(error.localizedDescription)"
-                print("[Upload] video load failed: \(error)")
+                SPAILog.error(.upload, "video load failed: \(error)")
             }
             return
         }
@@ -187,7 +187,7 @@ struct UploadWindowView: View {
             guard let data = try await item.loadTransferable(type: Data.self),
                   let ui = UIImage(data: data) else {
                 loadError = "Couldn't read that image."
-                print("[Upload] image data was nil or undecodable")
+                SPAILog.error(.upload, "image data was nil or undecodable")
                 return
             }
             videoURL = nil
@@ -197,7 +197,7 @@ struct UploadWindowView: View {
             await service.detectStill(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
         } catch {
             loadError = "Couldn't load that image: \(error.localizedDescription)"
-            print("[Upload] image load failed: \(error)")
+            SPAILog.error(.upload, "image load failed: \(error)")
         }
     }
 
@@ -227,7 +227,7 @@ struct UploadWindowView: View {
                 videoURL = dest
                 videoDuration = await duration(of: dest)
                 lastVideoDetectionState = nil
-                print("[Upload] video imported: \(dest.lastPathComponent), \(videoDuration)s")
+                SPAILog.info(.upload, "video imported: \(dest.lastPathComponent), \(videoDuration)s")
                 return
             }
 
@@ -235,7 +235,7 @@ struct UploadWindowView: View {
                 let data = try Data(contentsOf: url)
                 guard let ui = UIImage(data: data) else {
                     loadError = "Couldn't read that image."
-                    print("[Upload] file image data undecodable: \(url)")
+                    SPAILog.error(.upload, "file image data undecodable: \(url)")
                     return
                 }
                 videoURL = nil
@@ -243,7 +243,7 @@ struct UploadWindowView: View {
                 image = ui
                 lastVideoDetectionState = nil
                 await service.detectStill(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
-                print("[Upload] image imported: \(url.lastPathComponent)")
+                SPAILog.info(.upload, "image imported: \(url.lastPathComponent)")
                 return
             }
 
@@ -254,7 +254,7 @@ struct UploadWindowView: View {
                 image = ui
                 lastVideoDetectionState = nil
                 await service.detectStill(image: ui, step: SterileStep(rawValue: appModel.currentStepIndex))
-                print("[Upload] image imported via fallback: \(url.lastPathComponent)")
+                SPAILog.info(.upload, "image imported via fallback: \(url.lastPathComponent)")
             } else {
                 let destExt = ext.isEmpty ? "mov" : ext
                 let dest = FileManager.default.temporaryDirectory
@@ -269,11 +269,11 @@ struct UploadWindowView: View {
                 videoURL = dest
                 videoDuration = await duration(of: dest)
                 lastVideoDetectionState = nil
-                print("[Upload] video imported via fallback: \(dest.lastPathComponent), \(videoDuration)s")
+                SPAILog.info(.upload, "video imported via fallback: \(dest.lastPathComponent), \(videoDuration)s")
             }
         } catch {
             loadError = "Couldn't import that file: \(error.localizedDescription)"
-            print("[Upload] file import processing failed: \(error)")
+            SPAILog.error(.upload, "file import processing failed: \(error)")
         }
     }
 

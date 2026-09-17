@@ -35,27 +35,36 @@ final class SoundManager {
     private let contaminationDirectLevelDB: Double = 3
 
     private init() {
-        // Stays `.ambient`, and deliberately so.
+        // Do NOT configure the shared AVAudioSession here.
         //
-        // This was briefly changed to `.playback` to make the contamination alert louder.
-        // `.playback` is a *primary audio* category: claiming it and activating the session
-        // takes the audio route away from the system, including MRUIFeedback — the service
-        // that plays visionOS's button press feedback. Starved of the route, that service
-        // stalled, logging:
+        // History of every attempt and why it broke buttons:
         //
-        //     [MRUIFeedbackTypeButtonWithoutBackgroundTouchDown]
-        //     Playback timed out before completion (after 17646 ms)
+        //   1. `.playback` + `setActive(true)` — primary-audio category claims the hardware
+        //      route exclusively. MRUIFeedback (visionOS button-press haptics) can't get the
+        //      route and stalls:
+        //          [MRUIFeedbackTypeButtonWithoutBackgroundTouchDown]
+        //          Playback timed out before completion (after 17 646 ms)
+        //      Every button in the app stopped responding.
         //
-        // and every button in the app stopped responding, because the press feedback never
-        // completed. SoundManager is first touched when the immersive space opens, so the
-        // symptom was "enter the workflow and nothing is tappable any more".
+        //   2. `.ambient` + `setActive(true)` — shorter timeout, same symptom:
+        //          Playback timed out before completion (after 2 074 ms)
         //
-        // The alert's loudness does not depend on this anyway — it comes from
-        // SpatialAudioComponent.gain below, which runs through RealityKit's own spatial audio
-        // path rather than the AVAudioSession category. `.ambient` + .mixWithOthers keeps this
-        // app a good citizen of the shared route.
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
+        //   3. `.ambient` + no `setActive` — calling `setCategory` alone (without activation)
+        //      is still enough to alter the session state that visionOS exposes to MRUIFeedback.
+        //      The timeout dropped to ~2 034 ms but remained:
+        //          Playback timed out before completion (after 2 034 ms)
+        //
+        // Root cause: any `setCategory` call — even without `setActive` — notifies the system
+        // audio daemon that this app is configuring audio. In visionOS the daemon tracks
+        // per-app session config to arbitrate the shared route for system-feedback services.
+        // Touching the config is enough to create contention.
+        //
+        // Fix: leave the session entirely alone. The system default (.soloAmbient, inactive)
+        // lets MRUIFeedback use the route freely. AVAudioPlayer and RealityKit's spatial audio
+        // both configure and activate the session themselves when they actually play, and the
+        // daemon restores the route to system services when those apps go silent again.
+        let session = AVAudioSession.sharedInstance()
+        SPAILog.debug(.sound, "SoundManager init — session untouched (cat=\(session.category.rawValue) opts=\(session.categoryOptions.rawValue))")
     }
 
     func play(_ name: String, ext: String = "mp3", volume: Float = 1.0) {
@@ -67,7 +76,7 @@ final class SoundManager {
         }
 
         guard let url = Bundle.main.url(forResource: name, withExtension: ext) else {
-            print("[SoundManager] couldn't find \(name).\(ext) in bundle")
+            SPAILog.error(.sound, "couldn't find \(name).\(ext) in bundle")
             return
         }
 
@@ -78,7 +87,7 @@ final class SoundManager {
             players[name] = player
             player.play()
         } catch {
-            print("[SoundManager] failed to load \(name).\(ext): \(error)")
+            SPAILog.error(.sound, "failed to load \(name).\(ext): \(error)")
         }
     }
 
@@ -101,7 +110,7 @@ final class SoundManager {
 
             contaminationController = anchor.playAudio(resource)
         } catch {
-            print("[SoundManager] spatial playback failed, falling back to flat audio: \(error)")
+            SPAILog.error(.sound, "spatial playback failed, falling back to flat audio: \(error)")
             play("error_fx", ext: "mp3")
         }
     }

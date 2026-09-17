@@ -51,8 +51,8 @@ final class StationManager {
         let refs = ReferenceImage.loadReferenceImages(inGroupNamed: "StationMarkers")
         let provider = ImageTrackingProvider(referenceImages: refs)
         do { try await session.run([provider]) }
-        catch { print("[stations] ARKit failed: \(error)"); return }
-        
+        catch { SPAILog.error(.stations, "ARKit failed: \(error)"); return }
+
         for await update in provider.anchorUpdates {
             let anchor = update.anchor
             guard anchor.isTracked,

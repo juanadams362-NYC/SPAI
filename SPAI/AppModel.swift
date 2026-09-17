@@ -116,19 +116,58 @@ class AppModel {
 
     let tour = AppTour()
 
+    /// Entry point for starting the tour, so the role is captured before it can be changed.
+    func beginTour() {
+        roleBeforeTour = role
+        tour.start(wristMenusEnabled: wristMenusEnabled)
+    }
+
     func completeTour() { hasCompletedTour = true }
+
+    /// Puts back whatever the tour borrowed. Wired to `AppTour.onEnd`, so it covers every way
+    /// the tour can stop — skipped, finished, or torn down with the immersive space.
+    private func endTour() {
+        guard let previous = roleBeforeTour else { return }
+        roleBeforeTour = nil
+        guard role != previous else { return }
+        role = previous
+        announce("Role restored to \(previous.rawValue)", icon: "person.crop.circle")
+    }
+
+    /// The role step has made its point by the time it is acknowledged. Leaving the user
+    /// read-only past that strands them on the next step, which asks them to tap Start Step.
+    private func restoreWorkflowRoleForTour() {
+        guard isReadOnly else { return }
+        let restored = roleBeforeTour ?? .technician
+        guard role != restored else { return }
+        role = restored
+    }
 
     /// Replays the tour from Settings.
     func restartTour() {
         hasCompletedTour = false
+        roleBeforeTour = role
         tour.start(wristMenusEnabled: wristMenusEnabled)
     }
+
+    /// Role the user held before the tour borrowed it.
+    ///
+    /// The tour's role step says "Pick a different role to see it change", and taking it at
+    /// its word means choosing Supervisor or Observer — both read-only. `canRunWorkflow` then
+    /// turns `startStep` and `completeStep` into silent no-ops and disables the guided panel,
+    /// and the *next* tour step asks the user to tap Start Step. They tap, nothing happens,
+    /// the tour cannot advance past it, and every workflow control stays inert. Nothing put
+    /// the role back either, so dismissing the tour left the user stranded as an Observer
+    /// wondering why the app had stopped responding.
+    private var roleBeforeTour: TechRole?
 
     var role: TechRole = .technician {
         didSet {
             guard role != oldValue else { return }
+            
+            SPAILog.info(.ui, "action fired: changedRole → \(role.rawValue)")
             tour.note(.changedRole)
-            log("Role changed to \(role.rawValue)", kind: .info)
+            SPAILog.debug( SPAILog.Category.ui,"Role changed to \(role.rawValue)")
             if role == .observer || role == .supervisor {
                 panelVisibility["history"] = true
             }
@@ -136,6 +175,7 @@ class AppModel {
                 resetWorkflow()
             }
         }
+       
     }
 
     // MARK: - Role permissions
@@ -265,6 +305,7 @@ class AppModel {
     func toggleVisibility(_ panelID: String) {
         let nowVisible = !isVisible(panelID)
         panelVisibility[panelID] = nowVisible
+        SPAILog.info(.ui, "action fired: toggleVisibility(\(panelID)) → \(nowVisible ? "shown" : "hidden")")
 
         let name = Self.panelDisplayName(panelID)
         announce(
@@ -298,7 +339,7 @@ class AppModel {
     func logVideoDetectionTransition(_ state: String, at seconds: Double) {
         let timestamp = Self.videoTimestamp(seconds)
         let kind: LogEvent.Kind = state == "bare hand" ? .warning : .info
-        log("Video: \(state) at \(timestamp)", kind: kind)
+        SPAILog.debug(.video,"Video: \(state) at \(timestamp) kind \(kind)")
     }
 
     private static func videoTimestamp(_ seconds: Double) -> String {
@@ -349,7 +390,8 @@ class AppModel {
         let step = currentStep
         stepStarted = true
         guidedStepIndex = 0
-        tour.note(.startedStep)
+        SPAILog.info(.ui, "action fired: startStep → \(step.title)")
+//        tour.note(.startedStep)
         log("Started \(step.title)", kind: .info)
         speakCurrentGuidedStep()
         Task {
@@ -450,6 +492,16 @@ class AppModel {
         // Defaults on: `bool(forKey:)` returns false for a key that was never written, which
         // would silently ship the feature disabled to everyone who has not opened Settings.
         self.wristMenusEnabled = UserDefaults.standard.object(forKey: wristMenusKey) as? Bool ?? true
+
+        // The tour drives real controls, so it can leave real state behind it. These two hand
+        // that state back: one the moment a step's demonstration has landed, the other however
+        // the tour ends.
+        tour.onStepSatisfied = { [weak self] event in
+            guard event == .changedRole else { return }
+            self?.restoreWorkflowRoleForTour()
+        }
+        tour.onEnd = { [weak self] in self?.endTour() }
+
         Task { _ = try? await client.resetCompliance() }
         log("Session started", kind: .info)
     }

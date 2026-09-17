@@ -36,13 +36,13 @@ final class OnDeviceDetector {
             config.computeUnits = units
             do {
                 let vn = try VNCoreMLModel(for: try build(config))
-                print("[OnDeviceDetector] \(name) model loaded (\(units))")
+                SPAILog.info(.onDeviceModel, "\(name) model loaded (\(units))")
                 return vn
             } catch {
-                print("[OnDeviceDetector] \(name) model failed on \(units): \(error.localizedDescription)")
+                SPAILog.error(.onDeviceModel, "\(name) model failed on \(units): \(error.localizedDescription)")
             }
         }
-        print("[OnDeviceDetector] \(name) model unavailable")
+        SPAILog.error(.onDeviceModel, "\(name) model unavailable")
         return nil
     }
 
@@ -97,7 +97,7 @@ final class OnDeviceDetector {
         return await withCheckedContinuation { continuation in
             let request = VNCoreMLRequest(model: model) { request, error in
                 if let error {
-                    print("[OnDeviceDetector] request failed: \(error.localizedDescription)")
+                    SPAILog.error(.onDeviceModel, "request failed: \(error.localizedDescription)")
                     continuation.resume(returning: [])
                     return
                 }
@@ -146,7 +146,7 @@ final class OnDeviceDetector {
                 }
 
                 if rejected > 0 {
-                    print("[OnDeviceDetector] kept \(kept.count), rejected \(rejected) (confidence/size)")
+                    SPAILog.debug(.onDeviceModel, "kept \(kept.count), rejected \(rejected) (confidence/size)")
                 }
                 continuation.resume(returning: kept)
             }
@@ -157,7 +157,7 @@ final class OnDeviceDetector {
             do {
                 try handler.perform([request])
             } catch {
-                print("[OnDeviceDetector] handler failed: \(error.localizedDescription)")
+                SPAILog.error(.onDeviceModel, "handler failed: \(error.localizedDescription)")
                 continuation.resume(returning: [])
             }
         }

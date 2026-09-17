@@ -77,7 +77,7 @@ final class EnvironmentService: NSObject {
             errorMessage = nil
         } catch {
             errorMessage = "Couldn't reach weather service"
-            print("[EnvironmentService] fetch failed: \(error)")
+            SPAILog.error(.environment, "fetch failed: \(error)")
         }
     }
 }

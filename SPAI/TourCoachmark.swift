@@ -54,7 +54,10 @@ struct TourCoachmark: View {
                     }
                     Spacer()
                     primaryButton("Show me") {
-                        tour.start(wristMenusEnabled: appModel.wristMenusEnabled)
+                        
+                        // Through AppModel, not `tour.start` directly: it has to record the
+                        // role before the tour's role step talks the user out of it.
+                        appModel.beginTour()
                     }
                 }
             }
@@ -234,4 +237,5 @@ struct TourCoachmark: View {
         .environment(model)
         .padding(60)
         .background(.black)
+
 }

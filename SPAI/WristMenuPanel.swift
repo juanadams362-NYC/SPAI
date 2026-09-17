@@ -62,6 +62,11 @@ struct WristMenuPanel: View {
                 ) {
                     appModel.toggleVisibility("history")
                 }
+//                .tourHighlight(
+//                    active: appModel.tour.currentStep?.advanceOn == .openedHistory,
+//                    color: SPAIColor.accent,
+//                    cornerRadius: SPAIRadius.small - 4
+//                )
             }
             HStack(spacing: 4) {
                 quickButton(
@@ -72,6 +77,11 @@ struct WristMenuPanel: View {
                 ) {
                     appModel.toggleVisibility("chat")
                 }
+//                .tourHighlight(
+//                    active: appModel.tour.currentStep?.advanceOn == .openedChat,
+//                    color: SPAIColor.safe,
+//                    cornerRadius: SPAIRadius.small - 4
+//                )
                 quickButton(
                     label: "Settings",
                     systemImage: "gearshape.fill",
@@ -86,6 +96,11 @@ struct WristMenuPanel: View {
                     case .ignore: break
                     }
                 }
+//                .tourHighlight(
+//                    active: appModel.tour.currentStep?.advanceOn == .openedSettings,
+//                    color: SPAIColor.secondary,
+//                    cornerRadius: SPAIRadius.small - 4
+//                )
             }
 
             ActionFeedbackStrip()

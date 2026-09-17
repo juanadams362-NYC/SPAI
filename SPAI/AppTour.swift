@@ -122,6 +122,7 @@ final class AppTour {
 
     func next() {
         justSatisfied = false
+        dismissInterrupt()
         guard phase == .running else { return }
         if stepIndex < steps.count - 1 {
             stepIndex += 1
@@ -132,41 +133,124 @@ final class AppTour {
 
     func back() {
         justSatisfied = false
+        dismissInterrupt()
         guard phase == .running, stepIndex > 0 else { return }
         stepIndex -= 1
     }
 
+    /// Called whenever the tour stops for any reason — skipped, finished, or torn down with
+    /// the immersive space. Anything the tour borrowed gets handed back here.
+    var onEnd: (() -> Void)?
+
     /// Ends the tour without marking it complete, so it can be offered again.
     func skip() {
+        dismissInterrupt()
         phase = .idle
         stepIndex = 0
         justSatisfied = false
+        onEnd?()
     }
 
     /// Ends the tour for good.
     func finish() {
-        phase = .idle
+        dismissInterrupt()
+        phase = .finished
         stepIndex = 0
         justSatisfied = false
+        onEnd?()
     }
 
     /// Tears the tour down when the immersive space closes.
     func stop() {
+        dismissInterrupt()
         phase = .idle
         stepIndex = 0
         justSatisfied = false
+        onEnd?()
     }
+
+    /// Called once a satisfied step has been acknowledged and the tour has moved on.
+    ///
+    /// The tour asks the user to perform real actions, and some of those actions have real
+    /// consequences that outlive the step — changing role being the one that bit. Sequencing
+    /// belongs here; undoing a consequence belongs to whoever owns the state, so this hands
+    /// back rather than reaching into the model.
+    var onStepSatisfied: ((TourEvent) -> Void)?
 
     /// Called from the app's real controls. If the current step was waiting on this action,
     /// the tour moves on by itself — the user learns by doing rather than by reading.
+    ///
+    /// Correct event → step advances as normal (unchanged behaviour).
+    /// Wrong event during an action-gated step → soft interrupt popup appears near the
+    /// panel the user just tapped; the action itself still executes.
     func note(_ event: TourEvent) {
-        guard phase == .running, let step = currentStep, step.advanceOn == event else { return }
+        guard phase == .running, let step = currentStep else { return }
+        guard step.advanceOn == event else {
+            // Only interrupt when the step is waiting on a specific action — purely
+            // informational steps (advanceOn == nil) don't restrict interaction at all.
+            if step.advanceOn != nil {
+                showInterrupt(near: Self.panelID(for: event))
+            }
+            return
+        }
         justSatisfied = true
         Task { @MainActor in
             // Let the user see the result of what they just did before the card moves on.
             try? await Task.sleep(for: .milliseconds(900))
             guard self.justSatisfied else { return }
             self.next()
+            self.onStepSatisfied?(event)
+        }
+    }
+
+    // MARK: - Soft interrupt
+
+    /// Interaction states
+    ///
+    /// • **First wrong tap** — popup appears near the tapped panel, 3.5 s auto-dismiss.
+    /// • **Repeated wrong tap** — `interruptSeq` increments so TourInterruptPopup re-runs
+    ///   its appear transition (shake-in) and the auto-dismiss timer resets.
+    /// • **Dismiss (× button)** — `dismissInterrupt()` called, popup disappears immediately.
+    /// • **Skip** — `tour.skip()` called, tour and popup both end.
+    ///
+    /// Anchor: the arc slot of the panel the user just tapped, not the tour card's slot.
+    /// The popup appears 0.15 m closer than the panel and 0.25 m above its centre so it
+    /// reads as a foreground notification layered over the place the user was looking.
+
+    /// Non-nil while the "this step first" popup should be visible. The value is a key in
+    /// `ImmersiveView.layout` — it tells `ImmersiveView` which panel to anchor the popup to.
+    private(set) var interruptAnchorID: String? = nil
+
+    /// Incremented on every interrupt trigger. A change here while the popup is already
+    /// visible tells `TourInterruptPopup` to re-run its appear animation (the "repeated
+    /// wrong tap" shake) and resets the 3.5 s auto-dismiss timer.
+    private(set) var interruptSeq: Int = 0
+
+    func dismissInterrupt() {
+        interruptAnchorID = nil
+    }
+
+    private func showInterrupt(near panelID: String) {
+        interruptSeq += 1
+        interruptAnchorID = panelID
+        let seq = interruptSeq
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3.5))
+            guard self.interruptSeq == seq else { return }
+            self.interruptAnchorID = nil
+        }
+    }
+
+    /// Maps the event that fired to the panel it most naturally came from, so the popup
+    /// anchors next to the panel the user actually tapped.
+    private static func panelID(for event: TourEvent) -> String {
+        switch event {
+        case .changedRole:    return "statusBar"
+        case .startedStep:    return "workflow"
+        case .openedChat:     return "chat"
+        case .openedHistory:  return "history"
+        case .openedSettings: return "statusBar"
+        case .openedUpload:   return "upload"
         }
     }
 

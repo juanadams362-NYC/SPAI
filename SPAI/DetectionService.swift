@@ -109,7 +109,7 @@ final class DetectionService {
         if preferOnDevice, onDevice.isAvailable {
             let local = await detectOnDevice(image: image, wantInstruments: wantInstruments, wantTrayVerdict: wantTrayVerdict)
             applyResult(local, mode: .onDevice)
-            print("[DetectionService] on-device preferred: \(local.count) detections")
+            SPAILog.debug(.detection, "on-device preferred: \(local.count) detections")
             return
         }
         
@@ -146,9 +146,9 @@ final class DetectionService {
             }
 
             applyResult(merged, mode: .cloud)
-            print("[DetectionService] cloud: step=\(step?.title ?? "none"), kept \(merged.count)/\(before), \(ppe.inferenceTimeMs)ms")
+            SPAILog.debug(.detection, "cloud: step=\(step?.title ?? "none"), kept \(merged.count)/\(before), \(ppe.inferenceTimeMs)ms")
         } catch {
-            print("[DetectionService] cloud failed (\(error.localizedDescription)) — trying on-device")
+            SPAILog.error(.detection, "cloud failed (\(error.localizedDescription)) — trying on-device")
 
             if onDevice.isAvailable {
                 let local = await detectOnDevice(image: image, wantInstruments: wantInstruments, wantTrayVerdict: wantTrayVerdict)
@@ -157,12 +157,12 @@ final class DetectionService {
                 // has a typo is exactly how the same build behaves differently on two machines.
                 lastPathNote = "Backend unreachable — using the on-device model. \(error.localizedDescription)"
                 errorMessage = "Can't reach the backend, so SPAI is using the on-device model. Check the Backend URL in Settings."
-                print("[DetectionService] on-device fallback: \(local.count) detections")
+                SPAILog.debug(.detection, "on-device fallback: \(local.count) detections")
             } else {
                 mode = .offline
                 lastPathNote = "No backend and no on-device model."
                 errorMessage = "Detection unavailable — no backend and no on-device model."
-                print("[DetectionService] fully offline")
+                SPAILog.info(.detection, "fully offline")
             }
         }
     }

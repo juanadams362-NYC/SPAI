@@ -78,6 +78,8 @@ struct DetectionPanel: View {
                 : "Detection. Nothing detected yet — show SPAI an image, video, or live camera."
         )
         .onChange(of: service.contaminationRisk) { old, new in
+            
+    
             if old < 0.5 && new >= 0.5 && appModel.shouldHaltOnBareHand {
                 SoundManager.shared.playContaminationAlert()
                 // force: a safety alert speaks whether or not the user

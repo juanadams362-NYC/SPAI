@@ -10,6 +10,7 @@ struct HomeView: View {
 
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationStack {
@@ -92,6 +93,27 @@ struct HomeView: View {
                     .accessibilityLabel("Enter sterile prep workflow")
                     .accessibilityHint("Opens the spatial workspace and starts a session")
                     .disabled(appModel.immersiveSpaceState != .closed)
+
+                    // Settings was previously reachable only from inside the immersive space,
+                    // via the status bar or the wrist menu. That is fine until something in
+                    // there stops responding — and then the one screen holding "Replay guided
+                    // tour" and the diagnostic logging switch is behind the thing you are
+                    // trying to diagnose. Entering the workflow also dismisses this window, so
+                    // there was no way back to it either.
+                    Button {
+                        openWindow(id: "settings")
+                    } label: {
+                        Label("Settings", systemImage: "gearshape.fill")
+                            .font(.body)
+                            .foregroundStyle(.white.opacity(0.85))
+                            .padding(.horizontal, SPAISpacing.l)
+                            .padding(.vertical, SPAISpacing.m)
+                            .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+                    }
+                    .buttonStyle(.plain)
+                    .spaiHitTarget()
+                    .accessibilityLabel("Settings")
+                    .accessibilityHint("Opens settings, where the guided tour can be replayed")
                 }
                 .padding(SPAISpacing.xxl)
             }

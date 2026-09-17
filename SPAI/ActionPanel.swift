@@ -48,6 +48,10 @@ struct ActionPanel: View {
             }
 
             Button {
+                // Diagnostic: if this line appears when you press a control and nothing
+                // happens, input is reaching SwiftUI and the problem is downstream. If it
+                // never appears, the press is not landing on the panel at all.
+                SPAILog.debug(.ui, "quick action tapped: \(action.label)")
                 if isExpanded {
                     action.action()
                     withAnimation(.easeOut(duration: 0.2)) { expandedID = nil }

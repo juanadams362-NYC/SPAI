@@ -22,6 +22,7 @@ struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @Environment(DetectionService.self) private var detectionService
@@ -115,7 +116,9 @@ struct ImmersiveView: View {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .background else { return }
             Task { @MainActor in
-                await dismissImmersiveSpace()
+                if(appModel.immersiveSpaceState == .open){
+                    await dismissImmersiveSpace()
+                }
                 appModel.immersiveSpaceState = .closed
             }
         }
@@ -128,6 +131,10 @@ struct ImmersiveView: View {
             appModel.tour.stop()
             SoundManager.shared.contaminationAnchor = nil
             SpeechManager.shared.guidedAnchor = nil
+            // The home window was dismissed when the user entered the workflow.
+            // Reopen it now so there is always a window to return to when the
+            // immersive space closes (crown press, app relaunch, background, etc.).
+            openWindow(id: "home")
         }
     }
     
@@ -139,6 +146,7 @@ struct ImmersiveView: View {
             // there is a real environment authored in Reality Composer Pro.
 
             for id in Self.layout.keys {
+                
                 place(id, content, attachments)
             }
 
@@ -147,6 +155,13 @@ struct ImmersiveView: View {
             if let tourCard = attachments.entity(for: "tour") {
                 tourCard.isEnabled = false
                 content.add(tourCard)
+            }
+
+            // The soft-interrupt popup floats near whichever panel the user just tapped
+            // while the tour was waiting on a different action.
+            if let interruptPopup = attachments.entity(for: "tourInterrupt") {
+                interruptPopup.isEnabled = false
+                content.add(interruptPopup)
             }
 
             if let detectionEntity = attachments.entity(for: "detection") {
@@ -201,13 +216,35 @@ struct ImmersiveView: View {
                 for id in Self.layout.keys where id != "wristMenu" && id != "stationPicker" {
                     attachments.entity(for: id)?.position = arcPosition(for: id)
                 }
+
+                // Diagnostic. The arc is laid out against `headAnchor.eyeHeight`, which is read
+                // from ARKit's world space, while the panels live in the RealityView's scene
+                // space. If those two do not share an origin, the arc lands at the wrong height
+                // whatever the measurement says — and "on the floor" followed by "above my
+                // head" is what a space mismatch looks like from the inside. Print the head,
+                // the applied height, and where a panel actually ended up, to settle it.
+                let head = headAnchor.currentHeadPosition()
+                let headText = head.map { "[\($0.x), \($0.y), \($0.z)]" } ?? "nil"
+                let calibratedText = headAnchor.calibratedEyeHeight.map { "\($0)" } ?? "nil"
+                SPAILog.info(.ui, "arc relaid — applied eyeHeight \(headAnchor.eyeHeight) m, calibrated \(calibratedText), live head \(headText)")
+                for id in ["statusBar", "workflow", "detection"] {
+                    if let e = attachments.entity(for: id) {
+                        let w = e.position(relativeTo: nil)
+                        SPAILog.info(.ui, "  \(id) world [\(w.x), \(w.y), \(w.z)]")
+                    }
+                }
             }
 
             attachments.entity(for: "report")?.isEnabled = appModel.sessionComplete
-            attachments.entity(for: "guided")?.isEnabled = appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
+            attachments.entity(for: "guided")?.isEnabled =
+                appModel.stepStarted && !appModel.sessionComplete && appModel.canRunWorkflow
 
+            // Every pass, not only when the setting changes: this now writes an orientation
+            // that depends on where the user's head is, so it goes stale as they move. It is
+            // a quaternion per panel rather than the component write it replaced, which is
+            // what made doing this every pass too expensive before.
             for id in Self.layout.keys {
-                updateBillboard(id, attachments)
+                updateFacing(id, attachments)
             }
 
             // Fly a freshly-opened panel in from the wrist menu so the user can see where it
@@ -220,6 +257,7 @@ struct ImmersiveView: View {
             }
 
             updateTourCard(attachments)
+            // updateTourInterrupt(attachments)
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
@@ -269,6 +307,7 @@ struct ImmersiveView: View {
                 )
             }
             Attachment(id: "tour") { TourCoachmark() }
+            Attachment(id: "tourInterrupt") { TourInterruptPopup() }
         }
     }
 
@@ -284,7 +323,15 @@ struct ImmersiveView: View {
                 let right = normalize(cross(pose.up, pose.forward))
                 return pose.position + right * 0.30 + pose.up * 0.28
             }
-            return arcPosition(for: "wristMenu") + SIMD3<Float>(0, 0.35, 0.15)
+            // No wrist tracking (simulator, or wrist not yet seen on device).
+            //
+            // The old fallback was arcPosition(for: "wristMenu") + (0, 0.35, 0.15), which
+            // placed the card at x ≈ −1.13 m (far left) and z ≈ −0.26 m (very close).
+            // At that distance a 420-pt card fills most of the viewport and looks broken.
+            // Float straight ahead at normal reading distance instead — the wrist steps don't
+            // need a specific panel anchor, they just need to be readable.
+            SPAILog.debug(.ui, "tour wristMenu — no wrist pose, using centre fallback")
+            return [0, headAnchor.eyeHeight - 0.10, -1.20]
         }
 
         guard anchor != .center, let slot = Self.layout[anchor.rawValue] else {
@@ -298,8 +345,8 @@ struct ImmersiveView: View {
         let radius = max(slot.radius - 0.30, 0.65)
         let y = headAnchor.eyeHeight + slot.heightAboveEye - 0.22
         return [radius * sin(a), y, -radius * cos(a)]
-    }
 
+    }
     /// World position for a panel's slot, with heights resolved against the wearer's measured
     /// eye line.
     private func arcPosition(for id: String) -> SIMD3<Float> {
@@ -317,13 +364,15 @@ struct ImmersiveView: View {
         _ attachments: RealityViewAttachments
     ) {
         guard let panel = attachments.entity(for: id) else { return }
+        panel.components.set(InputTargetComponent())
+        
         panel.position = arcPosition(for: id)
-        applyBillboard(to: panel)
+        applyFacing(to: panel)
         content.add(panel)
     }
 
     private func setEnabled(_ id: String, _ attachments: RealityViewAttachments) {
-        attachments.entity(for: id)?.isEnabled = appModel.isVisible(id)
+        attachments.entity(for: id)?.isEnabled =  appModel.isVisible(id)
     }
 
     /// Scales a newly-opened panel up from the wrist menu into its slot. The tester tapped
@@ -389,12 +438,12 @@ struct ImmersiveView: View {
         #endif
     }
     
-    private func updateBillboard(_ id: String, _ attachments: RealityViewAttachments) {
+    private func updateFacing(_ id: String, _ attachments: RealityViewAttachments) {
         guard let entity = attachments.entity(for: id) else { return }
-        applyBillboard(to: entity)
+        applyFacing(to: entity)
     }
 
-    /// Keeps the tour card beside whatever the current step is about, gliding between subjects
+    /// Keeps the tour card above whatever the current step is about, gliding between subjects
     /// so the user's eye is led from one panel to the next instead of the card teleporting.
     private func updateTourCard(_ attachments: RealityViewAttachments) {
         guard let card = attachments.entity(for: "tour") else { return }
@@ -407,18 +456,21 @@ struct ImmersiveView: View {
             return
         }
 
-        // The card must always face the user, whatever the panel billboard setting is —
-        // it is a piece of instruction, not a workspace panel.
-        var billboard = BillboardComponent()
-        billboard.blendFactor = 1.0
-        card.components.set(billboard)
-
         let target = tourPosition()
         let anchorKey = appModel.tour.anchor.rawValue
 
         if entranceLog.tourAnchor != anchorKey {
             let isFirstPlacement = entranceLog.tourAnchor == nil
             entranceLog.tourAnchor = anchorKey
+
+            // Orient the card toward the user once, just before the animation starts.
+            // Calling face() on every update pass was the root cause of the "trippy"
+            // animation: setOrientation conflicts with a running move() animation, causing
+            // the card to stutter or stop mid-flight at a wrong position.
+            card.components.remove(BillboardComponent.self)
+            if let head = headAnchor.currentHeadPosition() {
+                face(card, towards: head)
+            }
 
             if reduceMotion {
                 card.position = target
@@ -441,23 +493,121 @@ struct ImmersiveView: View {
                 )
             }
         } else if appModel.tour.anchor == .wristMenu {
-            // The wrist moves continuously, so track it rather than animating to a fixed point.
-            card.position = target
+            // Follow the wrist every frame when tracking is live.
+            //
+            // IMPORTANT: only write card.position when there is an actual wrist pose to
+            // follow. Setting position unconditionally — even to the same fallback value —
+            // cancels any running move(to:) animation on the very next update pass, because
+            // RealityKit treats a direct property write as "the animation is done". The
+            // entrance animation (0.3 → 1.0 scale) is fired once in the if-block above; if
+            // we stomp it here every frame the card stays at scale 0.3 and looks tiny.
+            if handTracking.rightWristPose != nil {
+                card.position = target
+                card.components.remove(BillboardComponent.self)
+                if let head = headAnchor.currentHeadPosition() {
+                    face(card, towards: head)
+                }
+            }
+            // No wrist pose: the card stays wherever the entrance animation left it (the
+            // centre fallback from tourPosition). Nothing to update.
         }
     }
 
-    /// `BillboardComponent` carries a `blendFactor` that controls how much of the billboard
-    /// rotation is actually applied. The old code constructed the component with `init()` and
-    /// never set it, which is why "Panels look at you" appeared wired up — the setting really
-    /// did add and remove the component — while nothing visibly turned to face the user.
-    private func applyBillboard(to entity: Entity) {
-        if appModel.panelsBillboard {
-            var billboard = BillboardComponent()
-            billboard.blendFactor = 1.0
-            entity.components.set(billboard)
-        } else {
-            entity.components.remove(BillboardComponent.self)
+    /// Arc position for the soft-interrupt popup — near the panel the user just tapped
+    /// rather than near the current tour step's panel.
+    private func interruptPosition() -> SIMD3<Float> {
+        guard let anchorID = appModel.tour.interruptAnchorID,
+              let slot = Self.layout[anchorID] else {
+            return [0, headAnchor.eyeHeight - 0.05, -1.0]
         }
+        // Slightly closer to the user than the panel (0.15 m) and above its centre
+        // (0.25 m) so the popup reads as a foreground notification layered over the
+        // place the user was just looking.
+        let a = slot.angle * .pi / 180
+        let radius = max(slot.radius - 0.15, 0.60)
+        let y = headAnchor.eyeHeight + slot.heightAboveEye + 0.25
+        return [radius * sin(a), y, -radius * cos(a)]
+    }
+
+    /// Shows, hides, and repositions the soft-interrupt popup each RealityView pass.
+    ///
+    /// Unlike the tour card, the popup is deliberately NOT animated with `move(to:)` —
+    /// it snaps into place so the user's attention is grabbed immediately, and the
+    /// SwiftUI transition handles the appear/disappear animation.
+    private func updateTourInterrupt(_ attachments: RealityViewAttachments) {
+        guard let popup = attachments.entity(for: "tourInterrupt") else { return }
+
+        let isVisible = appModel.tour.interruptAnchorID != nil
+        popup.isEnabled = isVisible
+        guard isVisible else { return }
+
+        // Snap to position — no move() animation, the SwiftUI transition is enough.
+        popup.position = interruptPosition()
+
+        // Face the user. Calling face() every frame is fine here: the interrupt is
+        // brief (3.5 s max) and has no long-running move() animation to fight.
+        popup.components.remove(BillboardComponent.self)
+        if let head = headAnchor.currentHeadPosition() {
+            face(popup, towards: head)
+        }
+    }
+
+    /// Turns a panel to face the user by writing its **orientation**, not by attaching a
+    /// `BillboardComponent`.
+    ///
+    /// This is the whole reason nothing in the workspace was tappable on device.
+    ///
+    /// `BillboardComponent` rotates a panel at render time and leaves the entity's transform
+    /// alone — but the region that accepts a tap is derived from that transform. Panels are
+    /// placed by `arcPosition` with a position only, so their orientation stays at identity
+    /// (facing -Z, straight down the room's forward axis). Once `blendFactor` was set to 1.0
+    /// in SCRUM-122 the panels visibly turned toward the user while their tappable regions
+    /// stayed pointing wherever they were authored, and a tap landed on nothing. The further
+    /// off the centre line a panel sat, the wider the miss: `chat` at +46°, `actions` at +54°.
+    /// The floor-level eye height from the calibration bug piled a large pitch error on top.
+    ///
+    /// It also explains the one control that did work: the tour card sits dead ahead at
+    /// `.center`, where the billboard rotation is close to zero, so its visual and its hit
+    /// region still coincided and "Skip tour" was tappable while nothing else was.
+    ///
+    /// Writing the orientation keeps the two in the same place, because there is only one of
+    /// them. Slightly more work per pass than a component the render loop applies for free —
+    /// a quaternion per panel — and worth it for panels that respond when pressed.
+    private func applyFacing(to entity: Entity) {
+        // Belt and braces: if any of these entities is carrying the old component, the render
+        // rotation would fight the orientation written below.
+        entity.components.remove(BillboardComponent.self)
+
+        guard appModel.panelsBillboard, let head = headAnchor.currentHeadPosition() else {
+            // Straight ahead — identity is what the panels used before SCRUM-122, and what
+            // the simulator still uses, since there is no device pose to face there.
+            entity.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
+            return
+        }
+        face(entity, towards: head)
+    }
+
+    /// Aims `entity`'s front at `head`, writing **only** the orientation.
+    ///
+    /// The first version of this used `look(at:from:relativeTo:)`, which writes position as
+    /// well. That fought the `move(to:)` animations in `animateEntrance` and `updateTourCard`
+    /// — the transform was being reset underneath a running animation on every update pass —
+    /// and it is why the tour card stopped appearing when the tour started. Orientation is the
+    /// only thing this needs to change; positions belong to the arc and to the animations.
+    private func face(_ entity: Entity, towards head: SIMD3<Float>) {
+        let toHead = head - entity.position(relativeTo: nil)
+        guard length_squared(toHead) > 1e-6 else { return }
+        let dir = normalize(toHead)
+
+        // A head directly above or below a panel makes the up vector degenerate and the
+        // resulting rotation NaN — which renders as nothing at all. Leave the panel as it is
+        // rather than make it vanish.
+        guard abs(dir.y) < 0.999 else { return }
+
+        // An attachment's content faces +Z, so build the rotation carrying +Z onto `dir`.
+        let rotation = simd_quatf(angle: atan2(dir.x, dir.z), axis: [0, 1, 0])
+                     * simd_quatf(angle: -asin(dir.y), axis: [1, 0, 0])
+        entity.setOrientation(rotation, relativeTo: nil)
     }
 }
 

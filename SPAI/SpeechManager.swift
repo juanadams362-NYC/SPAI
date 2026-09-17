@@ -68,7 +68,7 @@ final class SpeechManager {
                     guard self.speechToken == token else { return }
                     self.playbackController = target.playAudio(resource)
                 } catch {
-                    print("[Speech] spatial render failed, falling back to flat audio: \(error)")
+                    SPAILog.error(.speech, "spatial render failed, falling back to flat audio: \(error)")
                     guard self.speechToken == token else { return }
                     self.synthesizer.speak(utterance)
                 }
@@ -111,14 +111,14 @@ final class SpeechManager {
                 .filter { $0.language.hasPrefix("en") }
 
             if let premium = english.first(where: { $0.quality == .premium }) {
-                print("[Speech] using premium voice: \(premium.name)")
+                SPAILog.info(.speech, "using premium voice: \(premium.name)")
                 return premium
             }
             if let enhanced = english.first(where: { $0.quality == .enhanced }) {
-                print("[Speech] using enhanced voice: \(enhanced.name)")
+                SPAILog.info(.speech, "using enhanced voice: \(enhanced.name)")
                 return enhanced
             }
-            print("[Speech] falling back to default voice")
+            SPAILog.info(.speech, "falling back to default voice")
             return AVSpeechSynthesisVoice(language: "en-US")
         }
 
@@ -182,7 +182,10 @@ final class VoiceInputManager {
             // can't get the route, so it times out and buttons stop responding.
             // `.mixWithOthers` shares the route instead of stealing it, so system feedback
             // keeps working while the microphone is open.
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .allowBluetoothHFP, .mixWithOthers])
+            // `.duckOthers` is deliberately absent. It contradicts the `.mixWithOthers` this
+            // comment is about: ducking is a claim of priority over the shared route, which is
+            // the same thing that starves MRUIFeedback. Sharing means sharing.
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.allowBluetoothHFP, .mixWithOthers])
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             errorMessage = "Couldn't configure the microphone."
@@ -246,9 +249,11 @@ final class VoiceInputManager {
         // Deactivate first so the system knows we're done with the route, then restore
         // to ambient. Just changing the category while the session is still active is not
         // enough — the route isn't released until the session deactivates.
+        // Deactivate, then restore the idle category — and leave it deactivated. Re-activating
+        // here would re-claim the route the moment the microphone closed, which is exactly the
+        // state SoundManager now avoids taking at launch. Playback reactivates on its own.
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
     }
 
     private func cleanupRecognition() {

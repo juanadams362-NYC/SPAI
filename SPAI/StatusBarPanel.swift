@@ -99,6 +99,12 @@ struct StatusBarPanel: View {
                 .spaiHitTarget(minSize: 40, pop: 1.10)
                 .accessibilityLabel("\(role.rawValue) role")
                 .accessibilityAddTraits(isOn ? [.isSelected] : [])
+                // Pulse all role pills when the tour step is waiting on a role change.
+                .tourHighlight(
+                    active: appModel.tour.currentStep?.advanceOn == .changedRole,
+                    color: SPAIColor.accent,
+                    cornerRadius: SPAIRadius.pill
+                )
             }
         }
         .animation(.easeOut(duration: 0.18), value: appModel.role)
@@ -132,6 +138,11 @@ struct StatusBarPanel: View {
             .accessibilityValue(appModel.isVisible("chat") ? "Open" : "Closed")
             .accessibilityHint("Opens the assistant, which knows your current step")
             .accessibilityAddTraits(appModel.isVisible("chat") ? [.isSelected] : [])
+            // Highlight when wrist menus are off and the tour is waiting on the chat action.
+//            .tourHighlight(
+//                active: !appModel.wristMenusEnabled
+//                    && appModel.tour.currentStep?.advanceOn == .openedChat
+//            )
 
             Button {
                 // Same debounced decision the wrist menu uses, so the two cannot disagree
@@ -149,6 +160,12 @@ struct StatusBarPanel: View {
             .accessibilityLabel("Settings")
             .accessibilityValue(appModel.isSettingsWindowOpen ? "Open" : "Closed")
             .accessibilityAddTraits(appModel.isSettingsWindowOpen ? [.isSelected] : [])
+            // Highlight when wrist menus are off and the tour is waiting on settings.
+//            .tourHighlight(
+//                active: !appModel.wristMenusEnabled
+//                    && appModel.tour.currentStep?.advanceOn == .openedSettings,
+//                color: SPAIColor.secondary
+//            )
 
             Button {
                 Task {

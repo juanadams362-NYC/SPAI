@@ -17,7 +17,7 @@ struct SessionHistoryPanel: View {
 
     private var isObserver: Bool { appModel.role == .observer }
     private var isSupervisor: Bool { appModel.role == .supervisor }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             if let pair = comparePair {
