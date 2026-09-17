@@ -97,16 +97,29 @@ struct ImmersiveView: View {
 
         #if !targetEnvironment(simulator)
         .task {
-            // Legacy ARKit camera path (requires special entitlements). Disabled by default
-            // now that Continuity Camera is integrated. Leave in place for reference.
-            // If you do enable this, ensure you are not also running ContinuityCameraService.
-            /*
+            // SCRUM-80: the AVP main camera feeds live frames straight into the same
+            // `DetectionService.detect` the rest of the pipeline already uses — not
+            // `detectStill`, which resets the contamination-alert stability because a picked
+            // photo is a new subject. A camera frame is the next frame of the current one, so
+            // it takes the continuous path on purpose.
+            //
+            // Simulator never reaches this: `CameraFrameProvider` compiles fine there (it's
+            // not a device-only type), but this whole task sits behind the same
+            // `#if !targetEnvironment(simulator)` that guards `cameraService.stop()` below —
+            // so the simulator keeps using photo upload untouched, and device is the only
+            // path that ever calls `start()`.
+            //
+            // Main Camera Access is an Enterprise entitlement that is not fully provisioned
+            // yet — CameraFrameService.start() already handles that: it logs a clear error
+            // (see `.camera` in Console/Xcode) and leaves the workflow otherwise unaffected
+            // rather than crashing. Don't also open the Upload window's Continuity Camera
+            // while this is running — that would be two camera pipelines feeding detection
+            // at once.
             cameraService.onFrameForDetection = { readOnlyBuffer in
                 guard let image = UIImage.from(readOnlyBuffer: readOnlyBuffer) else { return }
                 Task { await detectionService.detect(image: image, step: SterileStep(rawValue: appModel.currentStepIndex)) }
             }
             await cameraService.start()
-            */
         }
         #endif
         // Entering the workflow dismisses the "home" window, which takes RootSceneView — and
@@ -213,7 +226,8 @@ struct ImmersiveView: View {
             // changes, rather than every frame (which would fight the entrance animation).
             if entranceLog.appliedEyeHeight != headAnchor.eyeHeight {
                 entranceLog.appliedEyeHeight = headAnchor.eyeHeight
-                for id in Self.layout.keys where id != "wristMenu" && id != "stationPicker" {
+                for id in Self.layout.keys
+                where id != "wristMenu" && id != "stationPicker" && !entranceLog.isAnimating(id) {
                     attachments.entity(for: id)?.position = arcPosition(for: id)
                 }
 
@@ -243,7 +257,15 @@ struct ImmersiveView: View {
             // that depends on where the user's head is, so it goes stale as they move. It is
             // a quaternion per panel rather than the component write it replaced, which is
             // what made doing this every pass too expensive before.
-            for id in Self.layout.keys {
+            //
+            // Skip a panel still mid-`animateEntrance`: writing orientation directly onto an
+            // entity `move(to:)` is animating interrupts that animation on the spot, the same
+            // failure `updateTourCard` already documents for the tour card. Uncaught here it
+            // stranded regular panels mid-flight — at a random point along the 0.45 s tween,
+            // sometimes still scaled down from the entrance — which is why a reopened panel
+            // could land somewhere wrong or, after enough interrupted replays, never visibly
+            // recover its scale at all.
+            for id in Self.layout.keys where !entranceLog.isAnimating(id) {
                 updateFacing(id, attachments)
             }
 
@@ -382,11 +404,19 @@ struct ImmersiveView: View {
         guard let panel = attachments.entity(for: id) else { return }
         let home = arcPosition(for: id)
 
+        // Face the user once, before the flight starts, rather than leaving `updateFacing`
+        // to do it mid-animation — see the skip-while-animating note where that loop calls
+        // `entranceLog.isAnimating(id)`.
+        if let head = headAnchor.currentHeadPosition() {
+            face(panel, towards: head)
+        }
+
         // Reduce Motion: land the panel in place. The wrist menu's written confirmation
         // ("History opened") still says what happened, so nothing is lost but the flight.
         guard !reduceMotion else {
             panel.position = home
             panel.scale = .one
+            entranceLog.inFlight[id] = nil
             return
         }
 
@@ -401,7 +431,11 @@ struct ImmersiveView: View {
             translation: home
         )
         // Slight overshoot so the panel lands with a bit of weight rather than easing to a stop.
-        panel.move(
+        // The returned controller is what lets `updateFacing` and the eye-height reposition
+        // block (both of which write the transform directly) know to leave this panel alone
+        // until the flight actually finishes — a direct write while `move()` is still running
+        // interrupts it on the spot, stranding the panel wherever it was mid-flight.
+        entranceLog.inFlight[id] = panel.move(
             to: target,
             relativeTo: panel.parent,
             duration: 0.45,
@@ -621,6 +655,23 @@ final class PanelEntranceLog {
     var tourAnchor: String?
     /// Eye height the arc was last laid out against, so calibration is applied exactly once.
     var appliedEyeHeight: Float?
+
+    /// One entry per panel currently mid-`animateEntrance`. Anything that writes a panel's
+    /// transform directly — `updateFacing`'s per-pass orientation write, the eye-height
+    /// reposition block — has to check this first: a direct write while `move(to:)` is still
+    /// running interrupts that animation immediately, leaving the panel wherever it happened
+    /// to be, sometimes still scaled down from the entrance. `AnimationPlaybackController` is
+    /// the actual RealityKit source of truth for "is this still running," rather than a
+    /// duplicated timer that would drift if `animateEntrance`'s duration ever changed.
+    ///
+    /// Bounded by the fixed panel count (12) — one entry per id, always overwritten by the
+    /// next `animateEntrance` call for that id — so nothing here needs explicit eviction.
+    var inFlight: [String: AnimationPlaybackController] = [:]
+
+    func isAnimating(_ id: String) -> Bool {
+        guard let controller = inFlight[id] else { return false }
+        return !controller.isComplete
+    }
 }
 
 #Preview(immersionStyle: .mixed) {

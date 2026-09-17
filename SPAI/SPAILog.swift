@@ -37,6 +37,7 @@ enum SPAILog {
         case speech        = "speech"
         case environment   = "environment"
         case ui            = "ui"
+        case camera        = "camera"
     }
 
     /// Defaults key, shared with `@AppStorage` in SettingsView — the same split `speakSteps`

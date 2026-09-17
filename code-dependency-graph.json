@@ -1,0 +1,3128 @@
+{
+  "$schema_note": "Code dependency graph for SPAI. Nodes are Swift source files; edges are file-to-file dependencies inferred from type usage (regex-based static analysis, not a compiler AST \u2014 a strong approximation, not ground truth). Regenerate with scripts/generate-dependency-graph.py after structural changes.",
+  "generated_at": "2026-09-17T22:02:28+00:00",
+  "generated_from_commit": "3aeaa53",
+  "generated_from_branch": "user-testing-fixes",
+  "working_tree_dirty": true,
+  "stats": {
+    "file_count": 58,
+    "type_count": 111,
+    "edge_count": 172,
+    "extension_edge_count": 0
+  },
+  "nodes": [
+    {
+      "id": "Packages/RealityKitContent/Sources/RealityKitContent/RealityKitContent.swift",
+      "category": "other",
+      "imports": [
+        "Foundation"
+      ],
+      "declares": [],
+      "lines": 5
+    },
+    {
+      "id": "SPAI/ActionPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "QuickAction"
+        },
+        {
+          "kind": "struct",
+          "name": "ActionPanel"
+        }
+      ],
+      "lines": 91
+    },
+    {
+      "id": "SPAI/AppBackground.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "AppBackground"
+        }
+      ],
+      "lines": 36
+    },
+    {
+      "id": "SPAI/AppModel.swift",
+      "category": "model",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "PanelMode"
+        },
+        {
+          "kind": "enum",
+          "name": "TechRole"
+        },
+        {
+          "kind": "enum",
+          "name": "SterileStep"
+        },
+        {
+          "kind": "struct",
+          "name": "LogEvent"
+        },
+        {
+          "kind": "enum",
+          "name": "Kind"
+        },
+        {
+          "kind": "class",
+          "name": "AppModel"
+        },
+        {
+          "kind": "enum",
+          "name": "ImmersiveSpaceState"
+        },
+        {
+          "kind": "enum",
+          "name": "WindowToggle"
+        },
+        {
+          "kind": "struct",
+          "name": "ActionFeedback"
+        }
+      ],
+      "lines": 509
+    },
+    {
+      "id": "SPAI/AppTour.swift",
+      "category": "model",
+      "imports": [
+        "Foundation"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "TourEvent"
+        },
+        {
+          "kind": "enum",
+          "name": "TourAnchor"
+        },
+        {
+          "kind": "struct",
+          "name": "TourStep"
+        },
+        {
+          "kind": "class",
+          "name": "AppTour"
+        },
+        {
+          "kind": "enum",
+          "name": "Phase"
+        }
+      ],
+      "lines": 398
+    },
+    {
+      "id": "SPAI/BackendClient.swift",
+      "category": "service",
+      "imports": [
+        "Foundation",
+        "UIKit"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "BackendDetection"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "struct",
+          "name": "DetectResponse"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "struct",
+          "name": "TrayDetectResponse"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "struct",
+          "name": "BackendSettings"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "struct",
+          "name": "ComplianceState"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "struct",
+          "name": "ComplianceEventResult"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "class",
+          "name": "BackendClient"
+        },
+        {
+          "kind": "struct",
+          "name": "AskRequest"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "struct",
+          "name": "AskResponse"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "extension",
+          "name": "BackendClient"
+        },
+        {
+          "kind": "enum",
+          "name": "BackendError"
+        }
+      ],
+      "lines": 295
+    },
+    {
+      "id": "SPAI/CameraFrameService.swift",
+      "category": "service",
+      "imports": [
+        "ARKit",
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "CameraFrameService"
+        }
+      ],
+      "lines": 91
+    },
+    {
+      "id": "SPAI/ChatPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "ChatMessage"
+        },
+        {
+          "kind": "enum",
+          "name": "Role"
+        },
+        {
+          "kind": "struct",
+          "name": "ChatPanel"
+        }
+      ],
+      "lines": 220
+    },
+    {
+      "id": "SPAI/CompliancePanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "EnvironmentReading"
+        },
+        {
+          "kind": "struct",
+          "name": "CompliancePanel"
+        }
+      ],
+      "lines": 101
+    },
+    {
+      "id": "SPAI/ContinuityCameraPanel.swift",
+      "category": "view",
+      "imports": [
+        "AVFoundation",
+        "SwiftUI",
+        "UniformTypeIdentifiers"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "ContinuityCameraPanel"
+        }
+      ],
+      "lines": 199
+    },
+    {
+      "id": "SPAI/ContinuityCameraService.swift",
+      "category": "service",
+      "imports": [
+        "AVFoundation",
+        "CoreGraphics",
+        "CoreImage",
+        "Foundation",
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "ContinuityCameraService"
+        },
+        {
+          "kind": "enum",
+          "name": "Status"
+        },
+        {
+          "kind": "extension",
+          "name": "ContinuityCameraService"
+        }
+      ],
+      "lines": 330
+    },
+    {
+      "id": "SPAI/Cvpixelbuffer+uiimage.swift",
+      "category": "extension",
+      "imports": [
+        "CoreImage",
+        "CoreVideo",
+        "UIKit"
+      ],
+      "declares": [
+        {
+          "kind": "extension",
+          "name": "UIImage"
+        },
+        {
+          "kind": "extension",
+          "name": "UIImage"
+        }
+      ],
+      "lines": 38
+    },
+    {
+      "id": "SPAI/DemoView.swift",
+      "category": "view",
+      "imports": [
+        "PhotosUI",
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "DemoView"
+        }
+      ],
+      "lines": 193
+    },
+    {
+      "id": "SPAI/DesignTokens.swift",
+      "category": "design-system",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "SPAIColor"
+        },
+        {
+          "kind": "enum",
+          "name": "SPAIRadius"
+        },
+        {
+          "kind": "enum",
+          "name": "SPAISpacing"
+        },
+        {
+          "kind": "struct",
+          "name": "SPAIHitTarget"
+        },
+        {
+          "kind": "struct",
+          "name": "SPAIGlass"
+        },
+        {
+          "kind": "enum",
+          "name": "Mode"
+        },
+        {
+          "kind": "struct",
+          "name": "TourHighlightModifier"
+        },
+        {
+          "kind": "extension",
+          "name": "View"
+        }
+      ],
+      "lines": 186
+    },
+    {
+      "id": "SPAI/DetectionPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "DetectionPanel"
+        }
+      ],
+      "lines": 217
+    },
+    {
+      "id": "SPAI/DetectionService.swift",
+      "category": "service",
+      "imports": [
+        "SwiftUI",
+        "UIKit"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "DetectionMode"
+        },
+        {
+          "kind": "class",
+          "name": "DetectionService"
+        }
+      ],
+      "lines": 260
+    },
+    {
+      "id": "SPAI/DetectionStatus.swift",
+      "category": "model",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "DetectionStatus"
+        }
+      ],
+      "lines": 43
+    },
+    {
+      "id": "SPAI/DetectionTuning.swift",
+      "category": "model",
+      "imports": [
+        "Foundation"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "DetectionTuning"
+        }
+      ],
+      "lines": 152
+    },
+    {
+      "id": "SPAI/DetectionUploadPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "DetectionUploadPanel"
+        }
+      ],
+      "lines": 72
+    },
+    {
+      "id": "SPAI/EnvironmentService.swift",
+      "category": "service",
+      "imports": [
+        "CoreLocation",
+        "Foundation"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "EnvironmentService"
+        },
+        {
+          "kind": "extension",
+          "name": "EnvironmentService"
+        },
+        {
+          "kind": "struct",
+          "name": "OpenMeteoResponse"
+        },
+        {
+          "kind": "struct",
+          "name": "Current"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        }
+      ],
+      "lines": 119
+    },
+    {
+      "id": "SPAI/EventLogPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "EventLogPanel"
+        }
+      ],
+      "lines": 77
+    },
+    {
+      "id": "SPAI/FeatureCard.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "FeatureCard"
+        }
+      ],
+      "lines": 54
+    },
+    {
+      "id": "SPAI/GuidedStepPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "GuidedStepPanel"
+        }
+      ],
+      "lines": 303
+    },
+    {
+      "id": "SPAI/HandTrackingService.swift",
+      "category": "service",
+      "imports": [
+        "ARKit",
+        "QuartzCore",
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "HandTrackingService"
+        }
+      ],
+      "lines": 210
+    },
+    {
+      "id": "SPAI/HeadAnchorService.swift",
+      "category": "service",
+      "imports": [
+        "ARKit",
+        "QuartzCore",
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "HeadAnchorService"
+        }
+      ],
+      "lines": 187
+    },
+    {
+      "id": "SPAI/HomeView.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "HomeView"
+        }
+      ],
+      "lines": 128
+    },
+    {
+      "id": "SPAI/ImmersiveView.swift",
+      "category": "view",
+      "imports": [
+        "RealityKit",
+        "RealityKitContent",
+        "SwiftUI",
+        "simd"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "PanelSlot"
+        },
+        {
+          "kind": "struct",
+          "name": "ImmersiveView"
+        },
+        {
+          "kind": "class",
+          "name": "PanelEntranceLog"
+        }
+      ],
+      "lines": 682
+    },
+    {
+      "id": "SPAI/LEDBorder.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "BorderState"
+        },
+        {
+          "kind": "struct",
+          "name": "LEDBorder"
+        },
+        {
+          "kind": "extension",
+          "name": "View"
+        },
+        {
+          "kind": "extension",
+          "name": "Color"
+        }
+      ],
+      "lines": 71
+    },
+    {
+      "id": "SPAI/OnDeviceDetector.swift",
+      "category": "service",
+      "imports": [
+        "CoreML",
+        "ImageIO",
+        "UIKit",
+        "Vision"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "OnDeviceDetector"
+        }
+      ],
+      "lines": 180
+    },
+    {
+      "id": "SPAI/OnboardingView.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "OnboardingView"
+        }
+      ],
+      "lines": 245
+    },
+    {
+      "id": "SPAI/SPAIApp.swift",
+      "category": "app-entry",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "SPAIApp"
+        },
+        {
+          "kind": "struct",
+          "name": "RootSceneView"
+        }
+      ],
+      "lines": 97
+    },
+    {
+      "id": "SPAI/SPAILog.swift",
+      "category": "infrastructure",
+      "imports": [
+        "Foundation",
+        "os"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "SPAILog"
+        },
+        {
+          "kind": "enum",
+          "name": "Category"
+        }
+      ],
+      "lines": 105
+    },
+    {
+      "id": "SPAI/SessionHistoryPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "SessionHistoryPanel"
+        },
+        {
+          "kind": "struct",
+          "name": "ComparisonPair"
+        },
+        {
+          "kind": "struct",
+          "name": "SavedReportView"
+        }
+      ],
+      "lines": 469
+    },
+    {
+      "id": "SPAI/SessionRecord.swift",
+      "category": "model",
+      "imports": [
+        "Foundation"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "SessionRecord"
+        },
+        {
+          "kind": "enum",
+          "name": "CodingKeys"
+        },
+        {
+          "kind": "class",
+          "name": "SessionHistory"
+        }
+      ],
+      "lines": 86
+    },
+    {
+      "id": "SPAI/SessionReportPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "SessionReportPanel"
+        }
+      ],
+      "lines": 108
+    },
+    {
+      "id": "SPAI/SettingsView.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "SettingsView"
+        }
+      ],
+      "lines": 252
+    },
+    {
+      "id": "SPAI/SoundManager.swift",
+      "category": "service",
+      "imports": [
+        "AVFoundation",
+        "RealityKit"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "SoundManager"
+        },
+        {
+          "kind": "enum",
+          "name": "SoundManagerError"
+        }
+      ],
+      "lines": 129
+    },
+    {
+      "id": "SPAI/SpeechManager.swift",
+      "category": "service",
+      "imports": [
+        "AVFoundation",
+        "RealityKit",
+        "Speech",
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "SpeechManager"
+        },
+        {
+          "kind": "enum",
+          "name": "SpeechManagerError"
+        },
+        {
+          "kind": "class",
+          "name": "VoiceInputManager"
+        }
+      ],
+      "lines": 288
+    },
+    {
+      "id": "SPAI/StationManager.swift",
+      "category": "service",
+      "imports": [
+        "ARKit",
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "Station"
+        },
+        {
+          "kind": "class",
+          "name": "StationManager"
+        }
+      ],
+      "lines": 89
+    },
+    {
+      "id": "SPAI/StationPickerPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "StationPickerPanel"
+        }
+      ],
+      "lines": 101
+    },
+    {
+      "id": "SPAI/StationScripts.swift",
+      "category": "model",
+      "imports": [
+        "Foundation"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "StepCondition"
+        },
+        {
+          "kind": "struct",
+          "name": "GuidedStep"
+        },
+        {
+          "kind": "extension",
+          "name": "Array"
+        },
+        {
+          "kind": "enum",
+          "name": "StationScripts"
+        }
+      ],
+      "lines": 87
+    },
+    {
+      "id": "SPAI/StatusBarPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "StatusBarPanel"
+        },
+        {
+          "kind": "struct",
+          "name": "SterileNodeMark"
+        },
+        {
+          "kind": "struct",
+          "name": "SPAIHexagon"
+        }
+      ],
+      "lines": 272
+    },
+    {
+      "id": "SPAI/StatusPill.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "StatusPill"
+        }
+      ],
+      "lines": 39
+    },
+    {
+      "id": "SPAI/ToggleImmersiveSpaceButton.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "ToggleImmersiveSpaceButton"
+        }
+      ],
+      "lines": 58
+    },
+    {
+      "id": "SPAI/TourCoachmark.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "TourCoachmark"
+        }
+      ],
+      "lines": 242
+    },
+    {
+      "id": "SPAI/TourInterruptPopup.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "TourInterruptPopup"
+        }
+      ],
+      "lines": 133
+    },
+    {
+      "id": "SPAI/UploadWindowView.swift",
+      "category": "view",
+      "imports": [
+        "AVKit",
+        "PhotosUI",
+        "SwiftUI",
+        "UIKit",
+        "UniformTypeIdentifiers"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "PickedMovie"
+        },
+        {
+          "kind": "struct",
+          "name": "UploadWindowView"
+        },
+        {
+          "kind": "struct",
+          "name": "ContinuityCameraMini"
+        }
+      ],
+      "lines": 613
+    },
+    {
+      "id": "SPAI/VideoFrameService.swift",
+      "category": "service",
+      "imports": [
+        "AVFoundation",
+        "SwiftUI",
+        "UIKit"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "VideoFrameService"
+        }
+      ],
+      "lines": 220
+    },
+    {
+      "id": "SPAI/WorkflowProgressPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "WorkflowProgressPanel"
+        }
+      ],
+      "lines": 228
+    },
+    {
+      "id": "SPAI/WristGesture.swift",
+      "category": "model",
+      "imports": [
+        "simd"
+      ],
+      "declares": [
+        {
+          "kind": "enum",
+          "name": "WristGesture"
+        }
+      ],
+      "lines": 88
+    },
+    {
+      "id": "SPAI/WristMenuPanel.swift",
+      "category": "view",
+      "imports": [
+        "SwiftUI",
+        "simd"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "WristMenuPanel"
+        },
+        {
+          "kind": "struct",
+          "name": "ActionFeedbackStrip"
+        }
+      ],
+      "lines": 225
+    },
+    {
+      "id": "SPAITests/AppModelPanelTests.swift",
+      "category": "test",
+      "imports": [
+        "XCTest"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "AppModelPanelTests"
+        }
+      ],
+      "lines": 205
+    },
+    {
+      "id": "SPAITests/AppTourTests.swift",
+      "category": "test",
+      "imports": [
+        "XCTest"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "AppTourTests"
+        }
+      ],
+      "lines": 139
+    },
+    {
+      "id": "SPAITests/DetectionServiceTests.swift",
+      "category": "test",
+      "imports": [
+        "XCTest"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "DetectionServiceTests"
+        }
+      ],
+      "lines": 146
+    },
+    {
+      "id": "SPAITests/DetectionTuningTests.swift",
+      "category": "test",
+      "imports": [
+        "XCTest"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "DetectionTuningTests"
+        }
+      ],
+      "lines": 247
+    },
+    {
+      "id": "SPAITests/SPAITests.swift",
+      "category": "test",
+      "imports": [
+        "Testing"
+      ],
+      "declares": [
+        {
+          "kind": "struct",
+          "name": "SPAITests"
+        }
+      ],
+      "lines": 18
+    },
+    {
+      "id": "SPAITests/StationManagerTests.swift",
+      "category": "test",
+      "imports": [
+        "XCTest"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "StationManagerTests"
+        }
+      ],
+      "lines": 82
+    },
+    {
+      "id": "SPAITests/WristGestureTests.swift",
+      "category": "test",
+      "imports": [
+        "XCTest",
+        "simd"
+      ],
+      "declares": [
+        {
+          "kind": "class",
+          "name": "WristGestureTests"
+        }
+      ],
+      "lines": 148
+    }
+  ],
+  "edges": [
+    {
+      "from": "SPAI/ActionPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/ActionPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/ActionPanel.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/AppBackground.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/AppTour.swift",
+      "via": [
+        "AppTour"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "BackendClient"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/ChatPanel.swift",
+      "via": [
+        "Role"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "Category",
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/SessionRecord.swift",
+      "via": [
+        "SessionHistory",
+        "SessionRecord"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/SpeechManager.swift",
+      "via": [
+        "SpeechManager"
+      ]
+    },
+    {
+      "from": "SPAI/AppModel.swift",
+      "to": "SPAI/StationScripts.swift",
+      "via": [
+        "StationScripts"
+      ]
+    },
+    {
+      "from": "SPAI/AppTour.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/AppTour.swift",
+      "to": "SPAI/TourInterruptPopup.swift",
+      "via": [
+        "TourInterruptPopup"
+      ]
+    },
+    {
+      "from": "SPAI/CameraFrameService.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/ChatPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/ChatPanel.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "AskRequest",
+        "BackendClient"
+      ]
+    },
+    {
+      "from": "SPAI/ChatPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/ChatPanel.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/ChatPanel.swift",
+      "to": "SPAI/SpeechManager.swift",
+      "via": [
+        "VoiceInputManager"
+      ]
+    },
+    {
+      "from": "SPAI/CompliancePanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/CompliancePanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/ContinuityCameraPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/ContinuityCameraPanel.swift",
+      "to": "SPAI/ContinuityCameraService.swift",
+      "via": [
+        "ContinuityCameraService"
+      ]
+    },
+    {
+      "from": "SPAI/ContinuityCameraPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/ContinuityCameraPanel.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/ContinuityCameraService.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "Mode",
+        "SPAIColor"
+      ]
+    },
+    {
+      "from": "SPAI/DemoView.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "BackendClient",
+        "BackendDetection"
+      ]
+    },
+    {
+      "from": "SPAI/DemoView.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "Mode",
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/DesignTokens.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionPanel.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionPanel.swift",
+      "to": "SPAI/EnvironmentService.swift",
+      "via": [
+        "EnvironmentService"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionPanel.swift",
+      "to": "SPAI/LEDBorder.swift",
+      "via": [
+        "BorderState"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionPanel.swift",
+      "to": "SPAI/SoundManager.swift",
+      "via": [
+        "SoundManager"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionPanel.swift",
+      "to": "SPAI/SpeechManager.swift",
+      "via": [
+        "SpeechManager"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionService.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionService.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "BackendClient",
+        "BackendDetection",
+        "TrayDetectResponse"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionService.swift",
+      "to": "SPAI/DetectionTuning.swift",
+      "via": [
+        "DetectionTuning"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionService.swift",
+      "to": "SPAI/OnDeviceDetector.swift",
+      "via": [
+        "OnDeviceDetector"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionService.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionTuning.swift",
+      "to": "SPAI/OnDeviceDetector.swift",
+      "via": [
+        "OnDeviceDetector"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionUploadPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionUploadPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/DetectionUploadPanel.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/EnvironmentService.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/EventLogPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "LogEvent"
+      ]
+    },
+    {
+      "from": "SPAI/EventLogPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/FeatureCard.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/GuidedStepPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/GuidedStepPanel.swift",
+      "to": "SPAI/ContinuityCameraService.swift",
+      "via": [
+        "ContinuityCameraService"
+      ]
+    },
+    {
+      "from": "SPAI/GuidedStepPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/GuidedStepPanel.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/GuidedStepPanel.swift",
+      "to": "SPAI/SpeechManager.swift",
+      "via": [
+        "VoiceInputManager"
+      ]
+    },
+    {
+      "from": "SPAI/GuidedStepPanel.swift",
+      "to": "SPAI/StationManager.swift",
+      "via": [
+        "Station"
+      ]
+    },
+    {
+      "from": "SPAI/GuidedStepPanel.swift",
+      "to": "SPAI/StationScripts.swift",
+      "via": [
+        "GuidedStep",
+        "StationScripts"
+      ]
+    },
+    {
+      "from": "SPAI/HandTrackingService.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/HandTrackingService.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/HandTrackingService.swift",
+      "to": "SPAI/WristGesture.swift",
+      "via": [
+        "WristGesture"
+      ]
+    },
+    {
+      "from": "SPAI/HeadAnchorService.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/HomeView.swift",
+      "to": "SPAI/AppBackground.swift",
+      "via": [
+        "AppBackground"
+      ]
+    },
+    {
+      "from": "SPAI/HomeView.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/HomeView.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/HomeView.swift",
+      "to": "SPAI/FeatureCard.swift",
+      "via": [
+        "FeatureCard"
+      ]
+    },
+    {
+      "from": "SPAI/HomeView.swift",
+      "to": "SPAI/StatusPill.swift",
+      "via": [
+        "StatusPill"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/ActionPanel.swift",
+      "via": [
+        "ActionPanel",
+        "QuickAction"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/AppTour.swift",
+      "via": [
+        "AppTour"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/CameraFrameService.swift",
+      "via": [
+        "CameraFrameService"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/ChatPanel.swift",
+      "via": [
+        "ChatPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/ContinuityCameraPanel.swift",
+      "via": [
+        "ContinuityCameraPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/DetectionPanel.swift",
+      "via": [
+        "DetectionPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/DetectionUploadPanel.swift",
+      "via": [
+        "DetectionUploadPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/EventLogPanel.swift",
+      "via": [
+        "EventLogPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/GuidedStepPanel.swift",
+      "via": [
+        "GuidedStepPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/HandTrackingService.swift",
+      "via": [
+        "HandTrackingService"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/HeadAnchorService.swift",
+      "via": [
+        "HeadAnchorService"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/SPAIApp.swift",
+      "via": [
+        "RootSceneView"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/SessionHistoryPanel.swift",
+      "via": [
+        "SessionHistoryPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/SessionReportPanel.swift",
+      "via": [
+        "SessionReportPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/SoundManager.swift",
+      "via": [
+        "SoundManager"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/SpeechManager.swift",
+      "via": [
+        "SpeechManager"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/StationManager.swift",
+      "via": [
+        "StationManager"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/StationPickerPanel.swift",
+      "via": [
+        "StationPickerPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/StatusBarPanel.swift",
+      "via": [
+        "StatusBarPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/TourCoachmark.swift",
+      "via": [
+        "TourCoachmark"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/TourInterruptPopup.swift",
+      "via": [
+        "TourInterruptPopup"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/WorkflowProgressPanel.swift",
+      "via": [
+        "WorkflowProgressPanel"
+      ]
+    },
+    {
+      "from": "SPAI/ImmersiveView.swift",
+      "to": "SPAI/WristMenuPanel.swift",
+      "via": [
+        "WristMenuPanel"
+      ]
+    },
+    {
+      "from": "SPAI/OnDeviceDetector.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "BackendDetection"
+      ]
+    },
+    {
+      "from": "SPAI/OnDeviceDetector.swift",
+      "to": "SPAI/DetectionTuning.swift",
+      "via": [
+        "DetectionTuning"
+      ]
+    },
+    {
+      "from": "SPAI/OnDeviceDetector.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/OnboardingView.swift",
+      "to": "SPAI/AppBackground.swift",
+      "via": [
+        "AppBackground"
+      ]
+    },
+    {
+      "from": "SPAI/OnboardingView.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/OnboardingView.swift",
+      "to": "SPAI/ContinuityCameraService.swift",
+      "via": [
+        "Status"
+      ]
+    },
+    {
+      "from": "SPAI/OnboardingView.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/ContinuityCameraService.swift",
+      "via": [
+        "ContinuityCameraService"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/HomeView.swift",
+      "via": [
+        "HomeView"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/OnboardingView.swift",
+      "via": [
+        "OnboardingView"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/SettingsView.swift",
+      "via": [
+        "SettingsView"
+      ]
+    },
+    {
+      "from": "SPAI/SPAIApp.swift",
+      "to": "SPAI/UploadWindowView.swift",
+      "via": [
+        "UploadWindowView"
+      ]
+    },
+    {
+      "from": "SPAI/SPAILog.swift",
+      "to": "SPAI/HomeView.swift",
+      "via": [
+        "HomeView"
+      ]
+    },
+    {
+      "from": "SPAI/SPAILog.swift",
+      "to": "SPAI/SettingsView.swift",
+      "via": [
+        "SettingsView"
+      ]
+    },
+    {
+      "from": "SPAI/SessionHistoryPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/SessionHistoryPanel.swift",
+      "to": "SPAI/ChatPanel.swift",
+      "via": [
+        "Role"
+      ]
+    },
+    {
+      "from": "SPAI/SessionHistoryPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/SessionHistoryPanel.swift",
+      "to": "SPAI/SessionRecord.swift",
+      "via": [
+        "SessionRecord"
+      ]
+    },
+    {
+      "from": "SPAI/SessionReportPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/SessionReportPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/SettingsView.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/SettingsView.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "BackendClient"
+      ]
+    },
+    {
+      "from": "SPAI/SettingsView.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/SettingsView.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/SoundManager.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/SoundManager.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/SpeechManager.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/SpeechManager.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/SpeechManager.swift",
+      "to": "SPAI/SoundManager.swift",
+      "via": [
+        "SoundManager"
+      ]
+    },
+    {
+      "from": "SPAI/StationManager.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/StationManager.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/StationPickerPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/StationPickerPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/StationPickerPanel.swift",
+      "to": "SPAI/EnvironmentService.swift",
+      "via": [
+        "Current"
+      ]
+    },
+    {
+      "from": "SPAI/StationPickerPanel.swift",
+      "to": "SPAI/StationManager.swift",
+      "via": [
+        "Station",
+        "StationManager"
+      ]
+    },
+    {
+      "from": "SPAI/StationScripts.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/StatusBarPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "TechRole"
+      ]
+    },
+    {
+      "from": "SPAI/StatusBarPanel.swift",
+      "to": "SPAI/ChatPanel.swift",
+      "via": [
+        "Role"
+      ]
+    },
+    {
+      "from": "SPAI/StatusBarPanel.swift",
+      "to": "SPAI/ContinuityCameraService.swift",
+      "via": [
+        "Status"
+      ]
+    },
+    {
+      "from": "SPAI/StatusBarPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/StatusBarPanel.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/ToggleImmersiveSpaceButton.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/ToggleImmersiveSpaceButton.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/TourCoachmark.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/TourCoachmark.swift",
+      "to": "SPAI/AppTour.swift",
+      "via": [
+        "AppTour",
+        "TourStep"
+      ]
+    },
+    {
+      "from": "SPAI/TourCoachmark.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/TourInterruptPopup.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/TourInterruptPopup.swift",
+      "to": "SPAI/AppTour.swift",
+      "via": [
+        "AppTour"
+      ]
+    },
+    {
+      "from": "SPAI/TourInterruptPopup.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/TourInterruptPopup.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAI/UploadWindowView.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/UploadWindowView.swift",
+      "to": "SPAI/ContinuityCameraService.swift",
+      "via": [
+        "ContinuityCameraService"
+      ]
+    },
+    {
+      "from": "SPAI/UploadWindowView.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/UploadWindowView.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAI/UploadWindowView.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/UploadWindowView.swift",
+      "to": "SPAI/SettingsView.swift",
+      "via": [
+        "SettingsView"
+      ]
+    },
+    {
+      "from": "SPAI/UploadWindowView.swift",
+      "to": "SPAI/VideoFrameService.swift",
+      "via": [
+        "VideoFrameService"
+      ]
+    },
+    {
+      "from": "SPAI/VideoFrameService.swift",
+      "to": "SPAI/SPAILog.swift",
+      "via": [
+        "SPAILog"
+      ]
+    },
+    {
+      "from": "SPAI/WorkflowProgressPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel",
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAI/WorkflowProgressPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius",
+        "SPAISpacing"
+      ]
+    },
+    {
+      "from": "SPAI/WristMenuPanel.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "ActionFeedback",
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAI/WristMenuPanel.swift",
+      "to": "SPAI/DesignTokens.swift",
+      "via": [
+        "SPAIColor",
+        "SPAIRadius"
+      ]
+    },
+    {
+      "from": "SPAI/WristMenuPanel.swift",
+      "to": "SPAI/ImmersiveView.swift",
+      "via": [
+        "ImmersiveView"
+      ]
+    },
+    {
+      "from": "SPAITests/AppModelPanelTests.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "AppModel"
+      ]
+    },
+    {
+      "from": "SPAITests/AppModelPanelTests.swift",
+      "to": "SPAI/AppTour.swift",
+      "via": [
+        "AppTour"
+      ]
+    },
+    {
+      "from": "SPAITests/AppTourTests.swift",
+      "to": "SPAI/AppTour.swift",
+      "via": [
+        "AppTour",
+        "TourEvent"
+      ]
+    },
+    {
+      "from": "SPAITests/DetectionServiceTests.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "BackendDetection"
+      ]
+    },
+    {
+      "from": "SPAITests/DetectionServiceTests.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAITests/DetectionTuningTests.swift",
+      "to": "SPAI/AppModel.swift",
+      "via": [
+        "SterileStep"
+      ]
+    },
+    {
+      "from": "SPAITests/DetectionTuningTests.swift",
+      "to": "SPAI/BackendClient.swift",
+      "via": [
+        "BackendDetection"
+      ]
+    },
+    {
+      "from": "SPAITests/DetectionTuningTests.swift",
+      "to": "SPAI/DetectionService.swift",
+      "via": [
+        "DetectionService"
+      ]
+    },
+    {
+      "from": "SPAITests/DetectionTuningTests.swift",
+      "to": "SPAI/DetectionTuning.swift",
+      "via": [
+        "DetectionTuning"
+      ]
+    },
+    {
+      "from": "SPAITests/DetectionTuningTests.swift",
+      "to": "SPAI/StationScripts.swift",
+      "via": [
+        "GuidedStep",
+        "StationScripts"
+      ]
+    },
+    {
+      "from": "SPAITests/StationManagerTests.swift",
+      "to": "SPAI/StationManager.swift",
+      "via": [
+        "StationManager"
+      ]
+    },
+    {
+      "from": "SPAITests/WristGestureTests.swift",
+      "to": "SPAI/WristGesture.swift",
+      "via": [
+        "WristGesture"
+      ]
+    }
+  ],
+  "extension_edges": [],
+  "type_index": {
+    "ActionFeedback": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "ActionFeedbackStrip": {
+      "declared_in": [
+        "SPAI/WristMenuPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "ActionPanel": {
+      "declared_in": [
+        "SPAI/ActionPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "AppBackground": {
+      "declared_in": [
+        "SPAI/AppBackground.swift"
+      ],
+      "extended_in": []
+    },
+    "AppModel": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "AppModelPanelTests": {
+      "declared_in": [
+        "SPAITests/AppModelPanelTests.swift"
+      ],
+      "extended_in": []
+    },
+    "AppTour": {
+      "declared_in": [
+        "SPAI/AppTour.swift"
+      ],
+      "extended_in": []
+    },
+    "AppTourTests": {
+      "declared_in": [
+        "SPAITests/AppTourTests.swift"
+      ],
+      "extended_in": []
+    },
+    "Array": {
+      "declared_in": [],
+      "extended_in": [
+        "SPAI/StationScripts.swift"
+      ]
+    },
+    "AskRequest": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "AskResponse": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "BackendClient": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": [
+        "SPAI/BackendClient.swift"
+      ]
+    },
+    "BackendDetection": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "BackendError": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "BackendSettings": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "BorderState": {
+      "declared_in": [
+        "SPAI/LEDBorder.swift"
+      ],
+      "extended_in": []
+    },
+    "CameraFrameService": {
+      "declared_in": [
+        "SPAI/CameraFrameService.swift"
+      ],
+      "extended_in": []
+    },
+    "Category": {
+      "declared_in": [
+        "SPAI/SPAILog.swift"
+      ],
+      "extended_in": []
+    },
+    "ChatMessage": {
+      "declared_in": [
+        "SPAI/ChatPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "ChatPanel": {
+      "declared_in": [
+        "SPAI/ChatPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "CodingKeys": {
+      "declared_in": [
+        "SPAI/BackendClient.swift",
+        "SPAI/BackendClient.swift",
+        "SPAI/BackendClient.swift",
+        "SPAI/BackendClient.swift",
+        "SPAI/BackendClient.swift",
+        "SPAI/BackendClient.swift",
+        "SPAI/BackendClient.swift",
+        "SPAI/BackendClient.swift",
+        "SPAI/EnvironmentService.swift",
+        "SPAI/SessionRecord.swift"
+      ],
+      "extended_in": []
+    },
+    "Color": {
+      "declared_in": [],
+      "extended_in": [
+        "SPAI/LEDBorder.swift"
+      ]
+    },
+    "ComparisonPair": {
+      "declared_in": [
+        "SPAI/SessionHistoryPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "ComplianceEventResult": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "CompliancePanel": {
+      "declared_in": [
+        "SPAI/CompliancePanel.swift"
+      ],
+      "extended_in": []
+    },
+    "ComplianceState": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "ContinuityCameraMini": {
+      "declared_in": [
+        "SPAI/UploadWindowView.swift"
+      ],
+      "extended_in": []
+    },
+    "ContinuityCameraPanel": {
+      "declared_in": [
+        "SPAI/ContinuityCameraPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "ContinuityCameraService": {
+      "declared_in": [
+        "SPAI/ContinuityCameraService.swift"
+      ],
+      "extended_in": [
+        "SPAI/ContinuityCameraService.swift"
+      ]
+    },
+    "Current": {
+      "declared_in": [
+        "SPAI/EnvironmentService.swift"
+      ],
+      "extended_in": []
+    },
+    "DemoView": {
+      "declared_in": [
+        "SPAI/DemoView.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectResponse": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionMode": {
+      "declared_in": [
+        "SPAI/DetectionService.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionPanel": {
+      "declared_in": [
+        "SPAI/DetectionPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionService": {
+      "declared_in": [
+        "SPAI/DetectionService.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionServiceTests": {
+      "declared_in": [
+        "SPAITests/DetectionServiceTests.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionStatus": {
+      "declared_in": [
+        "SPAI/DetectionStatus.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionTuning": {
+      "declared_in": [
+        "SPAI/DetectionTuning.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionTuningTests": {
+      "declared_in": [
+        "SPAITests/DetectionTuningTests.swift"
+      ],
+      "extended_in": []
+    },
+    "DetectionUploadPanel": {
+      "declared_in": [
+        "SPAI/DetectionUploadPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "EnvironmentReading": {
+      "declared_in": [
+        "SPAI/CompliancePanel.swift"
+      ],
+      "extended_in": []
+    },
+    "EnvironmentService": {
+      "declared_in": [
+        "SPAI/EnvironmentService.swift"
+      ],
+      "extended_in": [
+        "SPAI/EnvironmentService.swift"
+      ]
+    },
+    "EventLogPanel": {
+      "declared_in": [
+        "SPAI/EventLogPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "FeatureCard": {
+      "declared_in": [
+        "SPAI/FeatureCard.swift"
+      ],
+      "extended_in": []
+    },
+    "GuidedStep": {
+      "declared_in": [
+        "SPAI/StationScripts.swift"
+      ],
+      "extended_in": []
+    },
+    "GuidedStepPanel": {
+      "declared_in": [
+        "SPAI/GuidedStepPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "HandTrackingService": {
+      "declared_in": [
+        "SPAI/HandTrackingService.swift"
+      ],
+      "extended_in": []
+    },
+    "HeadAnchorService": {
+      "declared_in": [
+        "SPAI/HeadAnchorService.swift"
+      ],
+      "extended_in": []
+    },
+    "HomeView": {
+      "declared_in": [
+        "SPAI/HomeView.swift"
+      ],
+      "extended_in": []
+    },
+    "ImmersiveSpaceState": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "ImmersiveView": {
+      "declared_in": [
+        "SPAI/ImmersiveView.swift"
+      ],
+      "extended_in": []
+    },
+    "Kind": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "LEDBorder": {
+      "declared_in": [
+        "SPAI/LEDBorder.swift"
+      ],
+      "extended_in": []
+    },
+    "LogEvent": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "Mode": {
+      "declared_in": [
+        "SPAI/DesignTokens.swift"
+      ],
+      "extended_in": []
+    },
+    "OnDeviceDetector": {
+      "declared_in": [
+        "SPAI/OnDeviceDetector.swift"
+      ],
+      "extended_in": []
+    },
+    "OnboardingView": {
+      "declared_in": [
+        "SPAI/OnboardingView.swift"
+      ],
+      "extended_in": []
+    },
+    "OpenMeteoResponse": {
+      "declared_in": [
+        "SPAI/EnvironmentService.swift"
+      ],
+      "extended_in": []
+    },
+    "PanelEntranceLog": {
+      "declared_in": [
+        "SPAI/ImmersiveView.swift"
+      ],
+      "extended_in": []
+    },
+    "PanelMode": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "PanelSlot": {
+      "declared_in": [
+        "SPAI/ImmersiveView.swift"
+      ],
+      "extended_in": []
+    },
+    "Phase": {
+      "declared_in": [
+        "SPAI/AppTour.swift"
+      ],
+      "extended_in": []
+    },
+    "PickedMovie": {
+      "declared_in": [
+        "SPAI/UploadWindowView.swift"
+      ],
+      "extended_in": []
+    },
+    "QuickAction": {
+      "declared_in": [
+        "SPAI/ActionPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "Role": {
+      "declared_in": [
+        "SPAI/ChatPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "RootSceneView": {
+      "declared_in": [
+        "SPAI/SPAIApp.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAIApp": {
+      "declared_in": [
+        "SPAI/SPAIApp.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAIColor": {
+      "declared_in": [
+        "SPAI/DesignTokens.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAIGlass": {
+      "declared_in": [
+        "SPAI/DesignTokens.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAIHexagon": {
+      "declared_in": [
+        "SPAI/StatusBarPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAIHitTarget": {
+      "declared_in": [
+        "SPAI/DesignTokens.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAILog": {
+      "declared_in": [
+        "SPAI/SPAILog.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAIRadius": {
+      "declared_in": [
+        "SPAI/DesignTokens.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAISpacing": {
+      "declared_in": [
+        "SPAI/DesignTokens.swift"
+      ],
+      "extended_in": []
+    },
+    "SPAITests": {
+      "declared_in": [
+        "SPAITests/SPAITests.swift"
+      ],
+      "extended_in": []
+    },
+    "SavedReportView": {
+      "declared_in": [
+        "SPAI/SessionHistoryPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "SessionHistory": {
+      "declared_in": [
+        "SPAI/SessionRecord.swift"
+      ],
+      "extended_in": []
+    },
+    "SessionHistoryPanel": {
+      "declared_in": [
+        "SPAI/SessionHistoryPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "SessionRecord": {
+      "declared_in": [
+        "SPAI/SessionRecord.swift"
+      ],
+      "extended_in": []
+    },
+    "SessionReportPanel": {
+      "declared_in": [
+        "SPAI/SessionReportPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "SettingsView": {
+      "declared_in": [
+        "SPAI/SettingsView.swift"
+      ],
+      "extended_in": []
+    },
+    "SoundManager": {
+      "declared_in": [
+        "SPAI/SoundManager.swift"
+      ],
+      "extended_in": []
+    },
+    "SoundManagerError": {
+      "declared_in": [
+        "SPAI/SoundManager.swift"
+      ],
+      "extended_in": []
+    },
+    "SpeechManager": {
+      "declared_in": [
+        "SPAI/SpeechManager.swift"
+      ],
+      "extended_in": []
+    },
+    "SpeechManagerError": {
+      "declared_in": [
+        "SPAI/SpeechManager.swift"
+      ],
+      "extended_in": []
+    },
+    "Station": {
+      "declared_in": [
+        "SPAI/StationManager.swift"
+      ],
+      "extended_in": []
+    },
+    "StationManager": {
+      "declared_in": [
+        "SPAI/StationManager.swift"
+      ],
+      "extended_in": []
+    },
+    "StationManagerTests": {
+      "declared_in": [
+        "SPAITests/StationManagerTests.swift"
+      ],
+      "extended_in": []
+    },
+    "StationPickerPanel": {
+      "declared_in": [
+        "SPAI/StationPickerPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "StationScripts": {
+      "declared_in": [
+        "SPAI/StationScripts.swift"
+      ],
+      "extended_in": []
+    },
+    "Status": {
+      "declared_in": [
+        "SPAI/ContinuityCameraService.swift"
+      ],
+      "extended_in": []
+    },
+    "StatusBarPanel": {
+      "declared_in": [
+        "SPAI/StatusBarPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "StatusPill": {
+      "declared_in": [
+        "SPAI/StatusPill.swift"
+      ],
+      "extended_in": []
+    },
+    "StepCondition": {
+      "declared_in": [
+        "SPAI/StationScripts.swift"
+      ],
+      "extended_in": []
+    },
+    "SterileNodeMark": {
+      "declared_in": [
+        "SPAI/StatusBarPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "SterileStep": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "TechRole": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "ToggleImmersiveSpaceButton": {
+      "declared_in": [
+        "SPAI/ToggleImmersiveSpaceButton.swift"
+      ],
+      "extended_in": []
+    },
+    "TourAnchor": {
+      "declared_in": [
+        "SPAI/AppTour.swift"
+      ],
+      "extended_in": []
+    },
+    "TourCoachmark": {
+      "declared_in": [
+        "SPAI/TourCoachmark.swift"
+      ],
+      "extended_in": []
+    },
+    "TourEvent": {
+      "declared_in": [
+        "SPAI/AppTour.swift"
+      ],
+      "extended_in": []
+    },
+    "TourHighlightModifier": {
+      "declared_in": [
+        "SPAI/DesignTokens.swift"
+      ],
+      "extended_in": []
+    },
+    "TourInterruptPopup": {
+      "declared_in": [
+        "SPAI/TourInterruptPopup.swift"
+      ],
+      "extended_in": []
+    },
+    "TourStep": {
+      "declared_in": [
+        "SPAI/AppTour.swift"
+      ],
+      "extended_in": []
+    },
+    "TrayDetectResponse": {
+      "declared_in": [
+        "SPAI/BackendClient.swift"
+      ],
+      "extended_in": []
+    },
+    "UIImage": {
+      "declared_in": [],
+      "extended_in": [
+        "SPAI/Cvpixelbuffer+uiimage.swift",
+        "SPAI/Cvpixelbuffer+uiimage.swift"
+      ]
+    },
+    "UploadWindowView": {
+      "declared_in": [
+        "SPAI/UploadWindowView.swift"
+      ],
+      "extended_in": []
+    },
+    "VideoFrameService": {
+      "declared_in": [
+        "SPAI/VideoFrameService.swift"
+      ],
+      "extended_in": []
+    },
+    "View": {
+      "declared_in": [],
+      "extended_in": [
+        "SPAI/DesignTokens.swift",
+        "SPAI/LEDBorder.swift"
+      ]
+    },
+    "VoiceInputManager": {
+      "declared_in": [
+        "SPAI/SpeechManager.swift"
+      ],
+      "extended_in": []
+    },
+    "WindowToggle": {
+      "declared_in": [
+        "SPAI/AppModel.swift"
+      ],
+      "extended_in": []
+    },
+    "WorkflowProgressPanel": {
+      "declared_in": [
+        "SPAI/WorkflowProgressPanel.swift"
+      ],
+      "extended_in": []
+    },
+    "WristGesture": {
+      "declared_in": [
+        "SPAI/WristGesture.swift"
+      ],
+      "extended_in": []
+    },
+    "WristGestureTests": {
+      "declared_in": [
+        "SPAITests/WristGestureTests.swift"
+      ],
+      "extended_in": []
+    },
+    "WristMenuPanel": {
+      "declared_in": [
+        "SPAI/WristMenuPanel.swift"
+      ],
+      "extended_in": []
+    }
+  }
+}

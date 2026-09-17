@@ -47,17 +47,40 @@ final class StationManager {
     private let session = ARKitSession()
     
     func startImageTracking() async {
-        guard ImageTrackingProvider.isSupported else { return }
+        guard ImageTrackingProvider.isSupported else {
+            SPAILog.error(.stations, "ImageTrackingProvider not supported on this device")
+            return
+        }
+
         let refs = ReferenceImage.loadReferenceImages(inGroupNamed: "StationMarkers")
+        // ARKit's own failure here is a low-level, easy-to-miss console line
+        // ("ar_image_tracking_provider_t ... No images were supplied") that gives no hint
+        // *why* — this is the actionable version: the group is either missing or every
+        // `.arreferenceimage` inside it failed to load. Station entry then falls back to
+        // whatever manual picker the UI offers, same as it would with the feature off.
+        guard !refs.isEmpty else {
+            SPAILog.error(.stations, "no reference images loaded from asset group \"StationMarkers\" — only the manual station picker will work until markers are registered")
+            return
+        }
+
         let provider = ImageTrackingProvider(referenceImages: refs)
         do { try await session.run([provider]) }
         catch { SPAILog.error(.stations, "ARKit failed: \(error)"); return }
 
+        SPAILog.info(.stations, "image tracking started with \(refs.count) reference image(s)")
+
         for await update in provider.anchorUpdates {
             let anchor = update.anchor
-            guard anchor.isTracked,
-                  let name = anchor.referenceImage.name,
-                  let station = station(for: name) else { continue }
+            guard anchor.isTracked, let name = anchor.referenceImage.name else { continue }
+            guard let station = station(for: name) else {
+                // Every name here came from an image we registered ourselves, so this is not
+                // a stray marker in view — it means a `.arreferenceimage` was named something
+                // that doesn't match any `Station.id`. Debug-level: a one-time setup mismatch
+                // to catch while wiring markers up, not an ongoing health signal to alarm on
+                // every time this anchor updates.
+                SPAILog.debug(.stations, "tracked reference image \"\(name)\" doesn't match any known station id")
+                continue
+            }
             enter(station)
         }
     }
