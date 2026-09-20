@@ -11,7 +11,6 @@ import SwiftUI
 struct SPAIApp: App {
     @State private var appModel = AppModel()
     @State private var detectionService = DetectionService()
-    @State private var continuityCamera = ContinuityCameraService()
     /// Starts at full passthrough. This is an app for handling real instruments on a real
     /// bench — the workspace belongs over the room, not instead of it.
     @State private var immersionStyle: ImmersionStyle = .mixed
@@ -21,7 +20,6 @@ struct SPAIApp: App {
             RootSceneView()
                 .environment(appModel)
                 .environment(detectionService)
-                .environment(continuityCamera)
         }
         .windowStyle(.plain)
         .defaultSize(width: 800, height: 600)
@@ -34,7 +32,6 @@ struct SPAIApp: App {
             SettingsView()
                 .environment(appModel)
                 .environment(detectionService)
-                .environment(continuityCamera)
         }
         .windowStyle(.plain)
         .defaultSize(width: 450, height: 700)
@@ -44,7 +41,6 @@ struct SPAIApp: App {
             UploadWindowView()
                 .environment(appModel)
                 .environment(detectionService)
-                .environment(continuityCamera)
         }
         .windowStyle(.plain)
         .defaultSize(width: 520, height: 640)
@@ -54,7 +50,6 @@ struct SPAIApp: App {
             ImmersiveView()
                 .environment(appModel)
                 .environment(detectionService)
-                .environment(continuityCamera)
         }
         // All three styles, not just .progressive.
         //

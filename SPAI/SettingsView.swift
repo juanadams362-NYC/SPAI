@@ -7,10 +7,21 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.self) private var environment
 
-    /// Adapts to the window's background: white on dark material, black on light material.
-    private var fg: Color { colorScheme == .dark ? .white : .black }
+    /// Foreground colour that achieves WCAG AA contrast on the settings window background.
+    ///
+    /// `.regularMaterial` is a ShapeStyle, not a Color, so it can't be fed directly to the
+    /// luminance helper. We use a concrete sRGB proxy whose brightness matches the material's
+    /// effective rendering in the current environment: dark windows show ~L 0.087 (white wins),
+    /// light windows show ~L 0.836 (black wins). The helper resolves the proxy colour under the
+    /// live environment so dynamic colorScheme changes are reflected automatically.
+    private var fg: Color {
+        let materialProxy = environment.colorScheme == .dark
+            ? Color(red: 0.15, green: 0.15, blue: 0.16)  // ≈ regularMaterial dark  (L ≈ 0.087)
+            : Color(red: 0.92, green: 0.92, blue: 0.93)  // ≈ regularMaterial light (L ≈ 0.836)
+        return materialProxy.accessibleForeground(in: environment)
+    }
 
     @AppStorage("backendURL") private var backendURL:String = "https://juan-builds-tech362-spai.hf.space"
     //"http://127.0.0.1:8000"
@@ -157,7 +168,7 @@ struct SettingsView: View {
                     .background(SPAIColor.secondary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityHint("Restarts the in-app walkthrough of the workspace")
 
             Button {
@@ -171,7 +182,7 @@ struct SettingsView: View {
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("Apply confidence threshold to backend")
 
             if let pushStatus {

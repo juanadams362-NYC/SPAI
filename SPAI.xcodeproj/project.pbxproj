@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		5EB4D17A2F9FD0C400FF10B3 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = 5EB4D1792F9FD0C400FF10B3 /* RealityKitContent */; };
+		793C3A85305F0C3D00816362 /* Enterprise.license in Resources */ = {isa = PBXBuildFile; fileRef = 793C3A84305F0C3C00816362 /* Enterprise.license */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,6 +25,7 @@
 		5EB4D1742F9FD0C400FF10B3 /* SPAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SPAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5EB4D1782F9FD0C400FF10B3 /* RealityKitContent */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RealityKitContent; sourceTree = "<group>"; };
 		5EB4D1882F9FD0C500FF10B3 /* SPAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SPAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		793C3A84305F0C3C00816362 /* Enterprise.license */ = {isa = PBXFileReference; lastKnownFileType = file; path = Enterprise.license; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -78,6 +80,7 @@
 				5EB4D1772F9FD0C400FF10B3 /* Packages */,
 				5EB4D18B2F9FD0C500FF10B3 /* SPAITests */,
 				5EB4D1752F9FD0C400FF10B3 /* Products */,
+				793C3A84305F0C3C00816362 /* Enterprise.license */,
 			);
 			sourceTree = "<group>";
 		};
@@ -191,6 +194,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				793C3A85305F0C3D00816362 /* Enterprise.license in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

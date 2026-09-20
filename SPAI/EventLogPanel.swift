@@ -22,6 +22,8 @@ struct EventLogPanel: View {
                 }
             }
             .frame(maxHeight: 220)
+
+            PanelDragHandle(panelID: "eventLog")
         }
         .padding(SPAISpacing.l)
         .frame(width: 360)

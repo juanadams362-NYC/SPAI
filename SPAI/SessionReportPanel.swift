@@ -75,8 +75,9 @@ struct SessionReportPanel: View {
                         .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
-                .spaiHitTarget()
+//                .spaiHitTarget()
             }
+            PanelDragHandle(panelID: "report")
         }
         .padding(SPAISpacing.l)
         .frame(width: 420)

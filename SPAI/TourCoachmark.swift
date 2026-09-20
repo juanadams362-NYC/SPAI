@@ -211,7 +211,7 @@ struct TourCoachmark: View {
                 .fixedSize()
         }
         .buttonStyle(.plain)
-        .spaiHitTarget(pop: 1.10)
+//        .spaiHitTarget(pop: 1.10)
         .accessibilityLabel(title)
     }
 
@@ -221,11 +221,11 @@ struct TourCoachmark: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
                 .padding(.horizontal, SPAISpacing.m)
-                .padding(.vertical, SPAISpacing.s)
+                .padding(.vertical, SPAISpacing.s + 4)
                 .fixedSize()
         }
         .buttonStyle(.plain)
-        .spaiHitTarget()
+//        .spaiHitTarget()
         .accessibilityLabel(title)
     }
 }

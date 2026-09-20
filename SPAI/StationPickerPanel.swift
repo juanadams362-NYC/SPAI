@@ -80,7 +80,7 @@ struct StationPickerPanel: View {
                 // 30 cm rather than at a window's ~1.5 m. 32pt at 30 cm subtends a larger angle
                 // than 44pt does at arm's length, so the target is easier to hit, not harder,
                 // while keeping the panel small enough to live on an arm.
-                .spaiHitTarget(minSize: compact ? 32 : 44, pop: compact ? 1.18 : 1.08)
+//                .spaiHitTarget(minSize: compact ? 32 : 44, pop: compact ? 1.18 : 1.08)
                 .accessibilityLabel("\(station.name) station")
                 .accessibilityValue(isHere ? "Current station" : "")
                 .accessibilityAddTraits(isHere ? [.isSelected] : [])

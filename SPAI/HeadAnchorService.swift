@@ -52,6 +52,27 @@ final class HeadAnchorService {
     /// Eye height to lay the panel arc out against.
     var eyeHeight: Float { calibratedEyeHeight ?? Self.defaultEyeHeight }
 
+    /// Live head yaw (rotation about the vertical axis), in radians, queried on demand.
+    ///
+    /// Used by `CameraFrameService` for the head-stability gate: if the yaw changes by
+    /// more than `DetectionTuning.headYawThresholdDegrees` the gate resets, skipping
+    /// frames until the head resettles on the work surface.
+    ///
+    /// Returns `nil` in the simulator and before world tracking has a fix. The gate
+    /// treats `nil` as "bypass" — tracking loss must not suppress safety alerts.
+    func currentHeadYaw() -> Float? {
+        #if targetEnvironment(simulator)
+        return nil
+        #else
+        guard worldTracking.state == .running,
+              let anchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime())
+        else { return nil }
+        // -Z is forward for the device transform (same convention as settledSample()).
+        let m = anchor.originFromAnchorTransform
+        return atan2(-m.columns.2.x, -m.columns.2.z)
+        #endif
+    }
+
     /// Live head position, queried on demand. Wrist gestures need it every frame — "am I
     /// holding my wrist up to look at it" is a question about the wrist *relative to the
     /// face*, not about the wrist alone.

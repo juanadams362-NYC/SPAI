@@ -35,7 +35,7 @@ struct DetectionUploadPanel: View {
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("Upload test media")
             .accessibilityValue(appModel.isUploadWindowOpen ? "Open" : "Closed")
             .accessibilityHint("Give SPAI a photo or video to run detection against")
@@ -60,6 +60,7 @@ struct DetectionUploadPanel: View {
                         .foregroundStyle(.white.opacity(0.5))
                 }
             }
+            PanelDragHandle(panelID: "upload")
         }
         .padding(SPAISpacing.l)
         .frame(width: 260)

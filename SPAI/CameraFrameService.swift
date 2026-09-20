@@ -22,7 +22,25 @@ final class CameraFrameService {
     private let detectionInterval: TimeInterval = 1.0
     private var lastDetectionTime: Date = .distantPast
 
-    var onFrameForDetection: ((CVReadOnlyPixelBuffer) -> Void)?
+    /// Called with a zone-cropped, ready-to-use UIImage at most once per `detectionInterval`,
+    /// and only while the head-stability gate is open. Callers no longer need to do the
+    /// pixel-buffer conversion — that happens here alongside the crop.
+    var onFrameForDetection: ((UIImage) -> Void)?
+
+    /// Returns the current head yaw in radians, or nil if tracking is unavailable.
+    /// Supplied by ImmersiveView, which owns HeadAnchorService.
+    /// When nil the gate is bypassed — tracking loss must not suppress safety alerts.
+    var headYawProvider: (() -> Float?)?
+
+    // MARK: - Head stability state
+
+    /// The yaw value when the head most recently entered the stable region.
+    private var stableReferenceYaw: Float?
+
+    /// When the head most recently entered (or re-entered) the stable region.
+    private var stableFrom: Date?
+
+    // MARK: - Lifecycle
 
     func start() async {
         // `queryAuthorization` only reads the current status — it never prompts. Main Camera
@@ -66,17 +84,58 @@ final class CameraFrameService {
 
         isRunning = true
         statusMessage = nil
-        SPAILog.info(.camera, "session started")
+        SPAILog.info(.camera, "session started — zone \(Int(DetectionTuning.detectionZoneWidthFraction * 100))%×\(Int(DetectionTuning.detectionZoneHeightFraction * 100))%, stability gate \(DetectionTuning.headYawStableSeconds)s / \(DetectionTuning.headYawThresholdDegrees)°")
 
         for await frame in frameUpdates {
             guard let sample = frame.sample(for: .left) else { continue }
             latestBuffer = sample.buffer
 
             let now = Date()
-            if now.timeIntervalSince(lastDetectionTime) >= detectionInterval {
-                lastDetectionTime = now
-                onFrameForDetection?(sample.buffer)
+            guard now.timeIntervalSince(lastDetectionTime) >= detectionInterval else { continue }
+
+            // ── Head stability gate ────────────────────────────────────────────────────
+            //
+            // Only send a frame to detection when the wearer's head has been pointing in
+            // roughly the same direction for at least `headYawStableSeconds`. A brief
+            // glance to the side resets the clock; sustained gaze on the bench opens it.
+            //
+            // The gate is bypassed completely when `headYawProvider` is nil (simulator)
+            // or returns nil (tracking momentarily unavailable) — tracking loss must never
+            // prevent a safety alert from the frame that's actually in front of the user.
+            if let provider = headYawProvider, let currentYaw = provider() {
+                if let reference = stableReferenceYaw {
+                    let deltaDeg = abs(wrappedAngleDelta(currentYaw, reference)) * (180 / Float.pi)
+                    if deltaDeg > DetectionTuning.headYawThresholdDegrees {
+                        // Head moved outside the stable window — reset the clock.
+                        stableReferenceYaw = currentYaw
+                        stableFrom = now
+                        SPAILog.debug(.camera, "head moved \(String(format: "%.1f", deltaDeg))° — stability gate reset")
+                        continue
+                    }
+                    // Head is within threshold; check if it has been stable long enough.
+                    let stableDuration = now.timeIntervalSince(stableFrom ?? now)
+                    guard stableDuration >= DetectionTuning.headYawStableSeconds else {
+                        SPAILog.debug(.camera, "head settling (\(String(format: "%.2f", stableDuration))s / \(DetectionTuning.headYawStableSeconds)s) — skipping frame")
+                        continue
+                    }
+                } else {
+                    // First yaw reading this session — establish the reference position.
+                    stableReferenceYaw = currentYaw
+                    stableFrom = now
+                    SPAILog.debug(.camera, "head stability reference established at \(String(format: "%.2f", currentYaw)) rad")
+                    continue
+                }
             }
+
+            // ── Zone crop + conversion ─────────────────────────────────────────────────
+            //
+            // Crop to the central passthrough rectangle before handing the image to
+            // detection. CIImage.cropped(to:) is lazy — pixels outside the rect are never
+            // rendered, so this is cheaper than cropping a fully-decoded UIImage.
+            guard let image = UIImage.fromZoneCropped(readOnlyBuffer: sample.buffer) else { continue }
+            lastDetectionTime = now
+            SPAILog.debug(.camera, "frame sent to detection (zone \(Int(image.size.width))×\(Int(image.size.height)))")
+            onFrameForDetection?(image)
         }
 
         isRunning = false
@@ -86,5 +145,19 @@ final class CameraFrameService {
         arkitSession.stop()
         isRunning = false
         latestBuffer = nil
+        stableReferenceYaw = nil
+        stableFrom = nil
+    }
+
+    // MARK: - Helpers
+
+    /// Shortest signed angular distance between two angles (radians), in (−π, π].
+    private func wrappedAngleDelta(_ a: Float, _ b: Float) -> Float {
+        var delta = a - b
+        // fmod approach keeps this branchless for the common "already in range" case.
+        delta = delta.truncatingRemainder(dividingBy: 2 * .pi)
+        if delta >  .pi { delta -= 2 * .pi }
+        if delta < -.pi { delta += 2 * .pi }
+        return delta
     }
 }

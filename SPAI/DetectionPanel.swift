@@ -63,6 +63,7 @@ struct DetectionPanel: View {
             environmentSection
             divider
             ppeRow
+            PanelDragHandle(panelID: "detection")
         }
         .padding(SPAISpacing.l)
         .frame(width: 300, alignment: .leading)

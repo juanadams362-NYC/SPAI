@@ -55,6 +55,20 @@ enum SterileStep: Int, CaseIterable, Identifiable {
     }
 }
 
+extension SterileStep {
+    /// True when this step requires glove/hand PPE detection.
+    var needsPPEDetection: Bool {
+        StationScripts.script(for: self).contains { $0.condition == .glovesOn }
+    }
+
+    /// True when this step requires instrument or tray detection.
+    var needsInstrumentDetection: Bool {
+        StationScripts.script(for: self).contains {
+            $0.condition == .instrumentsPresent || $0.condition == .trayLoaded
+        }
+    }
+}
+
 struct LogEvent: Identifiable {
     let id = UUID()
     let timestamp: String
@@ -186,6 +200,44 @@ class AppModel {
     var panelModes: [String: PanelMode] = [:]
     func mode(for panelID: String) -> PanelMode { panelModes[panelID] ?? .fixed }
     func setMode(_ mode: PanelMode, for panelID: String) { panelModes[panelID] = mode }
+
+    // MARK: - Panel drag offsets
+
+    /// World-space position deltas the user accumulates by dragging each panel's handle.
+    /// In-memory only — resets when the immersive space closes so every session starts from
+    /// the default arc layout.
+    var panelDragOffsets: [String: SIMD3<Float>] = [:]
+
+    func dragOffset(for panelID: String) -> SIMD3<Float> {
+        panelDragOffsets[panelID] ?? .zero
+    }
+
+    func setDragOffset(_ offset: SIMD3<Float>, for panelID: String) {
+        panelDragOffsets[panelID] = offset
+    }
+
+    /// Called from ImmersiveView.onDisappear so the next session uses the clean arc layout.
+    func resetAllDragOffsets() {
+        panelDragOffsets.removeAll()
+    }
+
+    // MARK: - Panel handle visibility
+
+    /// Whether each panel's drag handle is shown. Persisted — hiding a handle is a
+    /// preference, not session state.
+    private let handleVisibleKey = "panelHandleVisible"
+    private(set) var panelHandleVisible: [String: Bool] = [:]
+
+    func isHandleVisible(for panelID: String) -> Bool {
+        panelHandleVisible[panelID] ?? true   // default: shown
+    }
+
+    func setHandleVisible(_ visible: Bool, for panelID: String) {
+        panelHandleVisible[panelID] = visible
+        if let data = try? JSONEncoder().encode(panelHandleVisible) {
+            UserDefaults.standard.set(data, forKey: handleVisibleKey)
+        }
+    }
 
     // MARK: - Panel appearance
     var panelVisibility: [String: Bool] = ["chat": false, "history": false]
@@ -492,6 +544,12 @@ class AppModel {
         // Defaults on: `bool(forKey:)` returns false for a key that was never written, which
         // would silently ship the feature disabled to everyone who has not opened Settings.
         self.wristMenusEnabled = UserDefaults.standard.object(forKey: wristMenusKey) as? Bool ?? true
+
+        // Restore which panels the user has already hidden their drag handle on.
+        if let data = UserDefaults.standard.data(forKey: handleVisibleKey),
+           let stored = try? JSONDecoder().decode([String: Bool].self, from: data) {
+            self.panelHandleVisible = stored
+        }
 
         // The tour drives real controls, so it can leave real state behind it. These two hand
         // that state back: one the moment a step's demonstration has landed, the other however

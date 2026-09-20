@@ -34,6 +34,7 @@ struct WorkflowProgressPanel: View {
             }
 
             controls
+            PanelDragHandle(panelID: "workflow")
         }
         .padding(SPAISpacing.l)
         .frame(width: 760)
@@ -215,7 +216,7 @@ struct WorkflowProgressPanel: View {
                 .background(tint, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
         .buttonStyle(.plain)
-        .spaiHitTarget()
+//        .spaiHitTarget()
     }
 }
 

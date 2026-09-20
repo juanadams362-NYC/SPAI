@@ -17,13 +17,12 @@ struct ActionPanel: View {
     let actions: [QuickAction]
 
     @Environment(AppModel.self) private var appModel
-    @State private var expandedID: UUID?
-
     var body: some View {
         VStack(spacing: SPAISpacing.s + 4) {
             ForEach(actions) { action in
                 actionButton(action)
             }
+            PanelDragHandle(panelID: "actions")
         }
         .padding(SPAISpacing.s + 4)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
@@ -33,49 +32,31 @@ struct ActionPanel: View {
     }
 
     private func actionButton(_ action: QuickAction) -> some View {
-        let isExpanded = expandedID == action.id
-
-        return HStack(spacing: SPAISpacing.s) {
-            if isExpanded {
-                Text(action.label)
-                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, SPAISpacing.m)
-                    .padding(.vertical, SPAISpacing.s)
-                    .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                    .accessibilityHidden(true)
-            }
-
-            Button {
-                // Diagnostic: if this line appears when you press a control and nothing
-                // happens, input is reaching SwiftUI and the problem is downstream. If it
-                // never appears, the press is not landing on the panel at all.
-                SPAILog.debug(.ui, "quick action tapped: \(action.label)")
-                if isExpanded {
-                    action.action()
-                    withAnimation(.easeOut(duration: 0.2)) { expandedID = nil }
-                } else {
-                    withAnimation(.easeOut(duration: 0.2)) { expandedID = action.id }
+        // The earlier two-tap design (first tap expands a label to the LEFT of the button,
+        // second tap runs the action) moved the button rightward in the HStack whenever the
+        // label appeared. visionOS's gaze hover target was still tracking the button's old
+        // position, so the second pinch landed in empty space and the action never fired.
+        // Since every action here is a non-destructive panel toggle, a single tap is correct.
+        Button {
+            // Diagnostic: if this line appears when you press a control and nothing
+            // happens, input is reaching SwiftUI and the problem is downstream. If it
+            // never appears, the press is not landing on the panel at all.
+            SPAILog.debug(.ui, "quick action tapped: \(action.label)")
+            action.action()
+        } label: {
+            Image(systemName: action.icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(action.tint)
+                .frame(width: 52, height: 52)
+                .background(action.tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+                .overlay {
+                    RoundedRectangle(cornerRadius: SPAIRadius.medium)
+                        .stroke(action.tint.opacity(0.5), lineWidth: 1)
                 }
-            } label: {
-                Image(systemName: action.icon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(action.tint)
-                    .frame(width: 52, height: 52)
-                    .background(action.tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SPAIRadius.medium)
-                            .stroke(action.tint.opacity(0.5), lineWidth: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
-            // Icon-only buttons read as nothing to VoiceOver, and this one
-            // needs two taps, so say what each tap does.
-            .accessibilityLabel(action.label)
-            .accessibilityHint(isExpanded ? "Double tap to run" : "Double tap to confirm, then again to run")
         }
+        .buttonStyle(.plain)
+//            .spaiHitTarget()
+        .accessibilityLabel(action.label)
     }
 }
 

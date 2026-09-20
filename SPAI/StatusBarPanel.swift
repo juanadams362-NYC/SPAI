@@ -13,30 +13,31 @@ struct StatusBarPanel: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openWindow) private var openWindow
 
-    @State private var sessionSeconds: Int = 0
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
     var body: some View {
-        HStack(spacing: SPAISpacing.l) {
-            identityBlock
-            divider
-            sessionTimeBlock
-            divider
-            roleBlock
-            divider
-            modeBlock
-            Spacer(minLength: SPAISpacing.xl)
-            controlButtons
+        VStack(spacing: 0) {
+            HStack(spacing: SPAISpacing.l) {
+                identityBlock
+                divider
+                sessionTimeBlock
+                divider
+                roleBlock
+                divider
+                modeBlock
+                Spacer(minLength: SPAISpacing.xl)
+                controlButtons
+            }
+            .padding(.horizontal, SPAISpacing.l)
+            .padding(.vertical, SPAISpacing.m)
+            PanelDragHandle(panelID: "statusBar")
+                .padding(.horizontal, SPAISpacing.m)
+                .padding(.bottom, SPAISpacing.xs)
         }
-        .padding(.horizontal, SPAISpacing.l)
-        .padding(.vertical, SPAISpacing.m)
         // Wider than before: the four inline role pills need the room the role menu didn't.
         .frame(width: 1440)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
-        .onReceive(timer) { _ in sessionSeconds += 1 }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Status bar. Session time \(formattedTime). Role \(appModel.role.rawValue). Detection \(detectionService.mode.rawValue).")
+        .accessibilityLabel("Status bar. Role \(appModel.role.rawValue). Detection \(detectionService.mode.rawValue).")
     }
 
     private var identityBlock: some View {
@@ -56,25 +57,20 @@ struct StatusBarPanel: View {
         }
     }
 
+    // Extracted into its own view so the 1-second timer tick only re-renders the
+    // clock display. When sessionSeconds lived on StatusBarPanel itself the entire
+    // body re-evaluated every second, including controlButtons — and a re-render
+    // that overlapped with visionOS's ~150 ms pinch-recognition window could cancel
+    // the gesture before the button action fired.
     private var sessionTimeBlock: some View {
-        HStack(spacing: 8) {
-            Text("SESSION TIME")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.7))
-            Text(formattedTime)
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s)
-        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        SessionTimeView()
     }
 
     /// Roles are laid out inline rather than behind a `Menu`. A menu costs two pinches — one
     /// to open it, one to choose — and it hid the feature entirely: the tester never worked
     /// out that roles existed. Every role is now visible and one pinch away.
     private var roleBlock: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 10) {
             Text("ROLE")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.55))
@@ -89,14 +85,14 @@ struct StatusBarPanel: View {
                         .font(.system(size: 13, weight: isOn ? .bold : .medium))
                         .foregroundStyle(isOn ? Color.black : .white.opacity(0.85))
                         .padding(.horizontal, SPAISpacing.s + 2)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 14)
                         .background(
                             isOn ? AnyShapeStyle(SPAIColor.accent) : AnyShapeStyle(Color.white.opacity(0.10)),
                             in: Capsule()
                         )
                 }
                 .buttonStyle(.plain)
-                .spaiHitTarget(minSize: 40, pop: 1.10)
+//                .spaiHitTarget(minSize: 40, pop: 1.10)
                 .accessibilityLabel("\(role.rawValue) role")
                 .accessibilityAddTraits(isOn ? [.isSelected] : [])
                 // Pulse all role pills when the tour step is waiting on a role change.
@@ -133,7 +129,7 @@ struct StatusBarPanel: View {
                 barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("Ask SPAI")
             .accessibilityValue(appModel.isVisible("chat") ? "Open" : "Closed")
             .accessibilityHint("Opens the assistant, which knows your current step")
@@ -156,7 +152,7 @@ struct StatusBarPanel: View {
                 barButtonLabel("Settings", icon: "gearshape.fill", tint: SPAIColor.secondary)
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("Settings")
             .accessibilityValue(appModel.isSettingsWindowOpen ? "Open" : "Closed")
             .accessibilityAddTraits(appModel.isSettingsWindowOpen ? [.isSelected] : [])
@@ -177,7 +173,7 @@ struct StatusBarPanel: View {
                 barButtonLabel("End Session", icon: "xmark.circle.fill", tint: SPAIColor.critical)
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("End session")
             .accessibilityHint("Closes the immersive workspace and returns to the home window")
         }
@@ -201,10 +197,30 @@ struct StatusBarPanel: View {
         Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 36)
     }
 
-    private var formattedTime: String {
-        let minutes = sessionSeconds / 60
-        let seconds = sessionSeconds % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+}
+
+/// Owns the session timer so only this small view re-renders on each tick.
+private struct SessionTimeView: View {
+    @State private var seconds: Int = 0
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("SESSION TIME")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.7))
+            Text(formatted)
+                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, SPAISpacing.m)
+        .padding(.vertical, SPAISpacing.s)
+        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        .onReceive(timer) { _ in seconds += 1 }
+    }
+
+    private var formatted: String {
+        String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }
 

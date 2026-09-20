@@ -89,7 +89,7 @@ struct HomeView: View {
                         .shadow(color: SPAIColor.primary.opacity(0.4), radius: 20, y: 8)
                     }
                     .buttonStyle(.plain)
-                    .spaiHitTarget()
+//                    .spaiHitTarget()
                     .accessibilityLabel("Enter sterile prep workflow")
                     .accessibilityHint("Opens the spatial workspace and starts a session")
                     .disabled(appModel.immersiveSpaceState != .closed)
@@ -111,7 +111,7 @@ struct HomeView: View {
                             .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
                     }
                     .buttonStyle(.plain)
-                    .spaiHitTarget()
+//                    .spaiHitTarget()
                     .accessibilityLabel("Settings")
                     .accessibilityHint("Opens settings, where the guided tour can be replayed")
                 }

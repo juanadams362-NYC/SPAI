@@ -79,7 +79,7 @@ struct TourInterruptPopup: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .spaiHitTarget(minSize: 32)
+//                .spaiHitTarget(minSize: 32)
                 .accessibilityLabel("Dismiss")
             }
 
@@ -105,7 +105,7 @@ struct TourInterruptPopup: View {
                     .foregroundStyle(.white.opacity(0.65))
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("Skip tour")
         }
         .padding(SPAISpacing.m)

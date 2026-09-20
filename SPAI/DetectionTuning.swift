@@ -89,6 +89,42 @@ enum DetectionTuning {
     /// flicker during testing.
     static let clearFrameCount: Int = 3
 
+    // MARK: - Detection Zone
+
+    /// Fraction of the camera frame width that forms the detection zone.
+    ///
+    /// The AVP main camera covers roughly 90° horizontal FoV. The central work surface
+    /// (a 60 cm tray at ~60 cm working distance) subtends about 56° — so 62% of the frame
+    /// captures the whole tray while excluding walls and the far periphery.
+    static let detectionZoneWidthFraction: Double = 0.62
+
+    /// Fraction of the camera frame height that forms the detection zone.
+    ///
+    /// 55% keeps the full work surface in frame while cutting the ceiling. The zone is
+    /// centred on the frame by default and shifted by `detectionZoneVerticalOffset`.
+    static let detectionZoneHeightFraction: Double = 0.55
+
+    /// Vertical shift of the zone centre, as a fraction of frame height.
+    ///
+    /// `0.0` = centred on the frame. Positive values shift the zone downward (toward the
+    /// bench). Negative values shift it upward. Tune after first hardware test to align
+    /// with the tech's actual gaze-to-bench geometry.
+    static let detectionZoneVerticalOffset: Double = 0.0
+
+    // MARK: - Head Stability Gate
+
+    /// Seconds the user's head must remain within `headYawThresholdDegrees` of its
+    /// reference bearing before a frame is sent to detection.
+    ///
+    /// 1.5 s sits above a natural glance (≈0.5–0.8 s) and well below the 3+ seconds
+    /// it takes to deliberately turn toward a colleague, so transient looks don't trigger
+    /// detection but sustained gaze on the work surface does.
+    static let headYawStableSeconds: TimeInterval = 1.5
+
+    /// Maximum angular deviation (degrees) from the reference yaw that still counts as
+    /// "stable". Covers normal micro-movements and nodding while working.
+    static let headYawThresholdDegrees: Float = 10.0
+
     // MARK: - Class vocabulary
 
     /// Vocabulary that identifies a detection as a surgical instrument.

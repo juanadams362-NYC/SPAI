@@ -8,7 +8,6 @@ import SwiftUI
 struct GuidedStepPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(DetectionService.self) private var detectionService
-    @Environment(ContinuityCameraService.self) private var continuityCamera
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var consecutiveVerifiedSamples = 0
@@ -103,16 +102,17 @@ struct GuidedStepPanel: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, SPAISpacing.m)
-                        .padding(.vertical, SPAISpacing.s)
+                        .padding(.vertical, SPAISpacing.s + 4)
                         .background(satisfied ? SPAIColor.primary : SPAIColor.neutralMid.opacity(0.4),
                                     in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
-                .spaiHitTarget()
+//                .spaiHitTarget()
                 .disabled(!satisfied)
                 .accessibilityLabel(isLast ? "Finish station" : "Next step")
                 .accessibilityHint(satisfied ? "Ready" : "Waiting for detection to confirm this step")
             }
+            PanelDragHandle(panelID: "guided")
         }
         .padding(SPAISpacing.l)
         .frame(width: 380)
@@ -182,8 +182,16 @@ struct GuidedStepPanel: View {
     // MARK: - "SPAI can't see anything yet"
 
     /// Whether SPAI has any way of seeing the user's work right now.
+    ///
+    /// On device, CameraFrameService starts automatically when the immersive space opens, so
+    /// detection input is always present — no manual action required from the user.
+    /// On the simulator, there is no live camera: only a manually-uploaded still image counts.
     private var hasDetectionInput: Bool {
-        continuityCamera.isRunning || detectionService.hasResult
+        #if targetEnvironment(simulator)
+        return detectionService.hasResult
+        #else
+        return true
+        #endif
     }
 
     /// This step is blocked on a detection that can never arrive, because nothing is feeding
@@ -221,11 +229,11 @@ struct GuidedStepPanel: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, SPAISpacing.m)
-                    .padding(.vertical, SPAISpacing.s)
+                    .padding(.vertical, SPAISpacing.s + 4)
                     .background(SPAIColor.warning.opacity(0.9), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
-            .spaiHitTarget(pop: 1.10)
+//            .spaiHitTarget(pop: 1.10)
             .accessibilityLabel("Show SPAI an image or video")
             .accessibilityHint("Opens the upload window so this step can be verified")
         }

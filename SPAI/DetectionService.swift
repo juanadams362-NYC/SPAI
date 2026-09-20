@@ -18,8 +18,6 @@ final class DetectionService {
     private let client = BackendClient()
     private let onDevice = OnDeviceDetector()
     
-    private let instrumentSteps: Set<SterileStep> = [.decontamination, .inspection, .trayAssembly]
-    
     var mode: DetectionMode = .cloud
     
     var trayState: String?
@@ -94,6 +92,17 @@ final class DetectionService {
     }
 
     func detect(image: UIImage, step: SterileStep?, preferOnDevice: Bool = false) async {
+        // When step is nil (still image / video with no workflow context) default to running
+        // PPE detection but not instrument detection.
+        let wantPPE = step?.needsPPEDetection ?? true
+        let wantInstruments = step?.needsInstrumentDetection ?? false
+        let wantTrayVerdict = (step == .trayAssembly)
+
+        guard wantPPE || wantInstruments else {
+            SPAILog.debug(.detection, "skipping — step \(step?.title ?? "none") needs neither PPE nor instrument detection")
+            return
+        }
+
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
@@ -102,19 +111,17 @@ final class DetectionService {
         lastPathNote = nil
         trayState = nil
         instrumentCount = nil
-        
-        let wantInstruments = step.map { instrumentSteps.contains($0) } ?? false
-        let wantTrayVerdict = (step == .trayAssembly)
 
         if preferOnDevice, onDevice.isAvailable {
-            let local = await detectOnDevice(image: image, wantInstruments: wantInstruments, wantTrayVerdict: wantTrayVerdict)
+            let local = await detectOnDevice(image: image, wantPPE: wantPPE, wantInstruments: wantInstruments, wantTrayVerdict: wantTrayVerdict)
             applyResult(local, mode: .onDevice)
             SPAILog.debug(.detection, "on-device preferred: \(local.count) detections")
             return
         }
         
         do {
-            async let ppeTask = client.detect(image: image)
+            // Skip the PPE network call entirely when the step doesn't require it.
+            async let ppeTask: DetectResponse? = wantPPE ? client.detect(image: image) : nil
             async let trayTask: TrayDetectResponse? = wantInstruments
                 ? client.detectTray(image: image)
                 : nil
@@ -122,7 +129,8 @@ final class DetectionService {
             let ppe = try await ppeTask
             let tray = try await trayTask
 
-            var merged = ppe.detections.filter { Self.isPPEClass($0.className) }
+            var merged: [BackendDetection] = []
+            if let ppe { merged = ppe.detections.filter { Self.isPPEClass($0.className) } }
             if let tray { merged += tray.detections }
 
             // Same acceptance rules as the on-device path. The backend applies its own
@@ -146,12 +154,12 @@ final class DetectionService {
             }
 
             applyResult(merged, mode: .cloud)
-            SPAILog.debug(.detection, "cloud: step=\(step?.title ?? "none"), kept \(merged.count)/\(before), \(ppe.inferenceTimeMs)ms")
+            SPAILog.debug(.detection, "cloud: step=\(step?.title ?? "none"), kept \(merged.count)/\(before), PPE:\(ppe?.inferenceTimeMs ?? 0)ms")
         } catch {
             SPAILog.error(.detection, "cloud failed (\(error.localizedDescription)) — trying on-device")
 
             if onDevice.isAvailable {
-                let local = await detectOnDevice(image: image, wantInstruments: wantInstruments, wantTrayVerdict: wantTrayVerdict)
+                let local = await detectOnDevice(image: image, wantPPE: wantPPE, wantInstruments: wantInstruments, wantTrayVerdict: wantTrayVerdict)
                 applyResult(local, mode: .onDevice)
                 // Say *why* we fell back. Silently switching model and threshold because a URL
                 // has a typo is exactly how the same build behaves differently on two machines.
@@ -169,11 +177,16 @@ final class DetectionService {
 
     private func detectOnDevice(
         image: UIImage,
+        wantPPE: Bool,
         wantInstruments: Bool,
         wantTrayVerdict: Bool
     ) async -> [BackendDetection] {
-        var local = await onDevice.detect(image: image)
-            .filter { Self.isPPEClass($0.className) }
+        var local: [BackendDetection] = []
+
+        if wantPPE {
+            local = await onDevice.detect(image: image)
+                .filter { Self.isPPEClass($0.className) }
+        }
 
         if wantInstruments && onDevice.hasInstruments {
             let instruments = await onDevice.detectInstruments(image: image)

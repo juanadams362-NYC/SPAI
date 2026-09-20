@@ -30,6 +30,7 @@ struct ChatPanel: View {
             header
             messageList
             inputBar
+            PanelDragHandle(panelID: "chat")
         }
         .padding(SPAISpacing.l)
         .frame(width: 340, height: 440)
@@ -129,7 +130,7 @@ struct ChatPanel: View {
                         .foregroundStyle(voiceInput.isListening ? SPAIColor.warning : SPAIColor.accent)
                 }
                 .buttonStyle(.plain)
-                .spaiHitTarget()
+//                .spaiHitTarget()
                 .disabled(isWaiting)
                 .accessibilityLabel(voiceInput.isListening ? "Stop voice input" : "Start voice input")
 
@@ -138,7 +139,7 @@ struct ChatPanel: View {
                         .font(.system(size: 26))
                 }
                 .buttonStyle(.plain)
-                .spaiHitTarget()
+//                .spaiHitTarget()
                 .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || isWaiting)
                 .accessibilityLabel("Send question")
             }

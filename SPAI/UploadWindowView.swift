@@ -45,7 +45,6 @@ struct UploadWindowView: View {
     @State private var batchIndex: Int = 0
     @State private var batchTimer: Timer?
     @State private var isBatchMode: Bool = false
-    @State private var showContinuityCamera: Bool = false
 
     var body: some View {
         VStack(spacing: SPAISpacing.m) {
@@ -70,7 +69,7 @@ struct UploadWindowView: View {
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
 
             Button {
                 isFileImporterPresented = true
@@ -83,27 +82,7 @@ struct UploadWindowView: View {
                     .background(SPAIColor.secondary.opacity(0.8), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
-
-            #if !targetEnvironment(simulator)
-            Button {
-                showContinuityCamera.toggle()
-            } label: {
-                Label(showContinuityCamera ? "Hide Camera" : "Use Live Camera", systemImage: "iphone.and.arrow.forward")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SPAISpacing.s + 2)
-                    .background(SPAIColor.accent.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-            }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
-
-            if showContinuityCamera {
-                Divider().padding(.vertical, SPAISpacing.s)
-                ContinuityCameraMini()
-            }
-            #endif
+//            .spaiHitTarget()
 
             if isLoadingMedia {
                 ProgressView("Loading media…")
@@ -287,8 +266,12 @@ struct UploadWindowView: View {
         service.resetStability()
 
         videoService.onFrame = { frame in
+            // Apply the same zone crop as the live-camera path so video detection
+            // uses the central passthrough rectangle, not the full frame. No head-yaw
+            // gate here — video is a recording; there is no live gaze signal.
+            let zoned = frame.croppedToDetectionZone()
             await service.detect(
-                image: frame,
+                image: zoned,
                 step: SterileStep(rawValue: appModel.currentStepIndex),
                 preferOnDevice: shouldPreferOnDeviceForVideo
             )
@@ -311,7 +294,7 @@ struct UploadWindowView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Test Detection").font(.title2.bold())
-                Text("Upload images/videos or use live camera")
+                Text("Upload images or videos to run detection")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -323,7 +306,7 @@ struct UploadWindowView: View {
                     .font(.title2).foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
         }
     }
 
@@ -379,7 +362,7 @@ struct UploadWindowView: View {
                             .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
                     .buttonStyle(.plain)
-                    .spaiHitTarget()
+//                    .spaiHitTarget()
                 }
             } else {
                 Button {
@@ -393,7 +376,7 @@ struct UploadWindowView: View {
                         .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
-                .spaiHitTarget()
+//                .spaiHitTarget()
 
                 if videoService.framesProcessed > 0 {
                     Text("\(videoService.framesProcessed) frames processed, \(videoService.framesSkipped) skipped. Watch the detection and workflow panels.")
@@ -509,104 +492,3 @@ struct UploadWindowView: View {
     }
 }
 
-// MARK: - Continuity Camera Mini Component
-
-struct ContinuityCameraMini: View {
-    @Environment(AppModel.self) private var appModel
-    @Environment(DetectionService.self) private var detectionService
-    @Environment(ContinuityCameraService.self) private var cameraService
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            HStack {
-                Text("LIVE CAMERA")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(.white.opacity(0.7))
-                Spacer()
-                Text(cameraService.status.label)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(cameraService.status.color)
-            }
-
-            ZStack {
-                RoundedRectangle(cornerRadius: SPAIRadius.small)
-                    .fill(.white.opacity(0.05))
-                    .frame(height: 140)
-
-                if let img = cameraService.latestImage {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.small))
-                } else {
-                    VStack(spacing: 6) {
-                        Image(systemName: "iphone.radiowaves.left.and.right")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.white.opacity(0.4))
-                        Text("Waiting for device...")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-                }
-            }
-
-            HStack(spacing: SPAISpacing.s) {
-                Button {
-                    // Starting the camera is a new subject; clear any held alert.
-                    detectionService.resetStability()
-                    cameraService.start()
-                } label: {
-                    Label("Start", systemImage: "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SPAISpacing.xs + 2)
-                        .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                }
-                .buttonStyle(.plain)
-                .spaiHitTarget()
-
-                Button {
-                    cameraService.stop()
-                } label: {
-                    Label("Stop", systemImage: "stop.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SPAISpacing.xs + 2)
-                        .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                }
-                .buttonStyle(.plain)
-                .spaiHitTarget()
-            }
-
-            Toggle(isOn: Binding(
-                get: { cameraService.detectionEnabled },
-                set: { cameraService.detectionEnabled = $0 }
-            )) {
-                Text("Run detection on feed")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-            .toggleStyle(.switch)
-            .tint(SPAIColor.primary)
-        }
-        .padding(SPAISpacing.m)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
-        .onAppear {
-            cameraService.onFrameForDetection = { ui in
-                await detectionService.detect(
-                    image: ui,
-                    step: SterileStep(rawValue: appModel.currentStepIndex),
-                    preferOnDevice: false
-                )
-            }
-        }
-        .onDisappear {
-            cameraService.detectionEnabled = false
-            cameraService.stop()
-        }
-    }
-}

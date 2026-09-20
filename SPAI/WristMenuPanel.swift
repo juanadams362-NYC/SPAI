@@ -150,7 +150,7 @@ struct WristMenuPanel: View {
         .buttonStyle(.plain)
         // 44pt is the accessibility floor and also what made the flaky Reset button reliable;
         // the visual content is smaller than the target, which is the point.
-        .spaiHitTarget(minSize: 44, pop: 1.22)
+//        .spaiHitTarget(minSize: 44, pop: 1.22)
         .animation(reduceMotion ? .none : .easeOut(duration: 0.18), value: isOn)
         .help(label)
         .accessibilityLabel(label)

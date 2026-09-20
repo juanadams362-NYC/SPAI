@@ -97,26 +97,27 @@ struct ImmersiveView: View {
 
         #if !targetEnvironment(simulator)
         .task {
-            // SCRUM-80: the AVP main camera feeds live frames straight into the same
-            // `DetectionService.detect` the rest of the pipeline already uses — not
-            // `detectStill`, which resets the contamination-alert stability because a picked
-            // photo is a new subject. A camera frame is the next frame of the current one, so
-            // it takes the continuous path on purpose.
+            // SCRUM-80 / SCRUM-114: the AVP main camera feeds live frames into
+            // DetectionService via CameraFrameService, which now applies two filters
+            // before calling onFrameForDetection:
             //
-            // Simulator never reaches this: `CameraFrameProvider` compiles fine there (it's
-            // not a device-only type), but this whole task sits behind the same
-            // `#if !targetEnvironment(simulator)` that guards `cameraService.stop()` below —
-            // so the simulator keeps using photo upload untouched, and device is the only
-            // path that ever calls `start()`.
+            //   1. Head-stability gate — frames are skipped while the head is moving
+            //      (yaw change > DetectionTuning.headYawThresholdDegrees), so a brief
+            //      glance to the side doesn't trigger detection on whatever happens to
+            //      be centred at that moment.
             //
-            // Main Camera Access is an Enterprise entitlement that is not fully provisioned
-            // yet — CameraFrameService.start() already handles that: it logs a clear error
-            // (see `.camera` in Console/Xcode) and leaves the workflow otherwise unaffected
-            // rather than crashing. Don't also open the Upload window's Continuity Camera
-            // while this is running — that would be two camera pipelines feeding detection
-            // at once.
-            cameraService.onFrameForDetection = { readOnlyBuffer in
-                guard let image = UIImage.from(readOnlyBuffer: readOnlyBuffer) else { return }
+            //   2. Zone crop — only the central passthrough rectangle (the "clear space"
+            //      between the arc panels) is sent to detection, not the full ~90° FoV.
+            //      Peripheral objects that never enter the work area are invisible to the
+            //      detection pipeline.
+            //
+            // The callback receives a ready UIImage (already cropped and converted); no
+            // pixel-buffer handling is needed here.
+            //
+            // Main Camera Access is an Enterprise entitlement — CameraFrameService.start()
+            // handles auth failure gracefully (logs, leaves the workflow unaffected).
+            cameraService.headYawProvider = { headAnchor.currentHeadYaw() }
+            cameraService.onFrameForDetection = { image in
                 Task { await detectionService.detect(image: image, step: SterileStep(rawValue: appModel.currentStepIndex)) }
             }
             await cameraService.start()
@@ -137,6 +138,8 @@ struct ImmersiveView: View {
         }
         .onDisappear {
             appModel.immersiveSpaceState = .closed
+            // Clear all drag offsets so the next session starts from the default arc layout.
+            appModel.resetAllDragOffsets()
             #if !targetEnvironment(simulator)
             cameraService.stop()
             #endif
@@ -192,7 +195,9 @@ struct ImmersiveView: View {
             setEnabled("workflow",  attachments)
             setEnabled("chat", attachments)
             setEnabled("history", attachments)
+            #if targetEnvironment(simulator)
             setEnabled("upload", attachments)
+            #endif
             setEnabled("actions", attachments)
 
             // The wrist panels stay enabled and fade themselves out when tracking drops.
@@ -200,6 +205,16 @@ struct ImmersiveView: View {
             // mid-animation and read as the same abrupt pop the freeze did.
             attachments.entity(for: "stationPicker")?.isEnabled = true
             attachments.entity(for: "wristMenu")?.isEnabled = true
+
+            // Apply drag offsets in real-time while the user moves a panel handle.
+            // Reading appModel.panelDragOffsets here registers it as an Observable dependency,
+            // so the update closure re-runs whenever any offset changes during a drag gesture.
+            // Guard: skip wrist panels (repositioned by wrist anchors) and mid-animation ones.
+            for id in Self.layout.keys
+            where id != "wristMenu" && id != "stationPicker" && !entranceLog.isAnimating(id) {
+                guard appModel.dragOffset(for: id) != .zero else { continue }
+                attachments.entity(for: id)?.position = effectivePosition(for: id)
+            }
 
             updateWristAnchor(
                 "wristMenu", attachments,
@@ -228,7 +243,9 @@ struct ImmersiveView: View {
                 entranceLog.appliedEyeHeight = headAnchor.eyeHeight
                 for id in Self.layout.keys
                 where id != "wristMenu" && id != "stationPicker" && !entranceLog.isAnimating(id) {
-                    attachments.entity(for: id)?.position = arcPosition(for: id)
+                    // effectivePosition = arcPosition + any drag offset the user has applied,
+                    // so recalibration doesn't snap a repositioned panel back to the arc.
+                    attachments.entity(for: id)?.position = effectivePosition(for: id)
                 }
 
                 // Diagnostic. The arc is laid out against `headAnchor.eyeHeight`, which is read
@@ -279,15 +296,35 @@ struct ImmersiveView: View {
             }
 
             updateTourCard(attachments)
+            // Keep the tour card facing the user on every frame once its entrance animation
+            // completes — the same per-frame pattern that regular panels use via the
+            // `Self.layout.keys` loop above. "tour" is not in that dict, so it was never
+            // included, which is why the card froze at the heading it had when the animation
+            // started and drifted as the user moved their head.
+            //
+            // The wristMenu anchor already handles its own per-frame facing inside
+            // updateTourCard (it must follow a live wrist pose), so skip it here.
+            //
+            // Guard against isTourAnimating for the same reason the regular-panel loop
+            // guards against entranceLog.isAnimating: writing orientation directly while
+            // move(to:) is running cancels its rotation track on the spot.
+            if appModel.tour.isVisible,
+               appModel.tour.anchor != .wristMenu,
+               !entranceLog.isTourAnimating,
+               let tourCard = attachments.entity(for: "tour"),
+               let head = headAnchor.currentHeadPosition() {
+                face(tourCard, towards: head)
+            }
             // updateTourInterrupt(attachments)
         } attachments: {
             Attachment(id: "statusBar") { StatusBarPanel() }
             Attachment(id: "detection") { DetectionPanel(service: detectionService) }
             Attachment(id: "eventLog")  { EventLogPanel() }
             Attachment(id: "workflow")  { WorkflowProgressPanel() }
-            // Removed: camera panel (functionality merged into upload window)
-            // Attachment(id: "camera")    { ContinuityCameraPanel() }
-            #if true
+            // Simulator only: image-picker upload panel.
+            // On device the ARKit main camera (CameraFrameService) feeds detection
+            // automatically — DetectionUploadPanel must not exist in the view hierarchy.
+            #if targetEnvironment(simulator)
             Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
             #endif
             Attachment(id: "chat") { ChatPanel() }
@@ -369,6 +406,15 @@ struct ImmersiveView: View {
         return [radius * sin(a), y, -radius * cos(a)]
 
     }
+    /// Arc position plus any drag offset the user has accumulated this session.
+    ///
+    /// Every code path that places or repositions a panel should call this rather than
+    /// `arcPosition(for:)` directly so that a dragged panel doesn't snap back to centre
+    /// on the next eye-height recalibration or entrance animation.
+    private func effectivePosition(for id: String) -> SIMD3<Float> {
+        arcPosition(for: id) + appModel.dragOffset(for: id)
+    }
+
     /// World position for a panel's slot, with heights resolved against the wearer's measured
     /// eye line.
     private func arcPosition(for id: String) -> SIMD3<Float> {
@@ -402,7 +448,9 @@ struct ImmersiveView: View {
     /// existence off to one side. Motion out of the button gives the eye something to follow.
     private func animateEntrance(_ id: String, _ attachments: RealityViewAttachments) {
         guard let panel = attachments.entity(for: id) else { return }
-        let home = arcPosition(for: id)
+        // If the panel has been dragged this session, fly to its dragged position rather
+        // than the arc position so it lands where the user left it.
+        let home = effectivePosition(for: id)
 
         // Face the user once, before the flight starts, rather than leaving `updateFacing`
         // to do it mid-animation — see the skip-while-animating note where that loop calls
@@ -512,14 +560,14 @@ struct ImmersiveView: View {
             } else if isFirstPlacement {
                 card.position = target
                 card.scale = SIMD3<Float>(repeating: 0.3)
-                card.move(
+                entranceLog.tourAnimController = card.move(
                     to: Transform(scale: .one, rotation: card.orientation, translation: target),
                     relativeTo: card.parent,
                     duration: 0.45,
                     timingFunction: .easeOut
                 )
             } else {
-                card.move(
+                entranceLog.tourAnimController = card.move(
                     to: Transform(scale: .one, rotation: card.orientation, translation: target),
                     relativeTo: card.parent,
                     duration: 0.6,
@@ -668,9 +716,21 @@ final class PanelEntranceLog {
     /// next `animateEntrance` call for that id — so nothing here needs explicit eviction.
     var inFlight: [String: AnimationPlaybackController] = [:]
 
+    /// The most recent `move(to:)` controller for the tour card. Stored so the per-frame
+    /// orientation update can be skipped while the card is still in flight — writing
+    /// orientation directly during a running `move()` cancels its rotation track and strands
+    /// the card mid-flight (the same failure documented in `updateTourCard`). Once the
+    /// controller reports `.isComplete`, per-frame facing resumes.
+    var tourAnimController: AnimationPlaybackController?
+
     func isAnimating(_ id: String) -> Bool {
         guard let controller = inFlight[id] else { return false }
         return !controller.isComplete
+    }
+
+    var isTourAnimating: Bool {
+        guard let c = tourAnimController else { return false }
+        return !c.isComplete
     }
 }
 

@@ -33,6 +33,7 @@ struct SessionHistoryPanel: View {
             } else {
                 listView
             }
+            PanelDragHandle(panelID: "history")
         }
         .padding(SPAISpacing.l)
         .frame(width: comparePair != nil ? 520 : 400)
@@ -53,9 +54,11 @@ struct SessionHistoryPanel: View {
                 Label("Back", systemImage: "chevron.left")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
+                    .padding(.vertical, SPAISpacing.s + 4)
+                    .padding(.horizontal, SPAISpacing.s)
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("Back to session list")
             Spacer()
         }
@@ -71,9 +74,11 @@ struct SessionHistoryPanel: View {
                 Label("Back", systemImage: "chevron.left")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
+                    .padding(.vertical, SPAISpacing.s + 4)
+                    .padding(.horizontal, SPAISpacing.s)
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel("Back to session list")
             Spacer()
         }
@@ -138,9 +143,11 @@ struct SessionHistoryPanel: View {
                       systemImage: "square.split.2x1")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isComparing ? SPAIColor.warning : SPAIColor.accent)
+                    .padding(.vertical, SPAISpacing.s + 4)
+                    .padding(.horizontal, SPAISpacing.s)
             }
             .buttonStyle(.plain)
-            .spaiHitTarget()
+//            .spaiHitTarget()
             .accessibilityLabel(isComparing ? "Cancel comparing sessions" : "Compare two sessions")
             Spacer()
             if isComparing {
@@ -170,7 +177,7 @@ struct SessionHistoryPanel: View {
                             in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
         .buttonStyle(.plain)
-        .spaiHitTarget()
+//        .spaiHitTarget()
         .disabled(!ready)
         .accessibilityLabel(ready ? "Compare selected sessions" : "Select two sessions to compare")
     }
@@ -255,12 +262,12 @@ struct SessionHistoryPanel: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, SPAISpacing.m)
-                            .padding(.vertical, SPAISpacing.s)
+                            .padding(.vertical, SPAISpacing.s + 4)
                             .background(SPAIColor.neutralMid.opacity(0.5),
                                         in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
                     .buttonStyle(.plain)
-                    .spaiHitTarget()
+//                    .spaiHitTarget()
                     .disabled(safeIndex == 0)
                     .accessibilityLabel("Previous event")
 
@@ -271,12 +278,12 @@ struct SessionHistoryPanel: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, SPAISpacing.m)
-                            .padding(.vertical, SPAISpacing.s)
+                            .padding(.vertical, SPAISpacing.s + 4)
                             .background(SPAIColor.primary,
                                         in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
                     .buttonStyle(.plain)
-                    .spaiHitTarget()
+//                    .spaiHitTarget()
                     .disabled(safeIndex >= events.count - 1)
                     .accessibilityLabel("Next event")
 
@@ -337,7 +344,7 @@ struct SessionHistoryPanel: View {
                         in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
         .buttonStyle(.plain)
-        .spaiHitTarget()
+//        .spaiHitTarget()
         .accessibilityLabel("\(record.dateText). \(record.passed ? "Passed" : "Failed"). \(record.contaminationCount) contamination events. Duration \(record.durationText). Run as \(record.role). \(isComparing ? (isSelected ? "Selected for comparison." : "Tap to select for comparison.") : (isObserver ? "Opens replay." : "Opens report."))")
     }
 
