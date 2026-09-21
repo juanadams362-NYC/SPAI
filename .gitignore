@@ -91,3 +91,5 @@ datasets/
 !SPAI/best.mlpackage/
 !SPAI/best.mlpackage/**
 backend/model/*.mlpackage/
+!SPAI/instruments_best.mlpackage/
+!SPAI/instruments_best.mlpackage/**
