@@ -37,6 +37,9 @@ struct SPAIApp: App {
         .defaultSize(width: 450, height: 700)
         .windowResizability(.contentSize)
 
+        // Upload window: simulator only. On device the main camera feeds detection
+        // automatically — the upload window scene must not exist in the scene graph.
+        #if targetEnvironment(simulator)
         Window("Upload", id: "upload") {
             UploadWindowView()
                 .environment(appModel)
@@ -45,6 +48,7 @@ struct SPAIApp: App {
         .windowStyle(.plain)
         .defaultSize(width: 520, height: 640)
         .windowResizability(.contentSize)
+        #endif
 
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
             ImmersiveView()

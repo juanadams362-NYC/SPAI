@@ -45,9 +45,12 @@ struct ActionPanel: View {
             action.action()
         } label: {
             Image(systemName: action.icon)
-                .font(.system(size: 18, weight: .semibold))
+                // Icon scaled proportionally to the larger hit target.
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(action.tint)
-                .frame(width: 52, height: 52)
+                // 64 pt = SPAILayout.iconButton. At the actions panel's 1.35 m viewing
+                // distance this subtends ≈ 2.7°, comfortably hittable with indirect pinch.
+                .frame(width: SPAILayout.iconButton, height: SPAILayout.iconButton)
                 .background(action.tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
                 .overlay {
                     RoundedRectangle(cornerRadius: SPAIRadius.medium)

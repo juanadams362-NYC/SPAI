@@ -3,11 +3,14 @@
 //  SPAI
 //
 
+// All sizing is now proportional to panelWidth. Change panelWidth to update look everywhere.
+
 import SwiftUI
 
 struct DetectionPanel: View {
     @Environment(AppModel.self) private var appModel
     let service: DetectionService
+    var panelWidth: CGFloat = 350 // Default for previews and fallback
     private let environment = EnvironmentService.shared
 
     private let positivePressure = true
@@ -35,17 +38,17 @@ struct DetectionPanel: View {
     /// behaved differently from the one next to it with no way to tell. This is the panel the
     /// user is already reading when they wonder why detection looks off.
     private func degradedBanner(_ note: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: panelWidth * 0.017) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: panelWidth * 0.031, weight: .semibold))
                 .foregroundStyle(SPAIColor.warning)
             Text(note)
-                .font(.system(size: 11))
+                .font(.system(size: panelWidth * 0.031))
                 .foregroundStyle(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, SPAISpacing.s)
-        .padding(.vertical, 6)
+        .padding(.horizontal, panelWidth * 0.02)
+        .padding(.vertical, panelWidth * 0.017)
         .background(SPAIColor.warning.opacity(0.14), in: RoundedRectangle(cornerRadius: SPAIRadius.small - 4))
         .overlay(
             RoundedRectangle(cornerRadius: SPAIRadius.small - 4)
@@ -55,7 +58,7 @@ struct DetectionPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+        VStack(alignment: .leading, spacing: panelWidth * 0.02) {
             header
             if let note = service.lastPathNote { degradedBanner(note) }
             contaminationRow
@@ -65,8 +68,8 @@ struct DetectionPanel: View {
             ppeRow
             PanelDragHandle(panelID: "detection")
         }
-        .padding(SPAISpacing.l)
-        .frame(width: 300, alignment: .leading)
+        .padding(panelWidth * 0.07)
+        .frame(width: panelWidth, alignment: .leading)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.4), value: riskHigh)
@@ -79,8 +82,7 @@ struct DetectionPanel: View {
                 : "Detection. Nothing detected yet — show SPAI an image, video, or live camera."
         )
         .onChange(of: service.contaminationRisk) { old, new in
-            
-    
+
             if old < 0.5 && new >= 0.5 && appModel.shouldHaltOnBareHand {
                 SoundManager.shared.playContaminationAlert()
                 // force: a safety alert speaks whether or not the user
@@ -104,51 +106,55 @@ struct DetectionPanel: View {
     private var header: some View {
         HStack {
             Text("DETECTION")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .font(.system(size: panelWidth * 0.037, weight: .bold, design: .monospaced))
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.85))
             Spacer()
             if service.isLoading {
                 Text("…")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: panelWidth * 0.034, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.85))
+                    .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
             } else if riskHigh {
-                HStack(spacing: 6) {
-                    Circle().fill(SPAIColor.warning).frame(width: 7, height: 7)
+                HStack(spacing: panelWidth * 0.017) {
+                    Circle().fill(SPAIColor.warning).frame(width: panelWidth * 0.02, height: panelWidth * 0.02)
                     Text("RISK")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(.system(size: panelWidth * 0.034, weight: .bold, design: .monospaced))
                         .foregroundStyle(SPAIColor.warning)
                 }
+                .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
             }
         }
     }
 
     private var contaminationRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: panelWidth * 0.028) {
             Circle()
                 .fill(riskHigh ? SPAIColor.warning : SPAIColor.safe)
-                .frame(width: 10, height: 10)
-                .shadow(color: (riskHigh ? SPAIColor.warning : SPAIColor.safe).opacity(0.8), radius: 4)
+                .frame(width: panelWidth * 0.028, height: panelWidth * 0.028)
+                .shadow(color: (riskHigh ? SPAIColor.warning : SPAIColor.safe).opacity(0.8), radius: panelWidth * 0.011)
             Text("Contamination risk")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: panelWidth * 0.045, weight: .semibold))
                 .foregroundStyle(.white)
             Spacer()
             if service.hasResult {
                 Text("\(Int(contaminationRisk * 100))%")
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .font(.system(size: panelWidth * 0.057, weight: .bold, design: .monospaced))
                     .foregroundStyle(riskHigh ? SPAIColor.warning : SPAIColor.safe)
+                    .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
             } else {
                 Text("—")
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .font(.system(size: panelWidth * 0.057, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.6))
+                    .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
             }
         }
     }
 
     private var environmentSection: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+        VStack(alignment: .leading, spacing: panelWidth * 0.017) {
             Text("ENVIRONMENT (LIVE)")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .font(.system(size: panelWidth * 0.034, weight: .bold, design: .monospaced))
                 .tracking(1.2)
                 .foregroundStyle(.white.opacity(0.75))
             if let temperatureF = environment.temperatureF {
@@ -173,35 +179,37 @@ struct DetectionPanel: View {
     }
 
     private func environmentRow(icon: String, label: String, value: String, ok: Bool) -> some View {
-        HStack(spacing: 10) {
-            Circle().fill(ok ? SPAIColor.safe : SPAIColor.warning).frame(width: 8, height: 8)
+        HStack(spacing: panelWidth * 0.028) {
+            Circle().fill(ok ? SPAIColor.safe : SPAIColor.warning).frame(width: panelWidth * 0.023, height: panelWidth * 0.023)
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.system(size: panelWidth * 0.04))
                 .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 18)
+                .frame(width: panelWidth * 0.051)
             Text(label)
-                .font(.system(size: 14))
+                .font(.system(size: panelWidth * 0.04))
                 .foregroundStyle(.white.opacity(0.95))
             Spacer()
             Text(value)
-                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .font(.system(size: panelWidth * 0.04, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white)
         }
+        .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
     }
 
     private var ppeRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: panelWidth * 0.023) {
             Image(systemName: ppePassing ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 15))
+                .font(.system(size: panelWidth * 0.043))
                 .foregroundStyle(ppePassing ? SPAIColor.safe : SPAIColor.warning)
             Text(ppeText)
-                .font(.system(size: 14))
+                .font(.system(size: panelWidth * 0.04))
                 .foregroundStyle(.white.opacity(0.95))
             Spacer()
             Text("glove · hand")
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: panelWidth * 0.034, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.7))
         }
+        .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
     }
 
     private var divider: some View {
@@ -210,7 +218,7 @@ struct DetectionPanel: View {
 }
 
 #Preview {
-    DetectionPanel(service: DetectionService())
+    DetectionPanel(service: DetectionService(), panelWidth: 350)
         .environment(AppModel())
         .padding(60)
         .background(.black)

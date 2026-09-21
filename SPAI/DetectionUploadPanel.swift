@@ -11,6 +11,8 @@ struct DetectionUploadPanel: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
+    var panelWidth: CGFloat = SPAILayout.compactWidth
+
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             Text("SIM TEST")
@@ -31,7 +33,7 @@ struct DetectionUploadPanel: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .padding(.horizontal, SPAISpacing.l)
-                    .padding(.vertical, SPAISpacing.s + 2)
+                    .padding(.vertical, SPAILayout.buttonVPad)
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
@@ -63,7 +65,7 @@ struct DetectionUploadPanel: View {
             PanelDragHandle(panelID: "upload")
         }
         .padding(SPAISpacing.l)
-        .frame(width: 260)
+        .frame(width: panelWidth)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .accessibilityElement(children: .contain)

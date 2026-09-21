@@ -18,6 +18,14 @@ private struct PanelSlot {
     let radius: Float
 }
 
+///
+/// All panels and controls in this immersive space should use the shared `panelWidth`
+/// for frames, font sizes, button heights, padding, and spacing. This ensures a single
+/// cohesive proportional sizing system across the app.
+///
+/// All interactive controls (buttons) must enforce min hit area with `.spaiHitTarget(minSize: max(44, panelWidth * 0.13), pop: 1.08)`
+/// or equivalent. Visual size and hit area must be proportional to `panelWidth` everywhere.
+///
 struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.scenePhase) private var scenePhase
@@ -32,11 +40,19 @@ struct ImmersiveView: View {
     @State private var handTracking = HandTrackingService()
     @State private var headAnchor = HeadAnchorService()
 
+    @State private var cameraUnavailable: Bool = false
+    @State private var cameraErrorMessage: String? = nil
+
     /// Not `@State`: this is bookkeeping for the entrance animation, and mutating it must not
     /// invalidate the view — doing that from inside a RealityView update closure would loop.
     @State private var entranceLog = PanelEntranceLog()
 
     private let arcRadius: Float = 1.25
+
+    /// Shared panel width for consistent proportional sizing
+    // Each panel receives its own width from SPAILayout so the whole arc scales from
+    // one place. See DesignTokens.swift for the rationale behind each value.
+    // Update this value to adjust all panel and content sizing proportionally
 
     /// The full arc. Angles are degrees clockwise from straight ahead; heights are relative to
     /// the wearer's eye line; radius is metres out.
@@ -65,7 +81,23 @@ struct ImmersiveView: View {
     ]
 
     var body: some View {
-        realityContent
+        ZStack {
+            realityContent
+
+            if let cameraErrorMessage, cameraUnavailable {
+                VStack {
+                    Spacer()
+                    Text(cameraErrorMessage)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                        .background(Color.red.opacity(0.85))
+                        .foregroundColor(.white)
+                        .cornerRadius(16)
+                        .padding()
+                }
+                .transition(.opacity)
+            }
+        }
         .onAppear {
             appModel.immersiveSpaceState = .open
 
@@ -118,9 +150,18 @@ struct ImmersiveView: View {
             // handles auth failure gracefully (logs, leaves the workflow unaffected).
             cameraService.headYawProvider = { headAnchor.currentHeadYaw() }
             cameraService.onFrameForDetection = { image in
-                Task { await detectionService.detect(image: image, step: SterileStep(rawValue: appModel.currentStepIndex)) }
+                // Pass both the station step and the current guided sub-step condition so
+                // DetectionService can gate to exactly the inference this sub-step needs.
+                // A .manual sub-step produces a nil condition → full early-exit in detect().
+                let step = SterileStep(rawValue: appModel.currentStepIndex)
+                let guidedCondition = appModel.currentGuidedStepCondition
+                Task { await detectionService.detect(image: image, step: step, guidedCondition: guidedCondition) }
             }
             await cameraService.start()
+
+            // Check if camera started. If not, fallback to picker/upload panel.
+            cameraUnavailable = !cameraService.isRunning
+            cameraErrorMessage = cameraService.statusMessage
         }
         #endif
         // Entering the workflow dismisses the "home" window, which takes RootSceneView — and
@@ -317,18 +358,19 @@ struct ImmersiveView: View {
             }
             // updateTourInterrupt(attachments)
         } attachments: {
-            Attachment(id: "statusBar") { StatusBarPanel() }
-            Attachment(id: "detection") { DetectionPanel(service: detectionService) }
-            Attachment(id: "eventLog")  { EventLogPanel() }
-            Attachment(id: "workflow")  { WorkflowProgressPanel() }
+            Attachment(id: "statusBar") { StatusBarPanel(panelWidth: SPAILayout.barWidth) }
+            Attachment(id: "detection") { DetectionPanel(service: detectionService, panelWidth: SPAILayout.standardWidth) }
+            Attachment(id: "eventLog")  { EventLogPanel(panelWidth: SPAILayout.standardWidth) }
+            Attachment(id: "workflow")  { WorkflowProgressPanel(panelWidth: SPAILayout.wideWidth) }
             // Simulator only: image-picker upload panel.
             // On device the ARKit main camera (CameraFrameService) feeds detection
             // automatically — DetectionUploadPanel must not exist in the view hierarchy.
             #if targetEnvironment(simulator)
-            Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService) }
+            Attachment(id: "upload")   { DetectionUploadPanel(service: detectionService, panelWidth: SPAILayout.compactWidth) }
             #endif
-            Attachment(id: "chat") { ChatPanel() }
+            Attachment(id: "chat") { ChatPanel(panelWidth: SPAILayout.chatWidth) }
             Attachment(id: "actions") {
+                // TODO: Use panelWidth for all layout, padding, and sizing in this panel.
                 ActionPanel(actions: [
                     QuickAction(label: "Show All", icon: "rectangle.3.group.fill", tint: SPAIColor.secondary) {
                         appModel.showAllPanels()
@@ -350,15 +392,17 @@ struct ImmersiveView: View {
                     }
                 ])
             }
-            Attachment(id: "report") { SessionReportPanel() }
-            Attachment(id: "guided") { GuidedStepPanel() }
-            Attachment(id: "history") { SessionHistoryPanel() }
+            Attachment(id: "report") { SessionReportPanel(panelWidth: SPAILayout.standardWidth) }
+            Attachment(id: "guided") { GuidedStepPanel(panelWidth: SPAILayout.standardWidth) }
+            Attachment(id: "history") { SessionHistoryPanel(panelWidth: SPAILayout.standardWidth) }
             Attachment(id: "wristMenu") {
                 // Right wrist: quick actions, summoned by turning the wrist toward you.
+                // TODO: Use panelWidth for all layout, padding, and sizing in this panel.
                 WristMenuPanel(isPresented: handTracking.rightWristPresented)
             }
             Attachment(id: "stationPicker") {
                 // Left forearm: station picker, summoned by holding the forearm level.
+                // TODO: Use panelWidth for all layout, padding, and sizing in this panel.
                 StationPickerPanel(
                     manager: stationManager,
                     compact: true,
@@ -398,11 +442,19 @@ struct ImmersiveView: View {
             return [0, headAnchor.eyeHeight - 0.12, -1.0]
         }
 
-        // Same bearing as the subject, pulled 0.3 m closer and dropped slightly so the card
-        // reads as sitting in front of the panel it points at.
+        // Same bearing as the subject, pulled 0.3 m closer.
+        //
+        // The card normally drops 0.22 m below the panel centre so it reads as a caption.
+        // Exception: the workflow panel is already low (-0.65 m) and its controls — including
+        // the Start Step button the tour step tells the user to tap — sit at the panel's
+        // bottom edge. A -0.22 offset would place the card (at z = -0.85, closer than the
+        // panel) in front of those controls, making them unreachable while the tour is on
+        // that step. Position the card 0.20 m ABOVE the workflow panel centre instead, so
+        // the step-node track is behind the card but the control row is fully clear.
         let a = slot.angle * .pi / 180
         let radius = max(slot.radius - 0.30, 0.65)
-        let y = headAnchor.eyeHeight + slot.heightAboveEye - 0.22
+        let yOffset: Float = (anchor == .workflow) ? 0.20 : -0.22
+        let y = headAnchor.eyeHeight + slot.heightAboveEye + yOffset
         return [radius * sin(a), y, -radius * cos(a)]
 
     }
@@ -738,4 +790,3 @@ final class PanelEntranceLog {
     ImmersiveView()
         .environment(AppModel())
 }
-

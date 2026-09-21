@@ -81,6 +81,14 @@ struct TourCoachmark: View {
 
                 progressDots
 
+                // waitingPrompt on its own line so the button row beneath it never
+                // overflows — when prompt + "Next" were in the same HStack as "Back"
+                // + "Skip tour" + Spacer, the combined fixed-width content exceeded the
+                // card width and pushed the Next button outside the panel boundary.
+                if let cta = step.callToAction, step.advanceOn != nil {
+                    waitingPrompt(cta)
+                }
+
                 HStack(spacing: SPAISpacing.m) {
                     if tour.stepIndex > 0 {
                         secondaryButton("Back") { tour.back() }
@@ -92,13 +100,9 @@ struct TourCoachmark: View {
 
                     Spacer()
 
-                    if let cta = step.callToAction, step.advanceOn != nil {
-                        // Waiting on the user to do the real thing. "Next" is still offered
-                        // so nobody can get stuck on an action they can't perform.
-                        HStack(spacing: SPAISpacing.s) {
-                            waitingPrompt(cta)
-                            secondaryButton("Next") { tour.next() }
-                        }
+                    if step.advanceOn != nil {
+                        // User must perform the real action; "Next" lets them skip if stuck.
+                        secondaryButton("Next") { tour.next() }
                     } else {
                         primaryButton(tour.stepIndex == tour.steps.count - 1 ? "Finish" : "Next") {
                             tour.next()
@@ -190,7 +194,7 @@ struct TourCoachmark: View {
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(SPAISpacing.l)
-            .frame(width: 420, alignment: .leading)
+            .frame(width: SPAILayout.standardWidth, alignment: .leading)
             .spaiPanelBackground(opacity: 0.92)
             .overlay(
                 RoundedRectangle(cornerRadius: SPAIRadius.large)
@@ -205,13 +209,12 @@ struct TourCoachmark: View {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
-                .padding(.horizontal, SPAISpacing.l)
-                .padding(.vertical, SPAISpacing.s + 2)
+                .padding(.horizontal, SPAILayout.buttonHPad)
+                .padding(.vertical, SPAILayout.buttonVPad)
                 .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 .fixedSize()
         }
         .buttonStyle(.plain)
-//        .spaiHitTarget(pop: 1.10)
         .accessibilityLabel(title)
     }
 
@@ -221,11 +224,10 @@ struct TourCoachmark: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
                 .padding(.horizontal, SPAISpacing.m)
-                .padding(.vertical, SPAISpacing.s + 4)
+                .padding(.vertical, SPAILayout.buttonVPad)
                 .fixedSize()
         }
         .buttonStyle(.plain)
-//        .spaiHitTarget()
         .accessibilityLabel(title)
     }
 }

@@ -5,6 +5,8 @@
 
 import SwiftUI
 
+// All sizing is now proportional to panelWidth. Change panelWidth to update look everywhere.
+
 struct GuidedStepPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(DetectionService.self) private var detectionService
@@ -13,6 +15,8 @@ struct GuidedStepPanel: View {
     @State private var consecutiveVerifiedSamples = 0
     @State private var voiceConfirm = VoiceInputManager()
     @State private var voiceListenEnabled = false
+    
+    var panelWidth: CGFloat = 350 // Default for previews and fallback
 
     private let requiredVerifiedSamples = 3
 
@@ -62,30 +66,30 @@ struct GuidedStepPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+        VStack(alignment: .leading, spacing: panelWidth * 0.02) {
             HStack {
                 Text("GUIDED · \(appModel.currentStep.title.uppercased())")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: panelWidth * 0.045, weight: .bold, design: .monospaced))
                     .tracking(1.5)
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
                 Text("Step \(guidedIndex + 1) of \(script.count)")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(.system(size: panelWidth * 0.034, weight: .semibold, design: .monospaced))
                     .foregroundStyle(SPAIColor.accent)
             }
 
             Text(step.instruction)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: panelWidth * 0.046, weight: .medium))
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
 
             if needsDetectionInput { detectionInputCallout }
 
-            HStack(spacing: SPAISpacing.s) {
+            HStack(spacing: panelWidth * 0.015) {
                 Image(systemName: verificationIcon)
                     .foregroundStyle(satisfied ? SPAIColor.safe : SPAIColor.warning)
                 Text(verificationText)
-                    .font(.system(size: 13))
+                    .font(.system(size: panelWidth * 0.037))
                     .foregroundStyle(.white.opacity(0.85))
 
                 Spacer()
@@ -99,14 +103,15 @@ struct GuidedStepPanel: View {
                 } label: {
                     Label(isLast ? "Finish Station" : "Next Step",
                           systemImage: isLast ? "checkmark.seal" : "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: panelWidth * 0.04, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, SPAISpacing.m)
-                        .padding(.vertical, SPAISpacing.s + 4)
+                        .padding(.horizontal, panelWidth * 0.07)
+                        .padding(.vertical, panelWidth * 0.02 + 4)
                         .background(satisfied ? SPAIColor.primary : SPAIColor.neutralMid.opacity(0.4),
                                     in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
                 .buttonStyle(.plain)
+                .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
 //                .spaiHitTarget()
                 .disabled(!satisfied)
                 .accessibilityLabel(isLast ? "Finish station" : "Next step")
@@ -114,8 +119,8 @@ struct GuidedStepPanel: View {
             }
             PanelDragHandle(panelID: "guided")
         }
-        .padding(SPAISpacing.l)
-        .frame(width: 380)
+        .padding(panelWidth * 0.07)
+        .frame(width: panelWidth)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: appModel.guidedStepIndex)
@@ -205,18 +210,18 @@ struct GuidedStepPanel: View {
     }
 
     private var detectionInputCallout: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.s) {
-            HStack(spacing: SPAISpacing.s) {
+        VStack(alignment: .leading, spacing: panelWidth * 0.015) {
+            HStack(spacing: panelWidth * 0.015) {
                 Image(systemName: "eye.trianglebadge.exclamationmark.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: panelWidth * 0.043, weight: .semibold))
                     .foregroundStyle(SPAIColor.warning)
                 Text("SPAI can't see your work yet")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: panelWidth * 0.04, weight: .bold))
                     .foregroundStyle(.white)
             }
 
             Text("This step is confirmed by what the camera sees. Give SPAI something to look at — upload a photo or video, or connect your iPhone as a camera.")
-                .font(.system(size: 12))
+                .font(.system(size: panelWidth * 0.034))
                 .foregroundStyle(.white.opacity(0.8))
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -226,18 +231,19 @@ struct GuidedStepPanel: View {
                 appModel.announce("Upload opened", icon: "photo.badge.plus")
             } label: {
                 Label("Show SPAI an image or video", systemImage: "photo.badge.plus")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: panelWidth * 0.037, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, SPAISpacing.m)
-                    .padding(.vertical, SPAISpacing.s + 4)
+                    .padding(.horizontal, panelWidth * 0.07)
+                    .padding(.vertical, panelWidth * 0.02 + 4)
                     .background(SPAIColor.warning.opacity(0.9), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
             .buttonStyle(.plain)
+            .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
 //            .spaiHitTarget(pop: 1.10)
             .accessibilityLabel("Show SPAI an image or video")
             .accessibilityHint("Opens the upload window so this step can be verified")
         }
-        .padding(SPAISpacing.m)
+        .padding(panelWidth * 0.05)
         .background(SPAIColor.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         .overlay(
             RoundedRectangle(cornerRadius: SPAIRadius.small)
@@ -302,7 +308,7 @@ struct GuidedStepPanel: View {
 }
 
 #Preview {
-    GuidedStepPanel()
+    GuidedStepPanel(panelWidth: 350)
         .environment(AppModel())
         .environment(DetectionService())
         .padding(60)

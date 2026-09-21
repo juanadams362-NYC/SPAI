@@ -130,9 +130,9 @@ struct WristMenuPanel: View {
         Button(action: action) {
             VStack(spacing: 2) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(isOn ? Color.black : tint)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 34, height: 34)
                     .background(
                         isOn ? AnyShapeStyle(tint) : AnyShapeStyle(tint.opacity(0.20)),
                         in: RoundedRectangle(cornerRadius: SPAIRadius.small - 4)

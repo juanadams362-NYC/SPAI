@@ -3,10 +3,13 @@
 //  SPAI
 //
 
+// All sizing is now proportional to panelWidth. Change panelWidth to update look everywhere.
+
 import SwiftUI
 
 struct WorkflowProgressPanel: View {
     @Environment(AppModel.self) private var appModel
+    var panelWidth: CGFloat = 350 // Default for previews and fallback
 
     private var currentStep: SterileStep { appModel.currentStep }
     private var currentStepIndex: Int { appModel.currentStepIndex }
@@ -21,7 +24,7 @@ struct WorkflowProgressPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+        VStack(alignment: .leading, spacing: panelWidth * 0.013) {
             header
 
             HStack(spacing: 0) {
@@ -36,8 +39,8 @@ struct WorkflowProgressPanel: View {
             controls
             PanelDragHandle(panelID: "workflow")
         }
-        .padding(SPAISpacing.l)
-        .frame(width: 760)
+        .padding(panelWidth * 0.021)
+        .frame(width: panelWidth)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
@@ -55,14 +58,14 @@ struct WorkflowProgressPanel: View {
     /// assistant what she was supposed to be doing, because the panel showed progress nodes
     /// but never stated the step in words or gave the next action.
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: SPAISpacing.m) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .firstTextBaseline, spacing: panelWidth * 0.013) {
+            VStack(alignment: .leading, spacing: panelWidth * 0.006) {
                 Text("NOW — \(currentStep.title.uppercased())")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: panelWidth * 0.049, weight: .bold))
                     .foregroundStyle(.white)
 
                 Text(nextActionPrompt)
-                    .font(.system(size: 13))
+                    .font(.system(size: panelWidth * 0.038))
                     .foregroundStyle(.white.opacity(0.7))
             }
 
@@ -70,7 +73,7 @@ struct WorkflowProgressPanel: View {
 
             // 1-based: this read "0/5" while standing on the first of five steps.
             Text("STEP \(currentStepIndex + 1) OF \(SterileStep.allCases.count)")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(.system(size: panelWidth * 0.034, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.55))
                 .fixedSize()
         }
@@ -93,10 +96,10 @@ struct WorkflowProgressPanel: View {
     }
 
     private var controls: some View {
-        HStack(spacing: SPAISpacing.m) {
+        HStack(spacing: panelWidth * 0.013) {
             if appModel.isHalted {
                 Label("CONTAMINATION — WORKFLOW HALTED", systemImage: "exclamationmark.octagon.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: panelWidth * 0.04, weight: .bold))
                     .foregroundStyle(SPAIColor.critical)
 
                 Spacer()
@@ -109,17 +112,17 @@ struct WorkflowProgressPanel: View {
             } else if !appModel.canRunWorkflow {
                 Label("Viewing as \(appModel.role.rawValue) — read only",
                       systemImage: appModel.role == .observer ? "eye.fill" : "checkmark.seal.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: panelWidth * 0.04, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.6))
 
                 Spacer()
 
                 Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready: \(currentStep.title)")
-                    .font(.system(size: 13))
+                    .font(.system(size: panelWidth * 0.037))
                     .foregroundStyle(.white.opacity(0.5))
             } else {
                 Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
-                    .font(.system(size: 14))
+                    .font(.system(size: panelWidth * 0.04))
                     .foregroundStyle(.white.opacity(0.7))
 
                 Spacer()
@@ -154,11 +157,11 @@ struct WorkflowProgressPanel: View {
         let isCurrent = step.rawValue == currentStepIndex
         let isComplete = step.rawValue < currentStepIndex
 
-        return VStack(spacing: 8) {
+        return VStack(spacing: panelWidth * 0.023) {
             ZStack {
                 Circle()
                     .fill(nodeFill(isCurrent: isCurrent, isComplete: isComplete))
-                    .frame(width: 44, height: 44)
+                    .frame(width: panelWidth * 0.126, height: panelWidth * 0.126)
                     .scaleEffect(isCurrent ? 1.12 : 1.0)
                     .shadow(
                         color: isCurrent ? SPAIColor.primary.opacity(0.6) : .clear,
@@ -167,21 +170,21 @@ struct WorkflowProgressPanel: View {
 
                 if isComplete {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: panelWidth * 0.045, weight: .bold))
                         .foregroundStyle(.white)
                         .transition(.scale.combined(with: .opacity))
                 } else if isCurrent {
                     Image(systemName: stepStarted ? "circle.fill" : "play.fill")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: panelWidth * 0.04, weight: .bold))
                         .foregroundStyle(.white)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
 
             Text(step.title)
-                .font(.system(size: 12, weight: isCurrent ? .semibold : .regular))
+                .font(.system(size: panelWidth * 0.034, weight: isCurrent ? .semibold : .regular))
                 .foregroundStyle(isCurrent ? .white : .white.opacity(0.5))
-                .frame(width: 90)
+                .frame(width: panelWidth * 0.257)
                 .multilineTextAlignment(.center)
         }
     }
@@ -209,11 +212,12 @@ struct WorkflowProgressPanel: View {
     ) -> some View {
         Button(action: action) {
             Label(label, systemImage: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: panelWidth * 0.04, weight: .semibold))
                 .foregroundStyle(.white)
-                .padding(.horizontal, SPAISpacing.l)
-                .padding(.vertical, SPAISpacing.s + 2)
+                .padding(.horizontal, panelWidth * 0.043)
+                .padding(.vertical, (panelWidth * 0.016) + 2)
                 .background(tint, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
         }
         .buttonStyle(.plain)
 //        .spaiHitTarget()
@@ -221,7 +225,7 @@ struct WorkflowProgressPanel: View {
 }
 
 #Preview {
-    WorkflowProgressPanel()
+    WorkflowProgressPanel(panelWidth: 350)
         .environment(AppModel())
         .padding(60)
         .background(.black)

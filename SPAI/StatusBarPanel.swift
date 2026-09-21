@@ -13,9 +13,13 @@ struct StatusBarPanel: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openWindow) private var openWindow
 
+    /// Width driven by SPAILayout.barWidth (1 200 pt = 1.2 m at 1.55 m viewing distance ≈ 44°).
+    /// Spacing and padding below are tighter than the other panels so all content fits.
+    var panelWidth: CGFloat = SPAILayout.barWidth
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: SPAISpacing.l) {
+            HStack(spacing: SPAISpacing.m) {
                 identityBlock
                 divider
                 sessionTimeBlock
@@ -23,17 +27,16 @@ struct StatusBarPanel: View {
                 roleBlock
                 divider
                 modeBlock
-                Spacer(minLength: SPAISpacing.xl)
+                Spacer(minLength: 0)
                 controlButtons
             }
-            .padding(.horizontal, SPAISpacing.l)
+            .padding(.horizontal, SPAISpacing.m)
             .padding(.vertical, SPAISpacing.m)
             PanelDragHandle(panelID: "statusBar")
                 .padding(.horizontal, SPAISpacing.m)
                 .padding(.bottom, SPAISpacing.xs)
         }
-        // Wider than before: the four inline role pills need the room the role menu didn't.
-        .frame(width: 1440)
+        .frame(width: panelWidth)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
@@ -107,7 +110,7 @@ struct StatusBarPanel: View {
     }
 
     private var modeBlock: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Circle()
                 .fill(detectionService.mode == .cloud ? SPAIColor.safe :
                       detectionService.mode == .onDevice ? SPAIColor.warning : SPAIColor.critical)
@@ -116,8 +119,8 @@ struct StatusBarPanel: View {
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.9))
         }
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s)
+        .padding(.horizontal, SPAISpacing.s)
+        .padding(.vertical, 5)
         .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
     }
 
@@ -188,8 +191,8 @@ struct StatusBarPanel: View {
                     .fixedSize(horizontal: true, vertical: false)
             }
             .font(.system(size: 14, weight: .semibold))
-            .padding(.horizontal, SPAISpacing.m)
-            .padding(.vertical, SPAISpacing.s + 2)
+            .padding(.horizontal, 12)
+            .padding(.vertical, SPAILayout.buttonVPad)
             .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
 
@@ -205,18 +208,15 @@ private struct SessionTimeView: View {
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text("SESSION TIME")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.7))
-            Text(formatted)
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s)
-        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-        .onReceive(timer) { _ in seconds += 1 }
+        // Label dropped to save horizontal space in the status bar.
+        // The monospaced timer is self-explanatory as the only running counter visible.
+        Text(formatted)
+            .font(.system(size: 16, weight: .bold, design: .monospaced))
+            .foregroundStyle(.white)
+            .padding(.horizontal, SPAISpacing.m)
+            .padding(.vertical, SPAISpacing.s)
+            .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            .onReceive(timer) { _ in seconds += 1 }
     }
 
     private var formatted: String {

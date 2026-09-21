@@ -411,6 +411,17 @@ class AppModel {
     var guidedStepIndex: Int = 0
     var currentStep: SterileStep { SterileStep.allCases[currentStepIndex] }
 
+    /// The `StepCondition` of the guided sub-step the user is currently on, or nil if no step
+    /// is active. Used by the detection pipeline to gate inference at the sub-step level:
+    /// e.g., only PPE detection runs on a .glovesOn sub-step; both inferences skip entirely
+    /// on a .manual sub-step even if the parent SterileStep normally requires them.
+    var currentGuidedStepCondition: StepCondition? {
+        guard stepStarted else { return nil }
+        let s = StationScripts.script(for: currentStep)
+        guard let idx = s.clampedIndex(guidedStepIndex) else { return nil }
+        return s[idx].condition
+    }
+
     var shouldHaltOnBareHand: Bool {
         guard stepStarted else { return false }
         let script = StationScripts.script(for: currentStep)
@@ -443,7 +454,7 @@ class AppModel {
         stepStarted = true
         guidedStepIndex = 0
         SPAILog.info(.ui, "action fired: startStep → \(step.title)")
-//        tour.note(.startedStep)
+        tour.note(.startedStep)
         log("Started \(step.title)", kind: .info)
         speakCurrentGuidedStep()
         Task {

@@ -16,6 +16,8 @@ struct ChatPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(DetectionService.self) private var detectionService
 
+    var panelWidth: CGFloat = SPAILayout.chatWidth
+
     private let client = BackendClient()
 
     @State private var messages: [ChatMessage] = [
@@ -33,7 +35,8 @@ struct ChatPanel: View {
             PanelDragHandle(panelID: "chat")
         }
         .padding(SPAISpacing.l)
-        .frame(width: 340, height: 440)
+        // Height: ~1.31× width keeps the message list usable without being too tall.
+        .frame(width: panelWidth, height: panelWidth * 1.31)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ask SPAI chat. \(messages.count) messages. Answers are grounded in \(currentStep?.title ?? "no step").")
@@ -126,20 +129,20 @@ struct ChatPanel: View {
                     voiceInput.toggleListening()
                 } label: {
                     Image(systemName: voiceInput.isListening ? "stop.circle.fill" : "mic.circle.fill")
-                        .font(.system(size: 26))
+                        .font(.system(size: 30))
                         .foregroundStyle(voiceInput.isListening ? SPAIColor.warning : SPAIColor.accent)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
-//                .spaiHitTarget()
                 .disabled(isWaiting)
                 .accessibilityLabel(voiceInput.isListening ? "Stop voice input" : "Start voice input")
 
                 Button(action: send) {
                     Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 26))
+                        .font(.system(size: 30))
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
-//                .spaiHitTarget()
                 .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || isWaiting)
                 .accessibilityLabel("Send question")
             }

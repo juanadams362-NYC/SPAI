@@ -5,6 +5,60 @@
 
 import SwiftUI
 
+/// Unified layout system for SPAI's spatial arc panels.
+///
+/// At the default visionOS immersive-space rendering scale **1 SwiftUI point ≈ 1 mm** in the
+/// physical world (confirmed by the `ptToMeters = 0.001` constant in `PanelDragHandle`).
+/// Sizes below are therefore in millimetres as well as points.
+///
+/// **Panel width rationale**
+/// | Panel | Width (pt) | Distance (m) | Horiz. FoV |
+/// |-------|-----------|------------|----------|
+/// | Status bar | 900 | 1.55 | ~33° |
+/// | Workflow timeline | 600 | 1.15 | ~30° |
+/// | Standard content | 400 | 1.05–1.30 | 18–22° |
+/// | Chat | 320 | 1.30 | ~14° |
+///
+/// **Button hit-target rationale**
+/// Panels using `panelWidth` as their single sizing parameter derive button minimum heights
+/// from `panelWidth × 0.13`. Setting `standardWidth = 400` gives `400 × 0.13 = 52 pt` — a
+/// comfortable gaze-pinch target at 1–1.3 m (≈ 2.5–3°). Explicit icon buttons (ActionPanel)
+/// use `iconButton = 64 pt` because they have no label to widen the visual target.
+enum SPAILayout {
+    // MARK: — Panel widths
+
+    /// Status bar spanning the full front arc. 1 200 mm at 1.55 m ≈ 44° horizontal —
+    /// down from the former 1 440 mm (55°). Layout adjustments inside StatusBarPanel
+    /// (tighter HStack spacing, condensed session-time block, compact mode badge) make
+    /// the full role-picker + control-button row fit within this width.
+    static let barWidth:      CGFloat = 1200
+
+    /// Workflow five-step timeline. 600 mm at 1.15 m ≈ 30° horizontal.
+    static let wideWidth:     CGFloat = 600
+
+    /// Standard content panels (detection, event log, guided step, report, history, tour).
+    /// 400 mm at 1.05–1.30 m ≈ 18–22°. Yields 400 × 0.13 = 52 pt minimum button height.
+    static let standardWidth: CGFloat = 400
+
+    /// Chat panel — message bubbles need less horizontal room. 320 mm at 1.30 m ≈ 14°.
+    static let chatWidth:     CGFloat = 320
+
+    /// Simulator-only upload panel — minimal chrome.
+    static let compactWidth:  CGFloat = 260
+
+    // MARK: — Button hit targets
+
+    /// Icon-only buttons (ActionPanel column). 64 pt at 1.35 m ≈ 2.7° visual angle.
+    static let iconButton:    CGFloat = 64
+
+    /// Vertical padding for text-label buttons. 2 × 14 pt added to the ~22 pt label
+    /// line-height → ~50 pt total — safely hittable from all panel viewing distances.
+    static let buttonVPad:    CGFloat = 14
+
+    /// Horizontal padding for text-label buttons.
+    static let buttonHPad:    CGFloat = 20
+}
+
 enum SPAIColor {
     static let primary       = Color(red: 0.00, green: 0.48, blue: 1.00)
     static let secondary     = Color(red: 0.48, green: 0.30, blue: 1.00)

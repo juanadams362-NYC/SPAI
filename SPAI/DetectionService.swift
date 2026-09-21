@@ -91,15 +91,32 @@ final class DetectionService {
         await detect(image: image, step: step, preferOnDevice: preferOnDevice)
     }
 
-    func detect(image: UIImage, step: SterileStep?, preferOnDevice: Bool = false) async {
-        // When step is nil (still image / video with no workflow context) default to running
-        // PPE detection but not instrument detection.
-        let wantPPE = step?.needsPPEDetection ?? true
-        let wantInstruments = step?.needsInstrumentDetection ?? false
-        let wantTrayVerdict = (step == .trayAssembly)
+    /// - Parameters:
+    ///   - image: The frame or still image to run detection on.
+    ///   - step: The active `SterileStep`, used as a coarse gate and to decide tray verdict.
+    ///   - guidedCondition: When provided (live-camera path), gates inference to exactly what
+    ///     the **current guided sub-step** requires. A `.manual` condition skips all inference.
+    ///     When nil (upload / video path), the coarser step-level gate applies instead.
+    func detect(image: UIImage, step: SterileStep?, guidedCondition: StepCondition? = nil, preferOnDevice: Bool = false) async {
+        let wantPPE: Bool
+        let wantInstruments: Bool
+
+        if let condition = guidedCondition {
+            // Sub-step gate: only run what this specific guided step needs.
+            // .manual → both false → full early-out, zero inference.
+            wantPPE = (condition == .glovesOn)
+            wantInstruments = (condition == .instrumentsPresent || condition == .trayLoaded)
+        } else {
+            // Step-level fallback: used by still-image / video upload (no guided context).
+            // nil step defaults to PPE-only so an unknown context is never completely blind.
+            wantPPE = step?.needsPPEDetection ?? true
+            wantInstruments = step?.needsInstrumentDetection ?? false
+        }
+
+        let wantTrayVerdict = wantInstruments && (step == .trayAssembly)
 
         guard wantPPE || wantInstruments else {
-            SPAILog.debug(.detection, "skipping — step \(step?.title ?? "none") needs neither PPE nor instrument detection")
+            SPAILog.debug(.detection, "skipping — step \(step?.title ?? "none") condition \(guidedCondition.map(String.init(describing:)) ?? "nil") needs no inference")
             return
         }
 
