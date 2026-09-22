@@ -39,7 +39,7 @@ struct WorkflowProgressPanel: View {
             controls
             PanelDragHandle(panelID: "workflow")
         }
-        .padding(panelWidth * 0.021)
+        .padding(panelWidth * 0.04)
         .frame(width: panelWidth)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
@@ -120,32 +120,32 @@ struct WorkflowProgressPanel: View {
                 Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready: \(currentStep.title)")
                     .font(.system(size: panelWidth * 0.037))
                     .foregroundStyle(.white.opacity(0.5))
-            } else {
-                Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
+            } else if !stepStarted {
+                Text("Ready to start: \(currentStep.title)")
                     .font(.system(size: panelWidth * 0.04))
                     .foregroundStyle(.white.opacity(0.7))
-
                 Spacer()
-
-                if !stepStarted {
-                    actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
-                        appModel.startStep()
+                actionButton("Start Step", icon: "play.fill", tint: SPAIColor.primary) {
+                    appModel.startStep()
+                }
+//                .tourHighlight(active: appModel.tour.currentStep?.advanceOn == .startedStep)
+            } else {
+                // Header already says "In progress — follow the guided instructions on the right."
+                // Dropping the redundant status label prevents it from being crushed to near-zero
+                // width when all three action buttons are present (trainee role, step ≥ 1).
+                Spacer()
+                if canRedo {
+                    actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
+                        appModel.redoStep()
                     }
-//                    .tourHighlight(active: appModel.tour.currentStep?.advanceOn == .startedStep)
-                } else {
-                    if canRedo {
-                        actionButton("Redo Step", icon: "arrow.counterclockwise", tint: SPAIColor.secondary) {
-                            appModel.redoStep()
-                        }
+                }
+                if canSendBack {
+                    actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
+                        appModel.failStep()
                     }
-                    if canSendBack {
-                        actionButton("Fail / Send Back", icon: "exclamationmark.triangle.fill", tint: SPAIColor.warning) {
-                            appModel.failStep()
-                        }
-                    }
-                    actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
-                        appModel.completeStep()
-                    }
+                }
+                actionButton("Complete Step", icon: "checkmark", tint: SPAIColor.safe) {
+                    appModel.completeStep()
                 }
             }
         }
@@ -161,7 +161,10 @@ struct WorkflowProgressPanel: View {
             ZStack {
                 Circle()
                     .fill(nodeFill(isCurrent: isCurrent, isComplete: isComplete))
-                    .frame(width: panelWidth * 0.126, height: panelWidth * 0.126)
+                    // Was 0.126 (75.6pt at 600pt) — nodes overflowed the panel.
+                    // 0.1 = 60pt at 600pt: still a prominent indicator, leaves room
+                    // for connectors and prevents the 5-node row from overflowing.
+                    .frame(width: panelWidth * 0.1, height: panelWidth * 0.1)
                     .scaleEffect(isCurrent ? 1.12 : 1.0)
                     .shadow(
                         color: isCurrent ? SPAIColor.primary.opacity(0.6) : .clear,
@@ -170,21 +173,23 @@ struct WorkflowProgressPanel: View {
 
                 if isComplete {
                     Image(systemName: "checkmark")
-                        .font(.system(size: panelWidth * 0.045, weight: .bold))
+                        .font(.system(size: panelWidth * 0.038, weight: .bold))
                         .foregroundStyle(.white)
                         .transition(.scale.combined(with: .opacity))
                 } else if isCurrent {
                     Image(systemName: stepStarted ? "circle.fill" : "play.fill")
-                        .font(.system(size: panelWidth * 0.04, weight: .bold))
+                        .font(.system(size: panelWidth * 0.034, weight: .bold))
                         .foregroundStyle(.white)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
 
             Text(step.title)
-                .font(.system(size: panelWidth * 0.034, weight: isCurrent ? .semibold : .regular))
+                // Was 0.034 font / 0.257 frame — 5 × (0.257 × 600) = 771pt >> 552pt inner.
+                // 0.026 font / 0.16 frame: 5 × 96pt = 480pt, leaves 72pt for 4 connectors.
+                .font(.system(size: panelWidth * 0.026, weight: isCurrent ? .semibold : .regular))
                 .foregroundStyle(isCurrent ? .white : .white.opacity(0.5))
-                .frame(width: panelWidth * 0.257)
+                .frame(width: panelWidth * 0.16)
                 .multilineTextAlignment(.center)
         }
     }

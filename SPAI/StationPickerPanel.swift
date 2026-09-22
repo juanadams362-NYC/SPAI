@@ -73,6 +73,10 @@ struct StationPickerPanel: View {
                         isHere ? SPAIColor.safe.opacity(0.14) : Color.white.opacity(0.05),
                         in: RoundedRectangle(cornerRadius: SPAIRadius.small - 4)
                     )
+                    // Non-compact mode hangs on the arc at ~1m — needs the 44pt floor.
+                    // Compact rides the forearm at ~30 cm; the comment below explains why
+                    // that mode is deliberately smaller.
+                    .frame(minHeight: compact ? 0 : 44)
                 }
                 .buttonStyle(.plain)
                 // 32pt in the compact form, below the usual 44pt floor, deliberately: that

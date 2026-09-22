@@ -5,6 +5,7 @@
 
 import SwiftUI
 import ARKit
+import VisionEntitlementServices
 
 @MainActor
 @Observable
@@ -51,6 +52,9 @@ final class CameraFrameService {
         // needed, and still just returns the existing status if the user already answered.
         let authResult = await arkitSession.requestAuthorization(for: [.cameraAccess])
         let status = authResult[.cameraAccess]
+        // Log success too — "not authorized" and "authorized but no formats" both produce
+        // no camera output, and the only way to distinguish them in the log is this line.
+        SPAILog.info(.camera, "authorization: \(status?.description ?? "unknown")")
         guard status == .allowed else {
             statusMessage = "Camera access not authorized. Needs the Main Camera "
                 + "enterprise entitlement + license, and must run on Vision Pro hardware."
@@ -59,10 +63,54 @@ final class CameraFrameService {
             return
         }
 
-        let formats = CameraVideoFormat.supportedVideoFormats(for: .main, cameraPositions: [.left])
-        guard let format = formats.first else {
-            statusMessage = "No supported camera format found."
-            SPAILog.error(.camera, "no supported video format for .main / .left")
+        // Check the enterprise license state before attempting the format query.
+        // This gives us a direct, unambiguous answer about what the XPC sandbox
+        // restriction actually means, rather than inferring it from an empty format list.
+        let licenseStatus = EnterpriseLicenseDetails.shared.licenseStatus
+        let cameraApproved = EnterpriseLicenseDetails.shared.isApproved(for: .mainCameraAccess)
+        SPAILog.info(.camera, "enterprise license: \(licenseStatus), mainCameraAccess approved: \(cameraApproved)")
+        if licenseStatus != .valid {
+            SPAILog.error(.camera, "enterprise license not valid (status: \(licenseStatus)) — camera will not produce formats")
+        } else if !cameraApproved {
+            SPAILog.error(.camera, "enterprise license valid but mainCameraAccess not approved — check the entitlement request with Apple")
+        }
+
+        // Try camera position combinations in priority order.
+        //
+        // On some hardware or OS versions, only specific position sets expose formats —
+        // querying only [.left] returns empty even when the entitlement is valid. The most
+        // common cause of "no supported video format" is the enterprise license runtime
+        // check failing (com.apple.enterprise.licensing XPC sandbox restriction), but a
+        // wrong position query is the one thing we can fix in code without reprovisioning.
+        let candidates: [(positions: [CameraFrameProvider.CameraPosition],
+                          primary: CameraFrameProvider.CameraPosition,
+                          label: String)] = [
+            ([.left],         .left,  ".left"),
+            ([.right],        .right, ".right"),
+            ([.left, .right], .left,  ".left+.right"),
+        ]
+
+        var chosenFormat: CameraVideoFormat? = nil
+        var samplePosition: CameraFrameProvider.CameraPosition = .left
+
+        for candidate in candidates {
+            let fmts = CameraVideoFormat.supportedVideoFormats(
+                for: .main, cameraPositions: candidate.positions)
+            SPAILog.info(.camera, "formats for \(candidate.label): \(fmts.count)")
+            if let first = fmts.first {
+                chosenFormat = first
+                samplePosition = candidate.primary
+                SPAILog.info(.camera, "selected format for \(candidate.label)")
+                break
+            }
+        }
+
+        guard let format = chosenFormat else {
+            statusMessage = "No supported camera format found. "
+                + "Verify the Enterprise license profile is installed on this device "
+                + "and the Main Camera Access entitlement is in the provisioning profile."
+            isRunning = false
+            SPAILog.error(.camera, "no supported video format for any position — enterprise license may not be installed on device")
             return
         }
 
@@ -84,10 +132,10 @@ final class CameraFrameService {
 
         isRunning = true
         statusMessage = nil
-        SPAILog.info(.camera, "session started — zone \(Int(DetectionTuning.detectionZoneWidthFraction * 100))%×\(Int(DetectionTuning.detectionZoneHeightFraction * 100))%, stability gate \(DetectionTuning.headYawStableSeconds)s / \(DetectionTuning.headYawThresholdDegrees)°")
+        SPAILog.info(.camera, "session started — position \(samplePosition), zone \(Int(DetectionTuning.detectionZoneWidthFraction * 100))%×\(Int(DetectionTuning.detectionZoneHeightFraction * 100))%, stability gate \(DetectionTuning.headYawStableSeconds)s / \(DetectionTuning.headYawThresholdDegrees)°")
 
         for await frame in frameUpdates {
-            guard let sample = frame.sample(for: .left) else { continue }
+            guard let sample = frame.sample(for: samplePosition) else { continue }
             latestBuffer = sample.buffer
 
             let now = Date()

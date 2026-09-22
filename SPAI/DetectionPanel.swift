@@ -141,12 +141,10 @@ struct DetectionPanel: View {
                 Text("\(Int(contaminationRisk * 100))%")
                     .font(.system(size: panelWidth * 0.057, weight: .bold, design: .monospaced))
                     .foregroundStyle(riskHigh ? SPAIColor.warning : SPAIColor.safe)
-                    .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
             } else {
                 Text("—")
                     .font(.system(size: panelWidth * 0.057, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.6))
-                    .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
             }
         }
     }
@@ -193,7 +191,9 @@ struct DetectionPanel: View {
                 .font(.system(size: panelWidth * 0.04, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white)
         }
-        .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
+        // Display-only row — no minHeight needed. The 52pt floor is for interactive button
+        // hit targets; applying it here inflated each of the 3 environment rows by ~30pt
+        // (52pt forced vs ~16pt natural at 400pt), adding ~90pt of empty space to the panel.
     }
 
     private var ppeRow: some View {
@@ -209,7 +209,7 @@ struct DetectionPanel: View {
                 .font(.system(size: panelWidth * 0.034, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.7))
         }
-        .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
+        // Display-only row — minHeight not needed here.
     }
 
     private var divider: some View {

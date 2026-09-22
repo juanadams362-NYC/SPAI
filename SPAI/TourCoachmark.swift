@@ -155,7 +155,6 @@ struct TourCoachmark: View {
                     Spacer()
                     primaryButton("Start working") {
                         appModel.completeTour()
-                        tour.finish()
                     }
                 }
             }
@@ -210,7 +209,7 @@ struct TourCoachmark: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, SPAILayout.buttonHPad)
-                .padding(.vertical, SPAILayout.buttonVPad)
+                .padding(.vertical, 16)   // 16pt × 2 + 15pt line height ≈ 47pt ≥ 44pt floor
                 .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 .fixedSize()
         }
@@ -222,9 +221,14 @@ struct TourCoachmark: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.white.opacity(0.85))
                 .padding(.horizontal, SPAISpacing.m)
-                .padding(.vertical, SPAILayout.buttonVPad)
+                // 16pt each side + 14pt line height ≈ 46pt — meets the 44pt gaze-pinch floor.
+                // The former 14pt matched primaryButton but left no visible chrome: plain text
+                // at 75% opacity in a glass panel looked inactive, not tappable.
+                .padding(.vertical, 16)
+                .background(.white.opacity(0.10), in: Capsule())
+                .overlay(Capsule().stroke(.white.opacity(0.22), lineWidth: 1))
                 .fixedSize()
         }
         .buttonStyle(.plain)

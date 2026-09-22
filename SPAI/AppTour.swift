@@ -160,6 +160,19 @@ final class AppTour {
         onEnd?()
     }
 
+    /// The user pressed "Start Working" on the finished card — dismisses the tour panel.
+    ///
+    /// Distinct from `finish()` (which transitions to `.finished` to show the finished card)
+    /// and `stop()` (immersive space teardown). This is the affirmative "done, let me work"
+    /// path: the tour is complete, so `phase` goes to `.idle` immediately.
+    func conclude() {
+        dismissInterrupt()
+        phase = .idle
+        stepIndex = 0
+        justSatisfied = false
+        onEnd?()
+    }
+
     /// Tears the tour down when the immersive space closes.
     func stop() {
         dismissInterrupt()

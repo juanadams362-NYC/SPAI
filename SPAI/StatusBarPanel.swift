@@ -85,10 +85,14 @@ struct StatusBarPanel: View {
                     appModel.role = role
                 } label: {
                     Text(role.rawValue)
+                        .lineLimit(1)
                         .font(.system(size: 13, weight: isOn ? .bold : .medium))
                         .foregroundStyle(isOn ? Color.black : .white.opacity(0.85))
                         .padding(.horizontal, SPAISpacing.s + 2)
-                        .padding(.vertical, 14)
+                        // 16pt × 2 + 13pt line-height ≈ 45pt — clears the 44pt gaze-pinch floor.
+                        // The former 14pt gave 41pt, which visionOS's hover effect padded silently
+                        // but still registered as marginal in user testing.
+                        .padding(.vertical, 16)
                         .background(
                             isOn ? AnyShapeStyle(SPAIColor.accent) : AnyShapeStyle(Color.white.opacity(0.10)),
                             in: Capsule()
@@ -192,7 +196,8 @@ struct StatusBarPanel: View {
             }
             .font(.system(size: 14, weight: .semibold))
             .padding(.horizontal, 12)
-            .padding(.vertical, SPAILayout.buttonVPad)
+            // 16pt × 2 + 14pt line-height ≈ 46pt. Was SPAILayout.buttonVPad = 14 → 42pt.
+            .padding(.vertical, 16)
             .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
 

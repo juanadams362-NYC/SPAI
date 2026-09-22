@@ -46,7 +46,10 @@ struct SessionHistoryPanel: View {
             }
             PanelDragHandle(panelID: "history")
         }
-        .padding(spacingL)
+        // spacingL = panelWidth * 0.1 = 40pt was 12pt wider than the 28pt (0.07 × 400)
+        // used by every other standard panel — history looked notably more "roomy" than
+        // its neighbours. spacingM matches the peer convention.
+        .padding(spacingM)
         .frame(width: comparePair != nil ? panelWidth * 1.48 : panelWidth)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: radiusLarge, lineWidth: 1.5)

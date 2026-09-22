@@ -136,7 +136,25 @@ class AppModel {
         tour.start(wristMenusEnabled: wristMenusEnabled)
     }
 
-    func completeTour() { hasCompletedTour = true }
+    func completeTour() {
+        hasCompletedTour = true
+
+        // Close panels the tour opened. History is reset first so role restoration
+        // can re-open it correctly for supervisor/observer roles.
+        panelVisibility["chat"] = false
+        panelVisibility["history"] = false
+
+        // Dismiss the tour panel (phase → .idle) and restore the pre-tour role via onEnd.
+        tour.conclude()
+
+        // If the restored role is read-only, history should still be visible.
+        if isReadOnly {
+            panelVisibility["history"] = true
+        }
+
+        // Clear any workflow state the tour accumulated (started step, event log, etc.).
+        resetWorkflow()
+    }
 
     /// Puts back whatever the tour borrowed. Wired to `AppTour.onEnd`, so it covers every way
     /// the tour can stop — skipped, finished, or torn down with the immersive space.

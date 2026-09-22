@@ -35,6 +35,7 @@ struct DetectionUploadPanel: View {
                     .padding(.horizontal, SPAISpacing.l)
                     .padding(.vertical, SPAILayout.buttonVPad)
                     .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                    .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
 //            .spaiHitTarget()

@@ -18,17 +18,24 @@ struct EventLogPanel: View {
         VStack(alignment: .leading, spacing: panelWidth * 0.015) {
             header
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: panelWidth * 0.01) {
-                    ForEach(events) { event in
-                        eventRow(event)
+            if events.isEmpty {
+                Text("No events yet. Events appear here as steps are started, completed, or flagged.")
+                    .font(.system(size: panelWidth * 0.038))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, panelWidth * 0.04)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: panelWidth * 0.01) {
+                        ForEach(events) { event in
+                            eventRow(event)
+                        }
                     }
                 }
+                .frame(maxHeight: panelWidth * 0.63)
             }
-            .frame(maxHeight: panelWidth * 0.63)
 
             PanelDragHandle(panelID: "eventLog")
-                .frame(minWidth: 44, minHeight: max(44, panelWidth * 0.13))
         }
         .padding(panelWidth * 0.07)
         .frame(width: panelWidth)

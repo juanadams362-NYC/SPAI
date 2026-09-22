@@ -27,11 +27,10 @@ import SwiftUI
 enum SPAILayout {
     // MARK: — Panel widths
 
-    /// Status bar spanning the full front arc. 1 200 mm at 1.55 m ≈ 44° horizontal —
-    /// down from the former 1 440 mm (55°). Layout adjustments inside StatusBarPanel
-    /// (tighter HStack spacing, condensed session-time block, compact mode badge) make
-    /// the full role-picker + control-button row fit within this width.
-    static let barWidth:      CGFloat = 1200
+    /// Status bar spanning the full front arc. 1 320 mm at 1.55 m ≈ 49° horizontal.
+    /// Reduced from 1 440 mm (55°) but widened back from 1 200 mm (44°) which left
+    /// the role-picker pills 103 pt short — causing "Technician" to wrap to two lines.
+    static let barWidth:      CGFloat = 1320
 
     /// Workflow five-step timeline. 600 mm at 1.15 m ≈ 30° horizontal.
     static let wideWidth:     CGFloat = 600
