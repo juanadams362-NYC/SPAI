@@ -44,6 +44,14 @@ final class CameraFrameService {
     // MARK: - Lifecycle
 
     func start() async {
+        
+
+        if EnterpriseLicenseDetails.shared.licenseStatus != .valid {
+            SPAILog.info(.camera, "authorization: not valid")
+        } else if !EnterpriseLicenseDetails.shared.isApproved(for: .mainCameraAccess) {
+            SPAILog.info(.camera, "authorization: not approved")
+        }
+
         // `queryAuthorization` only reads the current status — it never prompts. Main Camera
         // Access is an Enterprise entitlement, and until the first prompt has been answered
         // the status is `.notDetermined` forever, which reads identically to "not
