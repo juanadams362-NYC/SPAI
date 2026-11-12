@@ -1,29 +1,40 @@
 """
-Tray detector — a SECOND model instance, separate from the glove/hand
-detector. This one runs the instrument-detection model. The route that
-uses it counts the detections to decide whether a tray is loaded or empty.
+Tray / instrument detector — a SECOND model instance, separate from the
+glove/hand detector. This one runs the instrument-detection model.
 
-The underlying model was trained on a 6-instrument dataset, but in practice
-it labels everything as one class — and for our purposes (counting
-instruments to decide loaded vs empty) the specific instrument type doesn't
-matter. So we relabel every detection to a single generic "instrument" name
-instead of the misleading per-instrument labels.
+The model is trained on six named instruments (Adson dressing forceps,
+Babcock tissue forceps, Halsted mosquito forceps, Mayo-Hegar needle holder,
+operating scissors, No. 3 scalpel handle).
+
+Earlier versions of this file threw the names away and reported every hit as
+a generic "instrument", because the labels coming out looked wrong. They
+looked wrong because the shared Detector was naming this model's classes
+with the PPE model's ["glove", "hand"] list. Detector now reads the label
+list out of each weights file, so the real instrument names come through and
+we keep them:
+
+  - class_name : the instrument's display name ("Mayo-Hegar Needle Holder")
+  - key        : stable id for lookups ("mayo_hegar_needle_holder")
+  - category   : always "instrument", so callers that only want to count
+                 instruments (tray loaded / empty) don't need to know names
 
 We reuse the existing Detector class (no duplicated inference code) but
 point it at the instrument weights.
 """
-
 from pathlib import Path
+
+from app import instruments
 from app.inference.detector import Detector
 
 # Instrument model weights live alongside the PPE model, in the same
 # backend/model folder.
 TRAY_MODEL_PATH = Path(__file__).parent.parent.parent / "model" / "instruments_best.pt"
 
-# What we report every detection as. The model can't reliably tell the
-# instruments apart, and we only need "there is an instrument here" to count
-# for loaded/empty — so everything is just "instrument".
-INSTRUMENT_LABEL = "instrument"
+# Category tag on every detection from this model.
+INSTRUMENT_LABEL = instruments.GENERIC_LABEL
+
+# One or more instruments on the tray = loaded. Zero = empty.
+LOADED_MIN_INSTRUMENTS = 1
 
 
 class TrayDetector(Detector):
@@ -32,15 +43,43 @@ class TrayDetector(Detector):
     def __init__(self) -> None:
         super().__init__()
         self.model_path = TRAY_MODEL_PATH
+        self.class_names = [info.name for info in instruments.all_instruments()]
+        # Below this we report "an instrument" rather than guess its name.
+        self.identify_threshold: float = instruments.DEFAULT_IDENTIFY_THRESHOLD
 
-    # Override only the labelling: report every detection as "instrument"
-    # regardless of which class id the model assigned. Everything else
-    # (load, detect, _real_detect, exif handling) is inherited unchanged.
-    def _real_detect(self, image_bytes: bytes) -> dict:
-        result = super()._real_detect(image_bytes)
+    def status(self) -> dict:
+        status = super().status()
+        status["identify_threshold"] = self.identify_threshold
+        return status
+
+    def detect(self, image_bytes: bytes) -> dict:
+        result = super().detect(image_bytes)
         for det in result["detections"]:
-            det["class_name"] = INSTRUMENT_LABEL
+            raw = det["class_name"]
+            det["category"] = INSTRUMENT_LABEL
+            det["key"] = instruments.key_for(raw)
+            det["class_name"] = instruments.display_name(raw)
         return result
+
+    def _stub_detect(self, image_bytes: bytes) -> dict:
+        """Fake instrument hit for development, so the app can exercise the
+        identification flow before the weights are in place."""
+        return {
+            "detections": [
+                {
+                    "class_id": 3,
+                    "class_name": "Mayo Hegar Needle Holder",
+                    "confidence": 0.9,
+                    "box": [140, 220, 360, 430],
+                },
+            ],
+            "inference_time_ms": 1,
+            "mode": "stub",
+        }
+
+    @staticmethod
+    def tray_state(count: int) -> str:
+        return "loaded" if count >= LOADED_MIN_INSTRUMENTS else "empty"
 
 
 # Module-level singleton, loaded once at startup (mirrors the PPE detector).

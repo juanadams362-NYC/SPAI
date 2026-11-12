@@ -11,7 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.inference.detector import detector
 from app.inference.tray_detector import tray_detector
-from app.routes import health, model, detect, compliance, batch, settings, detect_tray, ask
+from app.routes import (
+    health, model, detect, compliance, batch, settings, detect_tray, ask,
+    analyze, instruments,
+)
 from app.logging_config import setup_logging, get_logger
 from app.metrics import metrics
 
@@ -55,7 +58,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="SPAI Backend",
     description="Sterile Processing AI — detection API for the visionOS app.",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -82,6 +85,8 @@ app.include_router(health.router)
 app.include_router(model.router)
 app.include_router(detect.router)
 app.include_router(detect_tray.router)   # tray-state detection
+app.include_router(analyze.router)       # PPE + instruments + identification, one upload
+app.include_router(instruments.router)   # instrument reference cards
 app.include_router(compliance.router)
 app.include_router(batch.router)
 app.include_router(settings.router)
@@ -93,6 +98,6 @@ def root() -> dict:
     """Friendly landing message."""
     return {
         "name": "SPAI Backend",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "docs": "/docs",
     }

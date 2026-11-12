@@ -5,6 +5,7 @@ data so only write the steps once. Wording gets fleshed out later
 when all 5 stations get real content.
 """
 
+from app import instruments
 from app.llm_client import ask_llm, LLMError
 
 # Step scripts per station. Short placeholder wording for now.
@@ -48,8 +49,9 @@ SYSTEM_PROMPT = """You are SPAI, a training assistant for sterile processing dep
 The user is wearing an Apple Vision Pro headset while actively working. Their hands are gloved and busy with instruments. They are reading your answer on a floating panel and cannot type, scroll, or touch anything outside their work.
 Keep answers to 2-3 short sentences, plain language, immediately actionable from where they are standing.
 Never tell the user to touch the headset, remove gloves, use a phone or computer, or look anything up.
-Base your answer ONLY on the station steps and live detection state provided in each message.
-If the question cannot be answered from the provided steps, say you are not sure and tell them to ask their supervisor out loud.
+Base your answer ONLY on the station steps, live detection state, and instrument reference provided in each message.
+If the user asks what they are holding or what an instrument is, answer from the instrument reference: name it, say what it is for, and give the one check that matters most at their current station. If no instrument is named in the detection state, say you can't see it clearly and ask them to hold it up flat.
+If the question cannot be answered from the provided information, say you are not sure and tell them to ask their supervisor out loud.
 Never invent sterile processing procedure. Never tell the user to skip a step."""
 
 
@@ -69,11 +71,19 @@ def build_context(station: str, step_index: int, detection_summary: str, questio
         for i, s in enumerate(steps)
     )
 
+    # Reference facts for any instrument named in the detection state or in
+    # the question itself, so "what is this?" and "what do I check on a
+    # needle holder?" can both be answered without the model improvising.
+    named = instruments.mentioned_in(f"{detection_summary} {question}")
+    facts = instruments.facts_for_prompt(named)
+    reference = f"Instrument reference:\n{facts}\n" if facts else ""
+
     return (
         f"Station: {station.replace('_', ' ').title()}\n"
         f"Steps for this station (>> marks the user's current step):\n{numbered}\n"
         f"Current step: {step_index + 1} of {len(steps)}\n"
-        f"Live detection state: {detection_summary or 'no detections reported'}\n\n"
+        f"Live detection state: {detection_summary or 'no detections reported'}\n"
+        f"{reference}\n"
         f"User question: {question}"
     )
 

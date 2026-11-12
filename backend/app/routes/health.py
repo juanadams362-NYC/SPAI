@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.inference.detector import detector
+from app.inference.tray_detector import tray_detector
 from app.metrics import metrics
 
 router = APIRouter()
@@ -20,6 +21,7 @@ def health_stats() -> dict:
     return {
         "status": "ok",
         "model": detector.status(),
+        "instrument_model": tray_detector.status(),
         "metrics": metrics.snapshot(),
     }
 
@@ -35,9 +37,11 @@ def _format_uptime(seconds: int) -> str:
 def health_dashboard() -> str:
     """A simple visual status page for the backend."""
     model = detector.status()
+    tray = tray_detector.status()
     snap = metrics.snapshot()
     mode = model["mode"]
     mode_color = "#2ecc71" if mode == "real" else "#f39c12"
+    tray_color = "#2ecc71" if tray["mode"] == "real" else "#f39c12"
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -58,14 +62,16 @@ def health_dashboard() -> str:
 </head>
 <body>
   <h1>SPAI Backend Status</h1>
-  <p>Model mode: <span class="badge">{mode.upper()}</span></p>
+  <p>PPE model: <span class="badge">{mode.upper()}</span>
+     &nbsp; Instrument model: <span class="badge" style="background: {tray_color}">{tray['mode'].upper()}</span></p>
   <div class="grid">
     <div class="card"><div class="label">Uptime</div><div class="value">{_format_uptime(snap['uptime_seconds'])}</div></div>
     <div class="card"><div class="label">Total Requests</div><div class="value">{snap['request_count']}</div></div>
     <div class="card"><div class="label">Detections Run</div><div class="value">{snap['detection_count']}</div></div>
     <div class="card"><div class="label">Errors</div><div class="value">{snap['error_count']}</div></div>
     <div class="card"><div class="label">Confidence Threshold</div><div class="value">{model.get('confidence_threshold', 'n/a')}</div></div>
-    <div class="card"><div class="label">Classes</div><div class="value">{', '.join(model['classes'])}</div></div>
+    <div class="card"><div class="label">PPE Classes</div><div class="value">{', '.join(model['classes'])}</div></div>
+    <div class="card" style="grid-column: span 2"><div class="label">Instruments Recognised</div><div class="value" style="font-size: 16px; font-weight: 500; line-height: 1.6">{' · '.join(tray['classes'])}</div></div>
   </div>
 </body>
 </html>"""
