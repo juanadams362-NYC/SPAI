@@ -18,11 +18,127 @@ struct SettingsView: View {
     private let client = BackendClient()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.l) {
-            Text("SETTINGS")
-                .font(.system(size: 15, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.8))
+        ScrollView {
+            VStack(alignment: .leading, spacing: SPAISpacing.l) {
+                Text("SETTINGS")
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .tracking(1.5)
+                    .foregroundStyle(.white.opacity(0.8))
+
+                workspaceSection
+                sectionDivider
+                guidanceSection
+                sectionDivider
+                detectionSection
+            }
+            .padding(SPAISpacing.xl)
+        }
+        .frame(width: 420)
+        .frame(maxHeight: 760)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
+        // Closing via the system's own window controls should also clear
+        // the tracked-open flag, or the next status bar tap tries to
+        // dismiss a window that's already gone.
+        .onDisappear {
+            appModel.isSettingsWindowOpen = false
+        }
+    }
+
+    // MARK: - Workspace
+
+    private var workspaceSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            sectionTitle("Workspace")
+
+            settingBlock(title: "Layout") {
+                Picker("Layout", selection: Binding(
+                    get: { appModel.layout },
+                    set: { appModel.layout = $0 }
+                )) {
+                    ForEach(PanelLayout.allCases) { layout in
+                        Text(layout.label).tag(layout)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Workspace layout")
+
+                Text(appModel.layout == .focus
+                     ? "Shows only what the current task needs. Open anything else from Panels."
+                     : "Opens the event log and test media alongside the essentials.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            settingBlock(title: "Panel opacity: \(Int(appModel.panelOpacity * 100))%") {
+                Slider(
+                    value: Binding(
+                        get: { appModel.panelOpacity },
+                        set: { appModel.panelOpacity = $0 }
+                    ),
+                    in: 0.5...1.0,
+                    step: 0.05
+                )
+                .tint(SPAIColor.secondary)
+                .accessibilityLabel("Panel opacity")
+            }
+
+            settingToggle("Panels turn to face you", isOn: Binding(
+                get: { appModel.panelsBillboard },
+                set: { appModel.panelsBillboard = $0 }
+            ), tint: SPAIColor.accent)
+            .accessibilityHint("When on, panels rotate to face you as you move")
+        }
+    }
+
+    // MARK: - Guidance
+
+    private var guidanceSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            sectionTitle("Guidance")
+
+            settingToggle("Show Pip, the guide", isOn: Binding(
+                get: { appModel.showCompanion },
+                set: { appModel.showCompanion = $0 }
+            ), tint: SPAIColor.accent)
+            .accessibilityHint("Pip hops to the panel that needs your attention")
+
+            settingToggle("Say instrument names aloud", isOn: Binding(
+                get: { appModel.announceInstruments },
+                set: { appModel.announceInstruments = $0 }
+            ), tint: SPAIColor.accent)
+            .accessibilityHint("Hold up an instrument and SPAI tells you what it is")
+
+            // Reads each guided step out loud as it comes up. Contamination
+            // alerts speak regardless of this setting.
+            settingToggle("Speak step instructions", isOn: $speakSteps, tint: SPAIColor.primary)
+                .accessibilityHint("Reads each guided step aloud when it appears")
+
+            Button {
+                appModel.requestTour()
+            } label: {
+                Label("Replay the tour", systemImage: "figure.walk")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, SPAISpacing.l)
+                    .padding(.vertical, SPAISpacing.s + 2)
+                    .background(SPAIColor.secondary.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            }
+            .buttonStyle(.plain)
+            .spaiHitTarget()
+            .disabled(appModel.immersiveSpaceState != .open || !appModel.showCompanion)
+            .opacity(appModel.immersiveSpaceState == .open && appModel.showCompanion ? 1 : 0.45)
+            .accessibilityHint("Pip walks you around the workspace again")
+
+            settingToggle("Always show onboarding (testing)", isOn: $alwaysShowOnboarding, tint: SPAIColor.primary)
+        }
+    }
+
+    // MARK: - Detection
+
+    private var detectionSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            sectionTitle("Detection")
 
             settingBlock(title: "Backend URL") {
                 TextField( "http://127.0.0.1:8000", text: $backendURL)
@@ -42,47 +158,6 @@ struct SettingsView: View {
                     .tint(SPAIColor.accent)
                     .accessibilityLabel("Streaming frames per second")
             }
-
-            settingBlock(title: "Panel opacity: \(Int(appModel.panelOpacity * 100))%") {
-                Slider(
-                    value: Binding(
-                        get: { appModel.panelOpacity },
-                        set: { appModel.panelOpacity = $0 }
-                    ),
-                    in: 0.5...1.0,
-                    step: 0.05
-                )
-                .tint(SPAIColor.secondary)
-                .accessibilityLabel("Panel opacity")
-            }
-
-            Toggle(isOn: Binding(
-                get: { appModel.panelsBillboard },
-                set: { appModel.panelsBillboard = $0 }
-            )) {
-                Text("Panels look at you")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.95))
-            }
-            .tint(SPAIColor.accent)
-            .accessibilityHint("When enabled, panels follow your gaze and rotate to face you")
-
-            // Reads each guided step out loud as it comes up. Contamination
-            // alerts speak regardless of this setting.
-            Toggle(isOn: $speakSteps) {
-                Text("Speak step instructions")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.95))
-            }
-            .tint(SPAIColor.primary)
-            .accessibilityHint("Reads each guided step aloud when it appears")
-
-            Toggle(isOn: $alwaysShowOnboarding) {
-                Text("Always show onboarding (testing)")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.95))
-            }
-            .tint(SPAIColor.primary)
 
             Button {
                 Task { await pushThreshold() }
@@ -104,15 +179,27 @@ struct SettingsView: View {
                     .foregroundStyle(.white.opacity(0.8))
             }
         }
-        .padding(SPAISpacing.xl)
-        .frame(width: 420)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
-        // Closing via the system's own window controls should also clear
-        // the tracked-open flag, or the next status bar tap tries to
-        // dismiss a window that's already gone.
-        .onDisappear {
-            appModel.isSettingsWindowOpen = false
+    }
+
+    // MARK: - Pieces
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 19, weight: .bold))
+            .foregroundStyle(.white)
+    }
+
+    private var sectionDivider: some View {
+        Rectangle().fill(.white.opacity(0.18)).frame(height: 1)
+    }
+
+    private func settingToggle(_ title: String, isOn: Binding<Bool>, tint: Color) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title)
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.95))
         }
+        .tint(tint)
     }
 
     private func settingBlock<Content: View>(

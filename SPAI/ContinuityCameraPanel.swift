@@ -24,8 +24,7 @@ struct ContinuityCameraPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 360)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel()
         .onAppear {
             cameraService.onFrameForDetection = { ui in
                 await detectionService.detect(

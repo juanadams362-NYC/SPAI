@@ -15,11 +15,23 @@ struct BackendDetection: Codable, Identifiable {
     let confidence: Double
     let box: [Int]
 
+    // Instrument detections only — absent on PPE boxes and on responses from
+    // older backends, so all three are optional.
+    /// Stable catalog id, e.g. "mayo_hegar_needle_holder".
+    var key: String? = nil
+    /// "instrument" for anything from the instrument model.
+    var category: String? = nil
+    /// True when the backend saw a hand or glove on this instrument.
+    var held: Bool? = nil
+
     enum CodingKeys: String, CodingKey {
         case classId = "class_id"
         case className = "class_name"
         case confidence
         case box
+        case key
+        case category
+        case held
     }
 }
 
@@ -48,6 +60,26 @@ struct TrayDetectResponse: Codable {
         case mode
         case instrumentCount = "instrument_count"
         case trayState = "tray_state"
+    }
+}
+
+/// One frame, fully analyzed: PPE boxes, named instruments, and tray state
+/// from a single upload (POST /analyze).
+struct AnalyzeResponse: Codable {
+    let detections: [BackendDetection]
+    let instruments: [BackendDetection]
+    let instrumentCount: Int
+    let trayState: String
+    let inferenceTimeMs: Int
+    let mode: String
+
+    enum CodingKeys: String, CodingKey {
+        case detections
+        case instruments
+        case instrumentCount = "instrument_count"
+        case trayState = "tray_state"
+        case inferenceTimeMs = "inference_time_ms"
+        case mode
     }
 }
 
@@ -106,62 +138,62 @@ final class BackendClient {
 
     // MARK: Detection
 
+    /// Gloves and hands only.
     func detect(image: UIImage) async throws -> DetectResponse {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            throw BackendError.imageEncodingFailed
-        }
-
-        let url = baseURL.appendingPathComponent("detect")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)",
-                         forHTTPHeaderField: "Content-Type")
-
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"upload.jpg\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-        body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-
-        let (data, response) = try await URLSession.shared.upload(for: request, from: body)
-
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-
-        return try JSONDecoder().decode(DetectResponse.self, from: data)
+        try await upload(image, to: "detect")
     }
 
+    /// Instruments and tray state only.
     func detectTray(image: UIImage) async throws -> TrayDetectResponse {
+        try await upload(image, to: "detect-tray")
+    }
+
+    /// PPE, instruments, and tray state from one upload. Throws
+    /// `BackendError.endpointMissing` against a backend that predates
+    /// /analyze, so the caller can fall back to the two older endpoints.
+    func analyze(image: UIImage) async throws -> AnalyzeResponse {
+        try await upload(image, to: "analyze")
+    }
+
+    /// Detection has to keep pace with a live camera feed. A request that
+    /// hasn't answered in this long is treated as a failure so the app can
+    /// fall back to on-device detection instead of stalling on the default
+    /// 60-second timeout.
+    private static let detectionTimeout: TimeInterval = 8
+
+    private func upload<Response: Decodable>(_ image: UIImage, to path: String) async throws -> Response {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             throw BackendError.imageEncodingFailed
         }
 
-        let url = baseURL.appendingPathComponent("detect-tray")
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
+        request.timeoutInterval = Self.detectionTimeout
 
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)",
                          forHTTPHeaderField: "Content-Type")
 
         var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"upload.jpg\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"image\"; filename=\"upload.jpg\"\r\n".utf8))
+        body.append(Data("Content-Type: image/jpeg\r\n\r\n".utf8))
         body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
 
         let (data, response) = try await URLSession.shared.upload(for: request, from: body)
 
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+        guard let http = response as? HTTPURLResponse else {
+            throw BackendError.badResponse
+        }
+        if http.statusCode == 404 || http.statusCode == 405 {
+            throw BackendError.endpointMissing
+        }
+        guard http.statusCode == 200 else {
             throw BackendError.badResponse
         }
 
-        return try JSONDecoder().decode(TrayDetectResponse.self, from: data)
+        return try JSONDecoder().decode(Response.self, from: data)
     }
 
     // MARK: Health
@@ -288,4 +320,6 @@ extension BackendClient {
 enum BackendError: Error {
     case imageEncodingFailed
     case badResponse
+    /// The backend is reachable but doesn't have this route (an older deploy).
+    case endpointMissing
 }

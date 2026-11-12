@@ -19,7 +19,7 @@ struct ChatPanel: View {
     private let client = BackendClient()
 
     @State private var messages: [ChatMessage] = [
-        ChatMessage(role: .spai, text: "Ask me anything about your current step.")
+        ChatMessage(role: .spai, text: "Ask me about your current step — or hold up an instrument and ask what it is.")
     ]
     @State private var voiceInput = VoiceInputManager()
     @State private var draft = ""
@@ -33,7 +33,7 @@ struct ChatPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 340, height: 440)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
+        .spaiPanel(PanelID.chat)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ask SPAI chat. \(messages.count) messages. Answers are grounded in \(currentStep?.title ?? "no step").")
     }
@@ -172,12 +172,20 @@ struct ChatPanel: View {
     private var detectionSummary: String {
         guard detectionService.hasResult else { return "" }
         var parts: [String] = []
-        let names = detectionService.detections.map { $0.className.lowercased() }
-        parts.append(names.contains("glove") ? "gloves detected" : "no gloves detected")
-        if names.contains("hand") { parts.append("bare hand visible") }
-        let instrumentHits = names.filter { $0 == "instrument" }.count
+        let names = detectionService.detections.map(\.className)
+        parts.append(names.contains(where: DetectionService.isGloveClass) ? "gloves detected" : "no gloves detected")
+        if names.contains(where: DetectionService.isHandClass) { parts.append("bare hand visible") }
+
+        // Name what's being held, so "what is this?" and "what do I check on
+        // this?" can be answered. The backend matches the name against its
+        // instrument reference and hands the facts to the model.
+        if let instrument = detectionService.identifiedInstrument, instrument.certain {
+            let verb = instrument.held ? "holding" : "in view:"
+            parts.append("\(verb) \(instrument.name) (\(instrument.confidencePercent)% confident)")
+        }
+        let instrumentHits = detectionService.instrumentNames.count
         if instrumentHits > 0 {
-            parts.append("\(instrumentHits) instruments detected")
+            parts.append("\(instrumentHits) instrument\(instrumentHits == 1 ? "" : "s") detected")
         }
         if let tray = detectionService.trayState {
             parts.append("tray is \(tray)")

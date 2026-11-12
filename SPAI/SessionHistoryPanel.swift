@@ -36,8 +36,7 @@ struct SessionHistoryPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: comparePair != nil ? 520 : 400)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.history)
         .animation(.easeInOut(duration: 0.2), value: selected != nil)
         .animation(.easeInOut(duration: 0.2), value: comparePair != nil)
         .accessibilityElement(children: .contain)

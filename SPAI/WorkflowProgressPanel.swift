@@ -37,8 +37,7 @@ struct WorkflowProgressPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 760)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.workflow)
         .animation(.spring(response: 0.45, dampingFraction: 0.7), value: currentStepIndex)
         .animation(.easeInOut(duration: 0.3), value: stepStarted)
     }
@@ -47,16 +46,11 @@ struct WorkflowProgressPanel: View {
 
     private var header: some View {
         HStack {
-            Text("WORKFLOW PROGRESS")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.7))
-
+            Text("WORKFLOW").spaiEyebrow()
             Spacer()
-
-            Text("\(currentStepIndex)/\(SterileStep.allCases.count)")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+            Text("Station \(currentStepIndex + 1) of \(SterileStep.allCases.count)")
+                .font(SPAIFont.value)
+                .foregroundStyle(SPAIText.secondary)
         }
     }
 
@@ -77,18 +71,16 @@ struct WorkflowProgressPanel: View {
             } else if !appModel.canRunWorkflow {
                 Label("Viewing as \(appModel.role.rawValue) — read only",
                       systemImage: appModel.role == .observer ? "eye.fill" : "checkmark.seal.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.6))
-
+                    .font(SPAIFont.label)
+                    .foregroundStyle(SPAIText.secondary)
                 Spacer()
-
                 Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready: \(currentStep.title)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(SPAIFont.caption)
+                    .foregroundStyle(SPAIText.tertiary)
             } else {
-                Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready to start: \(currentStep.title)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
+                Text(stepStarted ? "In progress: \(currentStep.title)" : "Next up: \(currentStep.title)")
+                    .font(SPAIFont.body)
+                    .foregroundStyle(.white.opacity(0.9))
 
                 Spacer()
 
@@ -146,8 +138,8 @@ struct WorkflowProgressPanel: View {
             }
 
             Text(step.title)
-                .font(.system(size: 12, weight: isCurrent ? .semibold : .regular))
-                .foregroundStyle(isCurrent ? .white : .white.opacity(0.5))
+                .font(.system(size: 13, weight: isCurrent ? .semibold : .regular))
+                .foregroundStyle(isCurrent ? .white : .white.opacity(0.7))
                 .frame(width: 90)
                 .multilineTextAlignment(.center)
         }
@@ -176,7 +168,7 @@ struct WorkflowProgressPanel: View {
     ) -> some View {
         Button(action: action) {
             Label(label, systemImage: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(SPAIFont.button)
                 .foregroundStyle(.white)
                 .padding(.horizontal, SPAISpacing.l)
                 .padding(.vertical, SPAISpacing.s + 2)

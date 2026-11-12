@@ -17,54 +17,46 @@ struct StatusBarPanel: View {
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: SPAISpacing.l) {
+        HStack(spacing: SPAISpacing.m) {
             identityBlock
             divider
             sessionTimeBlock
-            divider
             roleBlock
-            divider
             modeBlock
-            Spacer(minLength: SPAISpacing.xl)
+            Spacer(minLength: SPAISpacing.l)
             controlButtons
         }
         .padding(.horizontal, SPAISpacing.l)
-        .padding(.vertical, SPAISpacing.m)
-        .frame(width: 1200)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .padding(.vertical, SPAISpacing.s + 4)
+        .frame(width: 860)
+        .spaiPanel(PanelID.statusBar)
         .onReceive(timer) { _ in sessionSeconds += 1 }
     }
 
     private var identityBlock: some View {
-        HStack(spacing: SPAISpacing.s + 4) {
-            SterileNodeMark(size: 38)
-                .frame(width: 48, height: 48)
+        HStack(spacing: SPAISpacing.s + 2) {
+            SterileNodeMark(size: 30)
+                .frame(width: 40, height: 40)
                 .background(SPAIColor.primary.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("SPAI")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
-                Text("SPD — OR Suite 3")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
+            Text("SPAI")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.white)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("SPAI")
     }
 
     private var sessionTimeBlock: some View {
-        HStack(spacing: 8) {
-            Text("SESSION TIME")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.7))
+        HStack(spacing: 6) {
+            Image(systemName: "clock")
+                .font(.system(size: 14))
+                .foregroundStyle(SPAIText.tertiary)
             Text(formattedTime)
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .font(SPAIFont.value)
                 .foregroundStyle(.white)
         }
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s)
-        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Session time \(sessionSeconds / 60) minutes \(sessionSeconds % 60) seconds")
     }
 
     private var roleBlock: some View {
@@ -81,44 +73,55 @@ struct StatusBarPanel: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
-                Circle().fill(SPAIColor.accent).frame(width: 8, height: 8)
+            HStack(spacing: 6) {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(SPAIColor.accent)
                 Text(appModel.role.rawValue)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.95))
+                    .font(SPAIFont.label)
+                    .foregroundStyle(.white)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(SPAIText.tertiary)
             }
+            .padding(.horizontal, SPAISpacing.s + 4)
+            .padding(.vertical, SPAISpacing.s)
+            .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
         }
         .buttonStyle(.plain)
         .spaiHitTarget()
+        .accessibilityLabel("Role: \(appModel.role.rawValue)")
+        .accessibilityHint("Change who is using SPAI")
     }
 
+    /// Where detection is running. Only speaks up when it isn't the normal
+    /// case, so a healthy connection is one quiet dot rather than a label.
     private var modeBlock: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Circle()
-                .fill(detectionService.mode == .cloud ? SPAIColor.safe :
-                      detectionService.mode == .onDevice ? SPAIColor.warning : SPAIColor.critical)
-                .frame(width: 8, height: 8)
-            Text(detectionService.mode.rawValue.uppercased())
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.9))
+                .fill(modeColor)
+                .frame(width: 9, height: 9)
+            if detectionService.mode != .cloud {
+                Text(detectionService.mode.rawValue)
+                    .font(SPAIFont.caption.weight(.semibold))
+                    .foregroundStyle(modeColor)
+            }
         }
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s)
-        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Detection running: \(detectionService.mode.rawValue)")
+    }
+
+    private var modeColor: Color {
+        switch detectionService.mode {
+        case .cloud:    return SPAIColor.safe
+        case .onDevice: return SPAIColor.warning
+        case .offline:  return SPAIColor.critical
+        }
     }
 
     private var controlButtons: some View {
-        HStack(spacing: SPAISpacing.m) {
-            Button {
-                appModel.toggleVisibility("chat")
-            } label: {
-                barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
-            }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+        HStack(spacing: SPAISpacing.s) {
+            panelsMenu
 
             Button {
                 if appModel.isSettingsWindowOpen {
@@ -134,36 +137,91 @@ struct StatusBarPanel: View {
             .buttonStyle(.plain)
             .spaiHitTarget()
 
-            Button {
-                Task {
-                    appModel.immersiveSpaceState = .inTransition
-                    await dismissImmersiveSpace()
-                    openWindow(id: "home")
+            // Ending the session is a two-step menu rather than a single
+            // tap: the button sits at eye level where a stray glance-and-
+            // pinch could otherwise throw away a session in progress.
+            Menu {
+                Button(role: .destructive) {
+                    Task {
+                        appModel.immersiveSpaceState = .inTransition
+                        await dismissImmersiveSpace()
+                        openWindow(id: "home")
+                    }
+                } label: {
+                    Label("End Session", systemImage: "xmark.circle.fill")
                 }
             } label: {
-                barButtonLabel("End Session", icon: "xmark.circle.fill", tint: SPAIColor.critical)
+                barButtonLabel("End", icon: "xmark.circle.fill", tint: SPAIColor.critical)
             }
             .buttonStyle(.plain)
             .spaiHitTarget()
+            .accessibilityLabel("End session")
         }
     }
 
-    private func barButtonLabel(_ text: String, icon: String, tint: Color) -> some View {
-            HStack(spacing: 8) {
-                Image(systemName: icon).foregroundStyle(tint)
-                Text(text)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+    /// One menu for everything that isn't needed all the time. This replaces
+    /// the separate quick-action rail and the always-open reference panels —
+    /// the workspace opens with three panels, and the rest are here.
+    private var panelsMenu: some View {
+        Menu {
+            Section("Open a panel") {
+                ForEach(PanelID.optional, id: \.self) { id in
+                    Button {
+                        appModel.toggleVisibility(id)
+                    } label: {
+                        Label(PanelID.title(id),
+                              systemImage: appModel.isVisible(id) ? "checkmark" : PanelID.icon(id))
+                    }
+                }
             }
-            .font(.system(size: 14, weight: .semibold))
-            .padding(.horizontal, SPAISpacing.m)
-            .padding(.vertical, SPAISpacing.s + 2)
-            .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+
+            Section("Workspace") {
+                Button {
+                    appModel.layout = appModel.layout == .focus ? .everything : .focus
+                } label: {
+                    Label(appModel.layout == .focus ? "Show Everything" : "Back to Focus",
+                          systemImage: appModel.layout == .focus ? "rectangle.3.group" : "scope")
+                }
+                Button {
+                    appModel.requestTour()
+                } label: {
+                    Label("Replay the Tour", systemImage: "figure.walk")
+                }
+            }
+
+            if appModel.canRunWorkflow {
+                Section {
+                    Button(role: .destructive) {
+                        appModel.resetWorkflow()
+                    } label: {
+                        Label("Reset Session", systemImage: "arrow.counterclockwise")
+                    }
+                }
+            }
+        } label: {
+            barButtonLabel("Panels", icon: "square.grid.2x2.fill", tint: SPAIColor.primary)
         }
+        .buttonStyle(.plain)
+        .spaiHitTarget()
+        .accessibilityHint("Open the event log, history, Ask SPAI, or test media")
+    }
+
+    private func barButtonLabel(_ text: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).foregroundStyle(tint)
+            Text(text)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .font(SPAIFont.button)
+        .padding(.horizontal, SPAISpacing.m)
+        .padding(.vertical, SPAISpacing.s + 2)
+        .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+    }
 
     private var divider: some View {
-        Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 36)
+        Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 30)
     }
 
     private var formattedTime: String {

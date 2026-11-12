@@ -25,18 +25,14 @@ struct EventLogPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 360)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.eventLog)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Event log. \(events.count) events. Most recent: \(events.first?.message ?? "none").")
     }
 
     private var header: some View {
         HStack {
-            Text("EVENT LOG")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.8))
+            Text("EVENT LOG").spaiEyebrow()
             Spacer()
             Text("\(events.count) events")
                 .font(.system(size: 12, design: .monospaced))

@@ -64,19 +64,19 @@ struct OnboardingView: View {
                 .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(.white)
 
-            Text("Your workspace includes several floating panels positioned in a comfortable arc:")
+            Text("Your workspace opens with just three panels. Pip, your guide, will hop onto each one to show you around.")
                 .font(.title3)
                 .foregroundStyle(.white.opacity(0.75))
 
             VStack(alignment: .leading, spacing: SPAISpacing.m) {
-                onboardingPoint(icon: "rectangle.3.group", title: "Status Bar (Top)",
-                                detail: "Shows session time, your role, detection mode, and quick actions")
+                onboardingPoint(icon: "checklist", title: "Workflow (Centre)",
+                                detail: "Your five stations and the Start Step button")
                 onboardingPoint(icon: "viewfinder", title: "Detection (Left)",
-                                detail: "Live PPE check, contamination risk, and environment stats")
-                onboardingPoint(icon: "waveform.path.ecg", title: "Event Log (Right)",
-                                detail: "Real-time feed of workflow events and alerts")
-                onboardingPoint(icon: "checklist", title: "Workflow Progress (Bottom)",
-                                detail: "Shows all 5 steps and your current position")
+                                detail: "Whether your gloves are on, and what instrument you're holding")
+                onboardingPoint(icon: "rectangle.3.group", title: "Status Bar (Top)",
+                                detail: "Session time, your role, and the Panels menu")
+                onboardingPoint(icon: "square.grid.2x2.fill", title: "Everything Else (Panels Menu)",
+                                detail: "Event log, history, Ask SPAI, and test media stay closed until you open them")
             }
         }
     }
@@ -98,8 +98,8 @@ struct OnboardingView: View {
                                 detail: "Detects gloves vs. bare hands in real-time")
                 onboardingPoint(icon: "exclamationmark.triangle.fill", title: "Contamination Risk",
                                 detail: "Alerts when bare skin is detected during sterile steps")
-                onboardingPoint(icon: "tray.full.fill", title: "Instrument Detection",
-                                detail: "Verifies surgical trays are loaded correctly")
+                onboardingPoint(icon: "tray.full.fill", title: "Instrument Identification",
+                                detail: "Hold up an instrument and SPAI names it and tells you what to check")
                 onboardingPoint(icon: "clock.arrow.circlepath", title: "Auto-Advance",
                                 detail: "Moves to next step after 3 consecutive successful detections")
             }
@@ -141,7 +141,7 @@ struct OnboardingView: View {
                 .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(.white)
 
-            Text("In the 'SIM TEST' panel, you can:")
+            Text("Open Test Media from the Panels menu to:")
                 .font(.title3)
                 .foregroundStyle(.white.opacity(0.75))
 

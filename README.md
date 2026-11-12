@@ -14,7 +14,10 @@ The goal of SPAI is to help sterile processing students, technicians, and instru
 - Sterile prep step guidance
 - AI detection alerts
 - PPE and glove detection
-- Surgical tool detection
+- Instrument identification — hold one up and SPAI names it and says what to check
+- Pip, an in-room guide that hops onto the panel you need to look at
+- Focus layout — three panels by default, everything else on request
+- Watch-style wrist menus (left: stations, right: quick actions)
 - Mock live-feed demo mode
 - Future Core ML integration for on-device inference
 

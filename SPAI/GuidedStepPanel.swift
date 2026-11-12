@@ -48,18 +48,28 @@ struct GuidedStepPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             HStack {
-                Text("GUIDED · \(appModel.currentStep.title.uppercased())")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.8))
+                Text(appModel.currentStep.title.uppercased()).spaiEyebrow()
                 Spacer()
-                Text("Step \(guidedIndex + 1) of \(script.count)")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                // Dots show how far through the station you are without
+                // making you read a fraction.
+                HStack(spacing: 6) {
+                    ForEach(0..<script.count, id: \.self) { index in
+                        Capsule()
+                            .fill(index < guidedIndex ? SPAIColor.safe
+                                  : index == guidedIndex ? SPAIColor.accent
+                                  : Color.white.opacity(0.25))
+                            .frame(width: index == guidedIndex ? 20 : 8, height: 8)
+                    }
+                }
+                .accessibilityHidden(true)
+                Text("\(guidedIndex + 1) of \(script.count)")
+                    .font(SPAIFont.value)
                     .foregroundStyle(SPAIColor.accent)
             }
 
             Text(step.instruction)
-                .font(.system(size: 16, weight: .medium))
+                .font(SPAIFont.instruction)
+                .lineSpacing(3)
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -67,8 +77,9 @@ struct GuidedStepPanel: View {
                 Image(systemName: verificationIcon)
                     .foregroundStyle(satisfied ? SPAIColor.safe : SPAIColor.warning)
                 Text(verificationText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(SPAIFont.label)
+                    .foregroundStyle(.white.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Spacer()
 
@@ -81,10 +92,10 @@ struct GuidedStepPanel: View {
                 } label: {
                     Label(isLast ? "Finish Station" : "Next Step",
                           systemImage: isLast ? "checkmark.seal" : "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(SPAIFont.button)
                         .foregroundStyle(.white)
                         .padding(.horizontal, SPAISpacing.m)
-                        .padding(.vertical, SPAISpacing.s)
+                        .padding(.vertical, SPAISpacing.s + 2)
                         .background(satisfied ? SPAIColor.primary : SPAIColor.neutralMid.opacity(0.4),
                                     in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
@@ -96,9 +107,8 @@ struct GuidedStepPanel: View {
             }
         }
         .padding(SPAISpacing.l)
-        .frame(width: 380)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .frame(width: 440)
+        .spaiPanel(PanelID.guided)
         .animation(.easeInOut(duration: 0.25), value: appModel.guidedStepIndex)
         .onChange(of: detectionService.resultRevision) { _, _ in
             recordVerificationSample()
@@ -194,6 +204,16 @@ struct GuidedStepPanel: View {
         }
     }
 
+    /// Says what SPAI is looking for, so a stalled step explains itself.
+    private var waitingText: String {
+        switch step.condition {
+        case .glovesOn:           return "Looking for your gloves…"
+        case .instrumentsPresent: return "Looking for instruments…"
+        case .trayLoaded:         return "Looking for a loaded tray…"
+        case .manual:             return ""
+        }
+    }
+
     private var verificationIcon: String {
         if step.condition == .manual { return "hand.tap.fill" }
         if !canVerify { return "icloud.slash" }
@@ -201,12 +221,12 @@ struct GuidedStepPanel: View {
     }
 
     private var verificationText: String {
-        if step.condition == .manual { return "Say \"done\" or tap to confirm" }
+        if step.condition == .manual { return "Say \"done\" or tap Next" }
         if !canVerify { return "Can't verify offline — confirm manually" }
         if satisfied {
             return "Verified \(min(consecutiveVerifiedSamples, requiredVerifiedSamples))/\(requiredVerifiedSamples)"
         }
-        return "Waiting for detection…"
+        return waitingText
     }
 }
 

@@ -80,8 +80,7 @@ struct SessionReportPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 420)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.report)
     }
 
     private func reportRow(icon: String, label: String, value: String, valueColor: Color = .white) -> some View {

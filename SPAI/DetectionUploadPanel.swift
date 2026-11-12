@@ -13,10 +13,7 @@ struct DetectionUploadPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            Text("SIM TEST")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.5))
+            Text("TEST MEDIA").spaiEyebrow()
 
             Button {
                 if appModel.isUploadWindowOpen {
@@ -41,27 +38,26 @@ struct DetectionUploadPanel: View {
 
             if service.isLoading {
                 Text("Detecting…")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(SPAIFont.caption)
+                    .foregroundStyle(SPAIText.secondary)
             } else if let error = service.errorMessage {
                 Text(error)
-                    .font(.system(size: 12))
+                    .font(SPAIFont.caption)
                     .foregroundStyle(SPAIColor.warning)
                     .fixedSize(horizontal: false, vertical: true)
             } else if service.hasResult {
-                Text("\(service.detections.count) detection(s)")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
+                Text(service.detections.count == 1 ? "1 thing detected" : "\(service.detections.count) things detected")
+                    .font(SPAIFont.caption)
+                    .foregroundStyle(SPAIText.secondary)
                 if let tray = service.trayState?.capitalized {
                     Text("Tray: \(tray)\(service.instrumentCount.map { " (\($0))" } ?? "")")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(SPAIFont.caption)
+                        .foregroundStyle(SPAIText.secondary)
                 }
             }
         }
         .padding(SPAISpacing.l)
         .frame(width: 260)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.upload)
     }
 }

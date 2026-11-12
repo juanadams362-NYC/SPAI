@@ -5,12 +5,21 @@
 
 import SwiftUI
 
+/// What SPAI can see right now, answered in the order a tech needs it:
+/// are my hands safe, what am I holding, is the room in range.
+///
+/// Each answer is one line. Detail — inspection checks, individual room
+/// readings — is a tap away, and opens by itself only when something is
+/// actually wrong.
 struct DetectionPanel: View {
     @Environment(AppModel.self) private var appModel
     let service: DetectionService
     private let environment = EnvironmentService.shared
 
     private let positivePressure = true
+
+    @State private var showRoomDetail = false
+    @State private var showChecks = false
 
     private var contaminationRisk: Double { service.contaminationRisk }
     private var ppePassing: Bool { service.ppePassing }
@@ -27,20 +36,95 @@ struct DetectionPanel: View {
         service.hasResult ? (ppePassing ? "PPE check passing" : "PPE check failed") : "PPE check idle"
     }
 
+    // MARK: Hands
+
+    private enum HandState {
+        case waiting, gloved, bare, none
+    }
+
+    private var handState: HandState {
+        guard service.hasResult else { return .waiting }
+        if riskHigh { return .bare }
+        if ppePassing { return .gloved }
+        return .none
+    }
+
+    private var handTitle: String {
+        switch handState {
+        case .waiting: return "Waiting for camera"
+        case .gloved:  return "Gloves on"
+        case .bare:    return "Bare hand visible"
+        case .none:    return "No hands in view"
+        }
+    }
+
+    private var handDetail: String {
+        switch handState {
+        case .waiting: return "Start the camera or load test media"
+        case .gloved:  return "Contamination risk low"
+        case .bare:    return "Contamination risk high"
+        case .none:    return "Hold your hands in view of the camera"
+        }
+    }
+
+    private var handIcon: String {
+        switch handState {
+        case .waiting: return "camera.viewfinder"
+        case .gloved:  return "checkmark.shield.fill"
+        case .bare:    return "exclamationmark.triangle.fill"
+        case .none:    return "hand.raised.slash"
+        }
+    }
+
+    private var handColor: Color {
+        switch handState {
+        case .waiting, .none: return SPAIText.secondary
+        case .gloved:         return SPAIColor.safe
+        case .bare:           return SPAIColor.warning
+        }
+    }
+
+    // MARK: Room
+
+    private var temperatureOK: Bool {
+        environment.temperatureF.map { (68...73).contains($0) } ?? true
+    }
+
+    private var humidityOK: Bool {
+        environment.humidityPct.map { (30...60).contains($0) } ?? true
+    }
+
+    private var roomOK: Bool { temperatureOK && humidityOK && positivePressure }
+
+    private var roomSummary: String {
+        guard roomOK else { return "Room out of range" }
+        var parts: [String] = []
+        if let temperature = environment.temperatureF { parts.append("\(temperature)°F") }
+        if let humidity = environment.humidityPct { parts.append("\(humidity)%") }
+        return parts.isEmpty ? "Room conditions" : "Room OK · " + parts.joined(separator: " · ")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             header
-            contaminationRow
+            handsRow
+
+            if let instrument = service.identifiedInstrument {
+                divider
+                instrumentSection(instrument)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
             divider
-            environmentSection
-            divider
-            ppeRow
+            roomSection
         }
         .padding(SPAISpacing.l)
-        .frame(width: 300, alignment: .leading)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .frame(width: 330, alignment: .leading)
+        .spaiPanel(PanelID.detection, border: borderState)
         .animation(.easeInOut(duration: 0.4), value: riskHigh)
+        .animation(.easeInOut(duration: 0.3), value: service.identifiedInstrument)
+        .animation(.easeInOut(duration: 0.25), value: showRoomDetail)
+        .animation(.easeInOut(duration: 0.25), value: showChecks)
         .onChange(of: service.contaminationRisk) { old, new in
             if old < 0.5 && new >= 0.5 && appModel.shouldHaltOnBareHand {
                 SoundManager.shared.playContaminationAlert()
@@ -57,112 +141,200 @@ struct DetectionPanel: View {
                 }
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Detection. Contamination risk \(service.hasResult ? "\(Int(contaminationRisk * 100)) percent" : "not measured"). \(ppeText).")
+        .onChange(of: service.identifiedInstrument?.key) { _, _ in
+            // A different instrument starts collapsed again.
+            showChecks = false
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Detection. \(handTitle). Contamination risk \(service.hasResult ? "\(Int(contaminationRisk * 100)) percent" : "not measured"). \(ppeText).")
         .onAppear { environment.start() }
     }
 
     private var header: some View {
         HStack {
-            Text("DETECTION")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.85))
+            Text("DETECTION").spaiEyebrow()
             Spacer()
             if service.isLoading {
-                Text("…")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.85))
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Checking")
             } else if riskHigh {
                 HStack(spacing: 6) {
-                    Circle().fill(SPAIColor.warning).frame(width: 7, height: 7)
+                    Circle().fill(SPAIColor.warning).frame(width: 8, height: 8)
                     Text("RISK")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(SPAIFont.eyebrow)
                         .foregroundStyle(SPAIColor.warning)
                 }
             }
         }
     }
 
-    private var contaminationRow: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(riskHigh ? SPAIColor.warning : SPAIColor.safe)
-                .frame(width: 10, height: 10)
-                .shadow(color: (riskHigh ? SPAIColor.warning : SPAIColor.safe).opacity(0.8), radius: 4)
-            Text("Contamination risk")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-            Spacer()
-            if service.hasResult {
+    private var handsRow: some View {
+        HStack(spacing: SPAISpacing.s + 4) {
+            Image(systemName: handIcon)
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(handColor)
+                .frame(width: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(handTitle)
+                    .font(SPAIFont.headline)
+                    .foregroundStyle(.white)
+                Text(handDetail)
+                    .font(SPAIFont.caption)
+                    .foregroundStyle(SPAIText.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if service.hasResult && handState != .none {
                 Text("\(Int(contaminationRisk * 100))%")
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundStyle(riskHigh ? SPAIColor.warning : SPAIColor.safe)
-            } else {
-                Text("—")
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityHidden(true)
             }
         }
     }
 
-    private var environmentSection: some View {
+    // MARK: Instrument
+
+    private func instrumentSection(_ instrument: IdentifiedInstrument) -> some View {
         VStack(alignment: .leading, spacing: SPAISpacing.s) {
-            Text("ENVIRONMENT (LIVE)")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .tracking(1.2)
-                .foregroundStyle(.white.opacity(0.75))
-            if let temperatureF = environment.temperatureF {
-                environmentRow(icon: "thermometer.medium", label: "Temperature",
-                               value: "\(temperatureF)°F", ok: (68...73).contains(temperatureF))
-            } else {
-                environmentRow(icon: "thermometer.medium", label: "Temperature",
-                               value: environment.errorMessage == nil ? "…" : "—", ok: true)
+            HStack(alignment: .top, spacing: SPAISpacing.s + 4) {
+                Image(systemName: instrument.info?.icon ?? "questionmark.circle")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(instrument.certain ? SPAIColor.accent : SPAIText.secondary)
+                    .frame(width: 36)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(instrument.held ? "YOU'RE HOLDING" : "IN VIEW")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .tracking(1.2)
+                        .foregroundStyle(SPAIText.tertiary)
+                    Text(instrument.certain ? instrument.name : "An instrument")
+                        .font(SPAIFont.bodyStrong)
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(instrument.info?.summary ?? "Not sure which one — hold it flat and a little closer.")
+                        .font(SPAIFont.caption)
+                        .foregroundStyle(SPAIText.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                if instrument.certain {
+                    Text("\(instrument.confidencePercent)%")
+                        .font(SPAIFont.value)
+                        .foregroundStyle(SPAIColor.accent)
+                        .accessibilityLabel("\(instrument.confidencePercent) percent confident")
+                }
             }
-            if let humidityPct = environment.humidityPct {
-                environmentRow(icon: "humidity.fill", label: "Humidity",
-                               value: "\(humidityPct)%", ok: (30...60).contains(humidityPct))
-            } else {
-                environmentRow(icon: "humidity.fill", label: "Humidity",
-                               value: environment.errorMessage == nil ? "…" : "—", ok: true)
+
+            if let info = instrument.info {
+                disclosureButton(showChecks ? "Hide checks" : "What to check", isOpen: showChecks) {
+                    showChecks.toggle()
+                }
+                if showChecks {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(info.inspect, id: \.self) { check in
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(SPAIColor.safe)
+                                    .padding(.top, 2)
+                                Text(check)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        Text(info.handling)
+                            .font(SPAIFont.caption)
+                            .foregroundStyle(SPAIText.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+                    }
+                    .transition(.opacity)
+                }
             }
-            environmentRow(icon: "wind", label: "Air pressure",
-                           value: positivePressure ? "Positive" : "Negative", ok: positivePressure)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Environment. Temperature \(environment.temperatureF.map(String.init) ?? "unavailable") degrees. Humidity \(environment.humidityPct.map(String.init) ?? "unavailable") percent. Air pressure \(positivePressure ? "positive" : "negative").")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(instrument.certain
+            ? "Instrument: \(instrument.name). \(instrument.info?.summary ?? "")"
+            : "An instrument is in view, but SPAI is not sure which one.")
+    }
+
+    // MARK: Room
+
+    private var roomSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+            Button {
+                showRoomDetail.toggle()
+            } label: {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(roomOK ? SPAIColor.safe : SPAIColor.warning)
+                        .frame(width: 9, height: 9)
+                    Text(roomSummary)
+                        .font(SPAIFont.label)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(SPAIText.tertiary)
+                        .rotationEffect(.degrees(showRoomDetail || !roomOK ? 180 : 0))
+                }
+            }
+            .buttonStyle(.plain)
+            .spaiHitTarget()
+            .accessibilityLabel("\(roomSummary). \(showRoomDetail ? "Hide" : "Show") room readings")
+
+            // Opens on its own when a reading is out of range.
+            if showRoomDetail || !roomOK {
+                VStack(alignment: .leading, spacing: SPAISpacing.s) {
+                    environmentRow(icon: "thermometer.medium", label: "Temperature",
+                                   value: environment.temperatureF.map { "\($0)°F" }
+                                       ?? (environment.errorMessage == nil ? "…" : "—"),
+                                   ok: temperatureOK)
+                    environmentRow(icon: "humidity.fill", label: "Humidity",
+                                   value: environment.humidityPct.map { "\($0)%" }
+                                       ?? (environment.errorMessage == nil ? "…" : "—"),
+                                   ok: humidityOK)
+                    environmentRow(icon: "wind", label: "Air pressure",
+                                   value: positivePressure ? "Positive" : "Negative", ok: positivePressure)
+                }
+                .transition(.opacity)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Temperature \(environment.temperatureF.map(String.init) ?? "unavailable") degrees. Humidity \(environment.humidityPct.map(String.init) ?? "unavailable") percent. Air pressure \(positivePressure ? "positive" : "negative").")
+            }
+        }
     }
 
     private func environmentRow(icon: String, label: String, value: String, ok: Bool) -> some View {
         HStack(spacing: 10) {
-            Circle().fill(ok ? SPAIColor.safe : SPAIColor.warning).frame(width: 8, height: 8)
             Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 18)
+                .font(.system(size: 15))
+                .foregroundStyle(ok ? SPAIText.secondary : SPAIColor.warning)
+                .frame(width: 20)
             Text(label)
-                .font(.system(size: 14))
+                .font(SPAIFont.label)
                 .foregroundStyle(.white.opacity(0.95))
             Spacer()
             Text(value)
-                .font(.system(size: 14, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white)
+                .font(SPAIFont.value)
+                .foregroundStyle(ok ? .white : SPAIColor.warning)
         }
     }
 
-    private var ppeRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: ppePassing ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 15))
-                .foregroundStyle(ppePassing ? SPAIColor.safe : SPAIColor.warning)
-            Text(ppeText)
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.95))
-            Spacer()
-            Text("glove · hand")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.7))
+    private func disclosureButton(_ title: String, isOpen: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(SPAIFont.label)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+            }
+            .foregroundStyle(SPAIColor.accent)
         }
+        .buttonStyle(.plain)
+        .spaiHitTarget()
     }
 
     private var divider: some View {

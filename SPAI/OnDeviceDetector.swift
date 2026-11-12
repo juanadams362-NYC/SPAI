@@ -41,9 +41,25 @@ final class OnDeviceDetector {
         }
     }
 
+    /// Instrument detection. Each hit comes back under its catalog display
+    /// name with its catalog key, matching what the backend's instrument
+    /// endpoints return, so the rest of the app treats both sources alike.
     func detectInstruments(image: UIImage) async -> [BackendDetection] {
         guard let instrumentModel else { return [] }
-        return await run(instrumentModel, on: image) { _ in 0 }
+        let raw = await run(instrumentModel, on: image) { label in
+            let key = InstrumentCatalog.key(for: label)
+            return InstrumentCatalog.all.firstIndex { $0.key == key } ?? 0
+        }
+        return raw.map { detection in
+            BackendDetection(
+                classId: detection.classId,
+                className: InstrumentCatalog.displayName(for: detection.className),
+                confidence: detection.confidence,
+                box: detection.box,
+                key: InstrumentCatalog.key(for: detection.className),
+                category: InstrumentCatalog.genericLabel
+            )
+        }
     }
 
     private func run(
