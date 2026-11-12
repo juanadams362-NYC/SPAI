@@ -7,11 +7,15 @@ Babcock tissue forceps, Halsted mosquito forceps, Mayo-Hegar needle holder,
 operating scissors, No. 3 scalpel handle).
 
 Earlier versions of this file threw the names away and reported every hit as
-a generic "instrument", because the labels coming out looked wrong. They
-looked wrong because the shared Detector was naming this model's classes
-with the PPE model's ["glove", "hand"] list. Detector now reads the label
-list out of each weights file, so the real instrument names come through and
-we keep them:
+a generic "instrument". Two things were wrong, and both are fixed:
+
+  1. The shared Detector named this model's classes with the PPE model's
+     ["glove", "hand"] list. It now reads the label list from each weights
+     file.
+  2. The v4 weights themselves called every instrument by one name. The v5
+     weights (see model-training/v5_instruments.md) tell them apart.
+
+So the real instrument names come through and we keep them:
 
   - class_name : the instrument's display name ("Mayo-Hegar Needle Holder")
   - key        : stable id for lookups ("mayo_hegar_needle_holder")
