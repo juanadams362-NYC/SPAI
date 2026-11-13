@@ -11,10 +11,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.inference.detector import detector
 from app.inference.tray_detector import tray_detector
+import os
+
+from fastapi import Depends
+
+from app import security
 from app.routes import (
     health, model, detect, compliance, batch, settings, detect_tray, ask,
-    analyze, instruments,
+    analyze, instruments, sessions, instructor,
 )
+from app.store import get_store
 from app.logging_config import setup_logging, get_logger
 from app.metrics import metrics
 
@@ -51,6 +57,20 @@ async def lifespan(app: FastAPI):
         tray_status["model_path"],
     )
 
+    # Records: open the database, apply the retention policy if one is set.
+    store = get_store()
+    retention = os.getenv("SPAI_RETENTION_DAYS")
+    if retention and retention.isdigit():
+        purged = store.purge_older_than(int(retention))
+        logger.info("Retention: removed %d run(s) older than %s days", purged, retention)
+    secured = security.is_secured()
+    if not all(secured.values()):
+        logger.warning(
+            "Running without %s. Fine on a desk; set SPAI_API_KEY and SPAI_INSTRUCTOR_PIN before putting this online.",
+            " or ".join(name for name, ok in (("a headset key", secured["headset_key"]),
+                                               ("an instructor PIN", secured["instructor_pin"])) if not ok),
+        )
+
     yield
     logger.info("Shutting down SPAI backend.")
 
@@ -58,14 +78,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="SPAI Backend",
     description="Sterile Processing AI — detection API for the visionOS app.",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # The headset is a native app and the dashboard is served from this same
+    # origin, so nothing legitimate needs cross-site cookies.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -81,16 +103,24 @@ async def count_requests(request, call_next):
 
 
 # Register the route modules. Each one defines a router; attach them all.
+#
+# Open to anyone: liveness and the dashboard page itself (which asks for the
+# PIN). Everything a headset calls needs the site's key when one is set.
+headset = [Depends(security.require_headset)]
 app.include_router(health.router)
-app.include_router(model.router)
-app.include_router(detect.router)
-app.include_router(detect_tray.router)   # tray-state detection
-app.include_router(analyze.router)       # PPE + instruments + identification, one upload
-app.include_router(instruments.router)   # instrument reference cards
-app.include_router(compliance.router)
-app.include_router(batch.router)
-app.include_router(settings.router)
-app.include_router(ask.router)           # AI trainer chat
+app.include_router(sessions.public)                           # /privacy
+app.include_router(instructor.router)                         # dashboard page + sign-in
+app.include_router(instructor.api)                            # dashboard data (instructor PIN)
+app.include_router(model.router, dependencies=headset)
+app.include_router(detect.router, dependencies=headset)
+app.include_router(detect_tray.router, dependencies=headset)  # tray-state detection
+app.include_router(analyze.router, dependencies=headset)      # PPE + instruments + identification
+app.include_router(instruments.router, dependencies=headset)  # instrument reference cards
+app.include_router(compliance.router, dependencies=headset)
+app.include_router(batch.router, dependencies=headset)
+app.include_router(settings.router, dependencies=headset)
+app.include_router(ask.router, dependencies=headset)          # AI trainer chat
+app.include_router(sessions.router, dependencies=headset)     # roster, protocol, run upload
 
 
 @app.get("/")
@@ -98,6 +128,7 @@ def root() -> dict:
     """Friendly landing message."""
     return {
         "name": "SPAI Backend",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "docs": "/docs",
+        "instructor": "/instructor",
     }

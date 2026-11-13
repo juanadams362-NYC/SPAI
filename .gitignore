@@ -93,3 +93,7 @@ datasets/
 !SPAI/instruments_best.mlpackage/
 !SPAI/instruments_best.mlpackage/**
 backend/model/*.mlpackage/
+
+# Pilot records: learner names and run history never belong in git
+backend/data/
+.pytest_cache/

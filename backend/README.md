@@ -41,6 +41,49 @@ The names come from the label list inside the weights file. The knowledge
 base is `app/instruments.py`; the app carries a matching copy in
 `SPAI/InstrumentCatalog.swift` for on-device fallback — change both together.
 
+## The pilot platform
+
+Beyond detection, the backend is what makes SPAI usable by a class:
+
+| Route | Who | What it does |
+| --- | --- | --- |
+| `GET /instructor` | Instructor | The dashboard: roster, results, score trends, where the class slips, run reports, protocol editor |
+| `GET /learners` | Headset | The roster, for the sign-in list |
+| `GET /protocol` | Headset | The institution's station scripts, count sheets and scoring rubric |
+| `PUT /sessions/{id}` | Headset | Upload a finished run; the server scores it. Safe to retry |
+| `GET /privacy` | Anyone | What this server stores, in plain language |
+| `/compliance/*` | Headset | Workflow state, now kept **per headset** via the `X-SPAI-Session` header |
+
+Records live in a SQLite file at `backend/data/spai.db` (override with
+`SPAI_DB`). Camera frames are never written anywhere.
+
+### Before real students use it
+
+Set these environment variables on the server:
+
+| Variable | Purpose |
+| --- | --- |
+| `SPAI_API_KEY` | Shared key the headsets send. Enter the same value in SPAI Settings |
+| `SPAI_INSTRUCTOR_PIN` | PIN for the instructor dashboard |
+| `SPAI_SECRET` | Any long random string; keeps instructors signed in across restarts |
+| `SPAI_RETENTION_DAYS` | Optional. Delete runs this many days after they end |
+| `GEMINI_API_KEY` | For Ask SPAI |
+
+Without the first two the server runs open and says so on the dashboard and
+at startup.
+
+**Storage must be persistent.** The database is a file. A host that wipes
+the disk on restart (a free Hugging Face Space does) will lose every run.
+For a pilot, use a host with a persistent volume and point `SPAI_DB` and
+`SPAI_PROTOCOL` at it, and serve over HTTPS.
+
+### A sample class for demos
+
+    python -m app.seed_demo            # 12 invented learners, ~50 runs
+    python -m app.seed_demo --clear
+
+Sample learners are flagged in the database and labelled in the dashboard.
+
 ## Tests
 
     cd backend
