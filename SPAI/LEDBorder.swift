@@ -17,7 +17,8 @@ enum BorderState {
 
     var colors: [Color] {
         switch self {
-        case .normal:    return [Color(hex: 0x4A9EFF), Color(hex: 0x9B6BFF), Color(hex: 0x6FD3FF)]
+        // Paper-and-stone neutrals, matching the hairlines on the website.
+        case .normal:    return [Color(hex: 0xF2EFE9), Color(hex: 0x8A847B), Color(hex: 0xBDB7AD)]
         case .attention: return [Color(hex: 0x6FD3FF), Color(hex: 0xFFFFFF), Color(hex: 0x4A9EFF)]
         case .warning:   return [Color(hex: 0xFFB020), Color(hex: 0xFF7A45), Color(hex: 0xFFB020)]
         case .critical:  return [Color(hex: 0xFF5A5A), Color(hex: 0xA32D2D), Color(hex: 0xFF5A5A)]

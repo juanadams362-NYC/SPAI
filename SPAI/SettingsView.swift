@@ -13,6 +13,11 @@ struct SettingsView: View {
     @AppStorage("streamingFPS") private var streamingFPS = 5.0
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
     @AppStorage("speakSteps") private var speakSteps = false
+    @AppStorage("apiKey") private var apiKey = ""
+    @AppStorage("detectOnDevice") private var detectOnDevice = true
+    @AppStorage("useHeadsetCamera") private var useHeadsetCamera = true
+    @AppStorage("voiceCommands") private var voiceCommands = true
+    @State private var connectionStatus: String?
 
     @State private var pushStatus: String?
     private let client = BackendClient()
@@ -114,6 +119,9 @@ struct SettingsView: View {
             settingToggle("Speak step instructions", isOn: $speakSteps, tint: SPAIColor.primary)
                 .accessibilityHint("Reads each guided step aloud when it appears")
 
+            settingToggle("Voice commands", isOn: $voiceCommands, tint: SPAIColor.primary)
+                .accessibilityHint("Say next, repeat, why, or what is this during a step")
+
             Button {
                 appModel.requestTour()
             } label: {
@@ -138,14 +146,59 @@ struct SettingsView: View {
 
     private var detectionSection: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            sectionTitle("Detection")
+            sectionTitle("Privacy")
 
-            settingBlock(title: "Backend URL") {
+            settingToggle("Keep camera frames on this headset", isOn: $detectOnDevice, tint: SPAIColor.safe)
+            Text(detectOnDevice
+                 ? "Checks run on the headset. Video is never sent to the server; only the record of each run is."
+                 : "Frames are sent to your SPAI server for checking and discarded there. They are never stored.")
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+
+            settingToggle("Use the headset's camera", isOn: $useHeadsetCamera, tint: SPAIColor.safe)
+                .accessibilityHint("Needs Apple's main camera access for enterprise. Takes effect next time the workspace opens.")
+
+            sectionDivider
+            sectionTitle("Server")
+
+            settingBlock(title: "Server address") {
                 TextField( "http://127.0.0.1:8000", text: $backendURL)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 14, design: .monospaced))
-                    .accessibilityLabel("Backend URL")
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityLabel("Server address")
             }
+
+            settingBlock(title: "Site key") {
+                SecureField("From your SPAI administrator", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Site key")
+            }
+
+            Button {
+                Task { await testConnection() }
+            } label: {
+                Label("Test connection", systemImage: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, SPAISpacing.l)
+                    .padding(.vertical, SPAISpacing.s + 2)
+                    .background(SPAIColor.secondary.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            }
+            .buttonStyle(.plain)
+            .spaiHitTarget()
+
+            if let connectionStatus {
+                Text(connectionStatus)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            sectionDivider
+            sectionTitle("Detection")
 
             settingBlock(title: "Confidence threshold: \(String(format: "%.2f", confidenceThreshold))") {
                 Slider(value: $confidenceThreshold, in: 0.05...0.95, step: 0.05)
@@ -211,6 +264,16 @@ struct SettingsView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white.opacity(0.95))
             content()
+        }
+    }
+
+    private func testConnection() async {
+        connectionStatus = "Checking…"
+        switch await client.connection() {
+        case .connected:   connectionStatus = "Connected. This headset is accepted by the server."
+        case .unreachable: connectionStatus = "Nothing answered at that address. Check it, and that the headset is on the same network."
+        case .wrongKey:    connectionStatus = "The server answered but didn't accept the site key."
+        case .outdated:    connectionStatus = "Connected, but the server is an older version without class records."
         }
     }
 

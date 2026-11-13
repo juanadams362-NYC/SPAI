@@ -21,6 +21,15 @@ The goal of SPAI is to help sterile processing students, technicians, and instru
 - Mock live-feed demo mode
 - Future Core ML integration for on-device inference
 
+## For a pilot
+
+- Students sign in on the headset; assessed runs are scored and sent to the instructor
+- Instructor dashboard in a browser: roster, results, score trends, run reports, CSV export
+- Each institution can edit the station scripts, count sheet and scoring
+- Camera frames stay on the headset by default; a plain-language privacy statement is built in
+
+See [docs/pilot-guide.md](docs/pilot-guide.md).
+
 ## Tech Stack
 
 - SwiftUI

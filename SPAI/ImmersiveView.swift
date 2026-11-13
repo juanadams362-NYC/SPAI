@@ -7,6 +7,7 @@ import SwiftUI
 import RealityKit
 import RealityKitContent
 import simd
+import UIKit
 
 struct ImmersiveView: View {
     @Environment(AppModel.self) private var appModel
@@ -16,6 +17,11 @@ struct ImmersiveView: View {
     @State private var stationManager = StationManager()
     @State private var handTracking = HandTrackingService()
     @State private var guide = GuideCompanion()
+    @State private var headsetCamera = CameraFrameService()
+    /// Parent of every room panel and of Pip. Moving this one entity moves
+    /// the whole workspace, which is how it is fitted to the user.
+    @State private var workspace = Entity()
+    @AppStorage("useHeadsetCamera") private var useHeadsetCamera = true
     /// The "press Start Step" nudge is only worth saying once per session.
     @State private var hasNudgedToStart = false
 
@@ -59,6 +65,10 @@ struct ImmersiveView: View {
         PanelID.eventLog, PanelID.chat, PanelID.history, PanelID.upload
     ]
 
+    /// The panel heights above assume eyes about this far off the floor.
+    /// The workspace is raised or lowered by the difference for each user.
+    private static let designEyeHeight: Float = 1.6
+
     /// RealityView attachments are laid out at this many points per metre.
     private static let pointsPerMeter: Float = 1360
 
@@ -69,6 +79,15 @@ struct ImmersiveView: View {
             .onChange(of: appModel.tourRequestID) { _, _ in
                 guard appModel.showCompanion else { return }
                 guide.startTour()
+            }
+            .onChange(of: appModel.recenterRequestID) { _, _ in
+                fitWorkspaceToUser(animated: true)
+            }
+            .onChange(of: detectionService.mode) { _, mode in
+                appModel.detectionModeLabel = mode.rawValue
+            }
+            .onChange(of: headsetCamera.statusMessage) { _, message in
+                appModel.cameraNote = message
             }
             .onChange(of: appModel.isHalted) { _, halted in
                 reactToHalt(halted)
@@ -103,9 +122,10 @@ struct ImmersiveView: View {
             for slot in Self.slots {
                 guard let panel = attachments.entity(for: slot.id) else { continue }
                 panel.position = Self.arcPosition(angle: slot.angle, height: slot.height, radius: slot.radius)
-                content.add(panel)
+                workspace.addChild(panel)
                 placed[slot.id] = panel
             }
+            content.add(workspace)
 
             // Alerts and narration come from the panel they're about.
             if let detection = placed[PanelID.detection] {
@@ -140,19 +160,21 @@ struct ImmersiveView: View {
             #endif
 
             // Pip and its speech bubble.
-            content.add(guide.root)
+            workspace.addChild(guide.root)
             let bubble = attachments.entity(for: PanelID.guideBubble)
             if let bubble {
                 bubble.components.set(BillboardComponent())
-                content.add(bubble)
+                workspace.addChild(bubble)
             }
             guide.attach(panels: placed, bubble: bubble, appModel: appModel)
 
             applyState(attachments)
 
-            // Give the room a moment to appear before Pip starts talking.
+            // Give the room a moment to appear, put it where this user can
+            // see it, and only then let Pip start talking.
             Task {
-                try? await Task.sleep(for: .seconds(1.2))
+                await fitWorkspaceWhenTrackingIsReady()
+                try? await Task.sleep(for: .seconds(0.8))
                 beginGuide()
             }
         } update: { _, attachments in
@@ -231,10 +253,76 @@ struct ImmersiveView: View {
             )
         }
 
+        appModel.detectionModeLabel = detectionService.mode.rawValue
+        // Pick up the school's latest wording and send any runs that were
+        // finished while offline.
+        Task {
+            await ProtocolStore.shared.refresh()
+            await appModel.flushUploads()
+        }
+
         #if !targetEnvironment(simulator)
         Task { await stationManager.startImageTracking() }
         Task { await handTracking.start() }
+        startHeadsetCamera()
         #endif
+    }
+
+    /// Feeds detection from the headset's own camera, so a student needs
+    /// nothing but the headset. Requires Apple's main-camera entitlement;
+    /// without it the camera reports why and the other sources still work.
+    private func startHeadsetCamera() {
+        guard useHeadsetCamera else {
+            appModel.cameraNote = nil
+            return
+        }
+        headsetCamera.onFrameForDetection = { buffer in
+            guard let image = UIImage.from(readOnlyBuffer: buffer) else { return }
+            Task {
+                await detectionService.detect(
+                    image: image,
+                    step: SterileStep(rawValue: appModel.currentStepIndex),
+                    preferOnDevice: false
+                )
+            }
+        }
+        Task { await headsetCamera.start() }
+    }
+
+    // MARK: - Fitting the workspace to the user
+
+    /// Hand and head tracking take a moment to start. Wait for a head pose
+    /// (briefly), then place the workspace. In the simulator there is no
+    /// pose and the workspace stays at its designed position.
+    private func fitWorkspaceWhenTrackingIsReady() async {
+        for _ in 0..<12 {
+            try? await Task.sleep(for: .seconds(0.25))
+            if handTracking.headPose() != nil {
+                fitWorkspaceToUser(animated: false)
+                return
+            }
+        }
+    }
+
+    /// Turns the workspace to face the way the user is looking and raises
+    /// or lowers it to their eye height. Panels used to sit at fixed heights
+    /// in a fixed direction, which put them out of view for anyone seated,
+    /// shorter or taller than the design assumed, or facing another way.
+    private func fitWorkspaceToUser(animated: Bool) {
+        guard let head = handTracking.headPose() else { return }
+        // Rotating by this angle about Y turns the workspace's "ahead" (-Z)
+        // to the direction the user faces.
+        let yaw = atan2(-head.forward.x, -head.forward.z)
+        let lift = min(max(head.position.y - Self.designEyeHeight, -0.65), 0.35)
+        let target = Transform(
+            rotation: simd_quatf(angle: yaw, axis: [0, 1, 0]),
+            translation: [head.position.x, lift, head.position.z]
+        )
+        if animated {
+            workspace.move(to: target, relativeTo: workspace.parent, duration: 0.6, timingFunction: .easeInOut)
+        } else {
+            workspace.transform = target
+        }
     }
 
     private func leaveSpace() {
@@ -242,8 +330,11 @@ struct ImmersiveView: View {
         appModel.spotlightPanel = nil
         appModel.isTourActive = false
         guide.detach()
+        // Leaving mid-run still records the run, as incomplete.
+        appModel.endRunEarly()
         #if !targetEnvironment(simulator)
         handTracking.stop()
+        headsetCamera.stop()
         #endif
         SoundManager.shared.contaminationAnchor = nil
         SpeechManager.shared.guidedAnchor = nil

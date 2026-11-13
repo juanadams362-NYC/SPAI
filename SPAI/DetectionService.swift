@@ -46,6 +46,25 @@ final class DetectionService {
 
     private var tracker = InstrumentTracker()
 
+    /// When the last camera frame arrived, from any source. Lets the UI
+    /// tell "no camera" apart from "camera running, nothing in view".
+    private(set) var lastFrameAt: Date?
+
+    /// True when on-device models are loaded, so private mode can be honoured.
+    var canRunOnDevice: Bool { onDevice.isAvailable }
+
+    /// The user's choice in Settings. On unless they have turned it off.
+    static var keepsFramesOnDevice: Bool {
+        UserDefaults.standard.object(forKey: "detectOnDevice") as? Bool ?? true
+    }
+
+    /// How many of each instrument are in view, by catalog key. Takes the
+    /// highest count over the last few frames, so one dropped detection
+    /// doesn't make an instrument blink out of the count sheet.
+    private(set) var instrumentCounts: [String: Int] = [:]
+    private var recentCounts: [[String: Int]] = []
+    private static let countWindow = 4
+
     /// Nil until we've tried. False once the backend has told us it has no
     /// /analyze route, after which we stop asking and use the older pair of
     /// endpoints for the rest of the session.
@@ -87,6 +106,12 @@ final class DetectionService {
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
+        lastFrameAt = Date()
+
+        // Private mode: frames stay on the headset whenever the on-device
+        // models can do the job. This is the default, and it is what the
+        // privacy page tells an institution's IT office.
+        let onDeviceFirst = preferOnDevice || Self.keepsFramesOnDevice
 
         errorMessage = nil
         trayState = nil
@@ -94,7 +119,15 @@ final class DetectionService {
 
         let wantTrayVerdict = (step == .trayAssembly)
 
-        if preferOnDevice, onDevice.isAvailable {
+        // Private mode is a promise, not a preference. If the on-device
+        // model can't run, say so; never quietly send the frame instead.
+        if Self.keepsFramesOnDevice, !onDevice.isAvailable {
+            mode = .offline
+            errorMessage = "On-headset checks aren't available on this device. To use the server instead, turn off \"Keep camera frames on this headset\" in Settings."
+            return
+        }
+
+        if onDeviceFirst, onDevice.isAvailable {
             let local = await detectOnDevice(image: image, wantTrayVerdict: wantTrayVerdict)
             applyResult(local, mode: .onDevice)
             print("[DetectionService] on-device preferred: \(local.count) detections")
@@ -173,6 +206,26 @@ final class DetectionService {
         mode = newMode
         resultRevision += 1
         updateIdentification()
+        updateInstrumentCounts()
+    }
+
+    private func updateInstrumentCounts() {
+        var frame: [String: Int] = [:]
+        for detection in detections where Self.isInstrumentClass(detection.className) {
+            // Only count instruments SPAI is prepared to name; a low-
+            // confidence box shouldn't tick an item off a count sheet.
+            guard detection.confidence >= InstrumentCatalog.identifyThreshold,
+                  let info = InstrumentCatalog.lookup(detection.key ?? detection.className) else { continue }
+            frame[info.key, default: 0] += 1
+        }
+        recentCounts.append(frame)
+        if recentCounts.count > Self.countWindow { recentCounts.removeFirst() }
+
+        var best: [String: Int] = [:]
+        for counts in recentCounts {
+            for (key, count) in counts { best[key] = max(best[key] ?? 0, count) }
+        }
+        if best != instrumentCounts { instrumentCounts = best }
     }
 
     /// Folds this frame into the running identification. A new instrument is
@@ -195,6 +248,8 @@ final class DetectionService {
         tracker.reset()
         identifiedInstrument = nil
         announcedInstrument = nil
+        recentCounts = []
+        instrumentCounts = [:]
     }
 
     static func isPPEClass(_ className: String) -> Bool {

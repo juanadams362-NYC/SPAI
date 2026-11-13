@@ -203,6 +203,23 @@ final class HandTrackingService {
         return WristJoints(wrist: wrist, indexKnuckle: index, middleKnuckle: middle, littleKnuckle: little)
     }
 
+    /// Where the user's head is and which way it faces along the floor.
+    /// Used to place the workspace in front of the user at their height.
+    func headPose() -> (position: SIMD3<Float>, forward: SIMD3<Float>)? {
+        guard worldTracking.state == .running,
+              let device = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime()),
+              device.isTracked else { return nil }
+        let transform = device.originFromAnchorTransform
+        let position = SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+        // The device looks down its own -Z. Flatten to the floor plane so
+        // looking up or down doesn't tilt the workspace.
+        var forward = SIMD3<Float>(-transform.columns.2.x, 0, -transform.columns.2.z)
+        let len = simd_length(forward)
+        guard len > 0.05 else { return nil }
+        forward /= len
+        return (position, forward)
+    }
+
     private func headPosition(at time: TimeInterval) -> SIMD3<Float>? {
         guard worldTracking.state == .running,
               let device = worldTracking.queryDeviceAnchor(atTimestamp: time),

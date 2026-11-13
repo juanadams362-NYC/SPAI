@@ -130,10 +130,50 @@ struct ComplianceEventResult: Codable {
 // MARK: - Client
 
 final class BackendClient {
+    /// The workflow this headset is running. Sent with every request so the
+    /// server keeps each headset's state separate; a classroom of headsets
+    /// sharing one server must not advance or halt each other's workflow.
+    static var sessionID = UUID().uuidString
+
     var baseURL: URL {
         let stored = UserDefaults.standard.string(forKey: "backendURL")
-        return stored.flatMap { URL(string: $0) }
+        return stored.flatMap { URL(string: $0.trimmingCharacters(in: .whitespaces)) }
             ?? URL(string: "http://127.0.0.1:8000")!
+    }
+
+    /// Every request goes through here so the site key and session id are
+    /// never forgotten on a new endpoint.
+    private func makeRequest(_ path: String, method: String = "GET", timeout: TimeInterval = 15) -> URLRequest {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = method
+        request.timeoutInterval = timeout
+        request.setValue(Self.sessionID, forHTTPHeaderField: "X-SPAI-Session")
+        let key = (UserDefaults.standard.string(forKey: "apiKey") ?? "").trimmingCharacters(in: .whitespaces)
+        if !key.isEmpty {
+            request.setValue(key, forHTTPHeaderField: "X-SPAI-Key")
+        }
+        return request
+    }
+
+    private func send<Response: Decodable>(_ request: URLRequest, body: Data? = nil) async throws -> Response {
+        var request = request
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.check(response)
+        return try JSONDecoder().decode(Response.self, from: data)
+    }
+
+    private static func check(_ response: URLResponse) throws {
+        guard let http = response as? HTTPURLResponse else { throw BackendError.badResponse }
+        switch http.statusCode {
+        case 200: return
+        case 401: throw BackendError.unauthorized
+        case 404, 405: throw BackendError.endpointMissing
+        default: throw BackendError.badResponse
+        }
     }
 
     // MARK: Detection
@@ -166,10 +206,7 @@ final class BackendClient {
             throw BackendError.imageEncodingFailed
         }
 
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
-        request.httpMethod = "POST"
-        request.timeoutInterval = Self.detectionTimeout
-
+        var request = makeRequest(path, method: "POST", timeout: Self.detectionTimeout)
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)",
                          forHTTPHeaderField: "Content-Type")
@@ -182,99 +219,104 @@ final class BackendClient {
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
 
         let (data, response) = try await URLSession.shared.upload(for: request, from: body)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw BackendError.badResponse
-        }
-        if http.statusCode == 404 || http.statusCode == 405 {
-            throw BackendError.endpointMissing
-        }
-        guard http.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-
+        try Self.check(response)
         return try JSONDecoder().decode(Response.self, from: data)
     }
 
     // MARK: Health
 
-    func health() async -> Bool {
-        let url = baseURL.appendingPathComponent("health")
+    /// Whether the server is reachable, and whether it accepts this
+    /// headset's key — two different problems with two different fixes.
+    func connection() async -> BackendConnection {
+        var probe = makeRequest("health", timeout: 5)
+        probe.cachePolicy = .reloadIgnoringLocalCacheData
         do {
-            let (_, response) = try await URLSession.shared.data(from: url)
-            return (response as? HTTPURLResponse)?.statusCode == 200
+            let (_, response) = try await URLSession.shared.data(for: probe)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return .unreachable }
         } catch {
-            return false
+            return .unreachable
         }
+        do {
+            let _: RosterResponse = try await send(makeRequest("learners", timeout: 5))
+            return .connected
+        } catch BackendError.unauthorized {
+            return .wrongKey
+        } catch BackendError.endpointMissing {
+            return .outdated
+        } catch {
+            return .unreachable
+        }
+    }
+
+    func health() async -> Bool {
+        await connection() != .unreachable
     }
 
     // MARK: Settings
 
     func getSettings() async throws -> BackendSettings {
-        let url = baseURL.appendingPathComponent("settings")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-        return try JSONDecoder().decode(BackendSettings.self, from: data)
+        try await send(makeRequest("settings"))
     }
 
     func updateConfidenceThreshold(_ value: Double) async throws -> BackendSettings {
-        let url = baseURL.appendingPathComponent("settings")
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["confidence_threshold": value])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-        return try JSONDecoder().decode(BackendSettings.self, from: data)
+        try await send(makeRequest("settings", method: "PATCH"),
+                       body: JSONEncoder().encode(["confidence_threshold": value]))
     }
 
     // MARK: Compliance
 
     func complianceState() async throws -> ComplianceState {
-        let url = baseURL.appendingPathComponent("compliance/state")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-        return try JSONDecoder().decode(ComplianceState.self, from: data)
+        try await send(makeRequest("compliance/state"))
     }
 
     func sendComplianceEvent(_ event: String, step: String? = nil) async throws -> ComplianceEventResult {
-        let url = baseURL.appendingPathComponent("compliance/event")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
         var payload: [String: String] = ["event": event]
         if let step { payload["step"] = step }
-        request.httpBody = try JSONEncoder().encode(payload)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-        return try JSONDecoder().decode(ComplianceEventResult.self, from: data)
+        return try await send(makeRequest("compliance/event", method: "POST"),
+                              body: JSONEncoder().encode(payload))
     }
 
     func resetCompliance() async throws -> ComplianceState {
-        let url = baseURL.appendingPathComponent("compliance/reset")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        try await send(makeRequest("compliance/reset", method: "POST"))
+    }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-        return try JSONDecoder().decode(ComplianceState.self, from: data)
+    // MARK: Pilot platform
+
+    /// The class roster, for the sign-in list.
+    func learners() async throws -> [Learner] {
+        let response: RosterResponse = try await send(makeRequest("learners"))
+        return response.learners
+    }
+
+    /// The institution's station scripts, count sheets and rubric.
+    func fetchProtocol() async throws -> SiteProtocol {
+        try await send(makeRequest("protocol"))
+    }
+
+    /// Uploads a finished run. The server scores it and returns the result
+    /// of record. Safe to call again with the same run.
+    func uploadRun(_ run: RunRecord) async throws -> ScoredRun {
+        try await send(makeRequest("sessions/\(run.id)", method: "PUT", timeout: 20),
+                       body: JSONEncoder().encode(run))
+    }
+
+    // MARK: Ask SPAI
+
+    func ask(_ question: AskRequest) async throws -> AskResponse {
+        try await send(makeRequest("ask", method: "POST", timeout: 30),
+                       body: JSONEncoder().encode(question))
     }
 }
 
-// MARK: - Ask SPAI
+enum BackendConnection: Equatable {
+    case connected
+    /// Nothing answered at the address in Settings.
+    case unreachable
+    /// The server answered but refused this headset's key.
+    case wrongKey
+    /// The server is an older version without the pilot features.
+    case outdated
+}
 
 struct AskRequest: Codable {
     let question: String
@@ -300,26 +342,11 @@ struct AskResponse: Codable {
     }
 }
 
-extension BackendClient {
-    func ask(_ request: AskRequest) async throws -> AskResponse {
-        let url = baseURL.appendingPathComponent("ask")
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONEncoder().encode(request)
-
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw BackendError.badResponse
-        }
-        return try JSONDecoder().decode(AskResponse.self, from: data)
-    }
-}
-
-
 enum BackendError: Error {
     case imageEncodingFailed
     case badResponse
     /// The backend is reachable but doesn't have this route (an older deploy).
     case endpointMissing
+    /// The site key in Settings is missing or wrong.
+    case unauthorized
 }

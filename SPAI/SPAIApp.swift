@@ -30,7 +30,7 @@ struct SPAIApp: App {
             .environment(continuityCamera)
         }
         .windowStyle(.plain)
-        .defaultSize(width: 800, height: 600)
+        .defaultSize(width: 960, height: 720)
 
         WindowGroup(id: "settings") {
             SettingsView()

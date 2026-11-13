@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 enum PanelMode: String, CaseIterable, Identifiable {
     case fixed
@@ -260,6 +261,14 @@ class AppModel {
     /// spotlit one is the only thing asking for attention.
     var isTourActive = false
 
+    /// Bumped to ask the immersive space to bring every panel back in
+    /// front of the user, at their height.
+    private(set) var recenterRequestID = 0
+    func requestRecenter() { recenterRequestID += 1 }
+
+    /// Why the headset's own camera isn't feeding detection, if it isn't.
+    var cameraNote: String?
+
     /// Bumped to ask the immersive space to (re)start the tour.
     private(set) var tourRequestID = 0
     func requestTour() { tourRequestID += 1 }
@@ -279,6 +288,7 @@ class AppModel {
 
     func logInstrument(_ instrument: IdentifiedInstrument) {
         guard instrument.certain else { return }
+        if !instrumentsSeen.contains(instrument.name) { instrumentsSeen.append(instrument.name) }
         log("Identified \(instrument.name) (\(instrument.confidencePercent)%)", kind: .info)
     }
 
@@ -291,6 +301,152 @@ class AppModel {
     private static func videoTimestamp(_ seconds: Double) -> String {
         let totalSeconds = max(Int(seconds.rounded()), 0)
         return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+
+    // MARK: - Who is working
+
+    /// The roster entry signed in on this headset, or nil for a guest.
+    var learner: Learner?
+    /// Name typed by someone who isn't on the roster.
+    var guestName: String = ""
+    var runMode: RunMode = .assessed
+
+    var learnerDisplayName: String {
+        if let learner { return learner.name }
+        let typed = guestName.trimmingCharacters(in: .whitespaces)
+        return typed.isEmpty ? "Guest" : typed
+    }
+
+    // MARK: - The run being recorded
+
+    /// What happened this run, in a form the server can score. Kept
+    /// alongside `eventLog` (which is for display) because scoring needs to
+    /// know the kind of each event and which station it belongs to.
+    private(set) var runEvents: [RunEvent] = []
+    private(set) var instrumentsSeen: [String] = []
+    private var runID = UUID().uuidString
+    private var runFinished = false
+    /// Where detection ran, for the record. Set by the immersive view.
+    var detectionModeLabel = ""
+
+    /// The result of the run that just ended, scored on the headset so it
+    /// shows immediately, online or not.
+    private(set) var lastResult: CompetencyResult?
+
+    enum UploadState: Equatable {
+        case none
+        case sending
+        case sent
+        /// Couldn't reach the server; saved on the headset to send later.
+        case waiting
+        /// Practice runs and guest runs stay on the headset.
+        case notRecorded
+    }
+    private(set) var uploadState: UploadState = .none
+
+    private let pendingKey = "pendingRunUploads"
+    /// Finished runs the server hasn't confirmed yet. Survives the app
+    /// closing, so a run finished in a dead spot still reaches the instructor.
+    private(set) var pendingUploads: [RunRecord] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(pendingUploads) {
+                UserDefaults.standard.set(data, forKey: pendingKey)
+            }
+        }
+    }
+
+    private func record(_ kind: String, _ message: String, station: SterileStep? = nil) {
+        guard !runFinished else { return }
+        runEvents.append(RunEvent(
+            at: RunClock.stamp(),
+            kind: kind,
+            station: (station ?? currentStep).backendName,
+            message: message
+        ))
+    }
+
+    /// Called when the count sheet doesn't match as a tray is closed.
+    func recordCountMismatch(_ summary: String) {
+        log("Count sheet: \(summary)", kind: .warning)
+        record("count_mismatch", "Count sheet did not match: \(summary)")
+    }
+
+    private var stationsCompleted: Int {
+        Set(runEvents.filter { $0.kind == "station_complete" }.compactMap(\.station)).count
+    }
+
+    /// Starts a fresh run with a fresh server-side workflow.
+    func beginRun() {
+        runID = UUID().uuidString
+        BackendClient.sessionID = runID
+        runEvents = []
+        instrumentsSeen = []
+        runFinished = false
+        lastResult = nil
+        uploadState = .none
+    }
+
+    /// Ends a run that was started but not finished, so it is recorded as
+    /// incomplete rather than lost. Does nothing if no station was started.
+    func endRunEarly() {
+        guard !runFinished, runEvents.contains(where: { $0.kind == "station_start" }) else { return }
+        finishRun(completed: false)
+    }
+
+    private func finishRun(completed: Bool) {
+        guard !runFinished else { return }
+        runFinished = true
+
+        let done = stationsCompleted
+        lastResult = Competency.score(
+            events: runEvents,
+            completed: completed,
+            stationsCompleted: done,
+            rubric: ProtocolStore.shared.rubric
+        )
+
+        // Practice is a rehearsal and stays on the headset, as promised on
+        // the sign-in screen.
+        guard runMode == .assessed else {
+            uploadState = .notRecorded
+            return
+        }
+
+        pendingUploads.append(RunRecord(
+            id: runID,
+            learnerID: learner?.id,
+            learnerName: learnerDisplayName,
+            role: role.rawValue,
+            mode: runMode.rawValue,
+            headset: UIDevice.current.name,
+            startedAt: RunClock.stamp(sessionStart),
+            endedAt: RunClock.stamp(),
+            durationSeconds: Int(Date().timeIntervalSince(sessionStart)),
+            completed: completed,
+            stationsCompleted: done,
+            events: runEvents,
+            instrumentsSeen: instrumentsSeen,
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
+            detectionMode: detectionModeLabel
+        ))
+        Task { await flushUploads() }
+    }
+
+    /// Sends every run the server hasn't confirmed. Safe to call any time:
+    /// the server replaces a run it already has, so a retry can't duplicate.
+    func flushUploads() async {
+        guard !pendingUploads.isEmpty, uploadState != .sending else { return }
+        uploadState = .sending
+        for run in pendingUploads {
+            do {
+                _ = try await client.uploadRun(run)
+                pendingUploads.removeAll { $0.id == run.id }
+            } catch {
+                uploadState = .waiting
+                return
+            }
+        }
+        uploadState = .sent
     }
 
     // MARK: - Workflow state
@@ -321,6 +477,20 @@ class AppModel {
         SpeechManager.shared.speak(script[idx].instruction)
     }
 
+    /// Reads the current step again, on request — whether or not spoken
+    /// guidance is switched on, because the user just asked for it.
+    func repeatGuidedStep() {
+        let script = StationScripts.script(for: currentStep)
+        guard stepStarted, !script.isEmpty else { return }
+        SpeechManager.shared.speak(script[min(max(guidedStepIndex, 0), script.count - 1)].instruction, force: true)
+    }
+
+    /// Records that a camera-checked step was confirmed by hand instead.
+    func recordManualOverride(_ reason: String) {
+        log("Confirmed by hand: \(reason)", kind: .info)
+        record("manual_override", "Step confirmed by hand: \(reason)")
+    }
+
     func advanceGuidedStep() {
         let script = StationScripts.script(for: currentStep)
         guard guidedStepIndex < script.count - 1 else { return }
@@ -328,54 +498,55 @@ class AppModel {
         speakCurrentGuidedStep()
     }
 
+    /// Tells the server about a workflow event, without waiting on it.
+    ///
+    /// The headset is the source of truth for where the student is. The
+    /// server keeps a matching record, but a slow, restarted or unreachable
+    /// server must never stop someone starting or finishing a step — that
+    /// used to freeze the workflow for up to fifteen seconds, or for good.
+    /// If the two disagree, it is noted in the log and work carries on.
+    private func notifyServer(_ event: String, step: SterileStep? = nil) {
+        Task {
+            guard let result = try? await client.sendComplianceEvent(event, step: step?.backendName),
+                  !result.accepted else { return }
+            log("Server record out of step: \(result.message)", kind: .info)
+        }
+    }
+
     func startStep() {
-        guard canRunWorkflow else { return }
+        guard canRunWorkflow, !stepStarted, !sessionComplete else { return }
         let step = currentStep
         stepStarted = true
         guidedStepIndex = 0
         log("Started \(step.title)", kind: .info)
+        record("station_start", "Started \(step.title)")
         speakCurrentGuidedStep()
-        Task {
-            let result = try? await client.sendComplianceEvent("start_step", step: step.backendName)
-            if let result, !result.accepted {
-                await MainActor.run {
-                    stepStarted = false
-                    SpeechManager.shared.stop()
-                    log("Backend rejected start: \(result.message)", kind: .warning)
-                }
-            }
-        }
+        notifyServer("start_step", step: step)
     }
 
     func completeStep() {
-        guard canRunWorkflow else { return }
+        guard canRunWorkflow, stepStarted, !isHalted else { return }
         let completed = currentStep
-        Task {
-            let result = try? await client.sendComplianceEvent("complete_step", step: completed.backendName)
-            await MainActor.run {
-                if let result, !result.accepted {
-                    log("Backend rejected complete: \(result.message)", kind: .warning)
-                    return
-                }
-                if currentStepIndex < SterileStep.allCases.count - 1 {
-                    currentStepIndex += 1
-                    log("Completed \(completed.title)", kind: .success)
-                } else {
-                    log("Completed \(completed.title) — workflow complete", kind: .success)
-                    sessionComplete = true
-                    history.add(SessionRecord(
-                        passed: contaminationCount == 0,
-                        contaminationCount: contaminationCount,
-                        durationSeconds: Int(Date().timeIntervalSince(sessionStart)),
-                        events: eventLog.map { "\($0.timestamp)  \($0.message)" },
-                        role: role.rawValue
-                    ))
-                }
-                stepStarted = false
-                guidedStepIndex = 0
-                SpeechManager.shared.stop()
-            }
+        record("station_complete", "Completed \(completed.title)", station: completed)
+        if currentStepIndex < SterileStep.allCases.count - 1 {
+            currentStepIndex += 1
+            log("Completed \(completed.title)", kind: .success)
+        } else {
+            log("Completed \(completed.title) — workflow complete", kind: .success)
+            sessionComplete = true
+            finishRun(completed: true)
+            history.add(SessionRecord(
+                passed: contaminationCount == 0,
+                contaminationCount: contaminationCount,
+                durationSeconds: Int(Date().timeIntervalSince(sessionStart)),
+                events: eventLog.map { "\($0.timestamp)  \($0.message)" },
+                role: role.rawValue
+            ))
         }
+        stepStarted = false
+        guidedStepIndex = 0
+        SpeechManager.shared.stop()
+        notifyServer("complete_step", step: completed)
     }
 
     func failStep() {
@@ -387,21 +558,24 @@ class AppModel {
         isHalted = false
         SpeechManager.shared.stop()
         log("Failed \(failed.title) — tray sent back to Decontamination", kind: .warning)
+        record("send_back", "Failed \(failed.title) — tray sent back to Decontamination", station: failed)
         Task { _ = try? await client.resetCompliance() }
     }
 
     func raiseContamination() {
         isHalted = true
         log("Contamination detected — workflow halted", kind: .warning)
+        record("contamination", "Contamination detected — workflow halted")
         contaminationCount += 1
-        Task { _ = try? await client.sendComplianceEvent("contamination") }
+        notifyServer("contamination")
     }
 
     func acknowledgeContamination() {
         guard canRunWorkflow else { return }
         isHalted = false
         log("Contamination acknowledged — workflow resumed", kind: .info)
-        Task { _ = try? await client.sendComplianceEvent("acknowledge") }
+        record("acknowledge", "Contamination acknowledged — workflow resumed")
+        notifyServer("acknowledge")
     }
 
     func redoStep() {
@@ -411,9 +585,14 @@ class AppModel {
         guidedStepIndex = 0
         SpeechManager.shared.stop()
         log("Redo \(step.title)", kind: .info)
+        record("redo", "Redo \(step.title)")
     }
 
     func resetWorkflow() {
+        // Abandoning a run that had started still counts as a run: the
+        // instructor should see that it was begun and not finished.
+        endRunEarly()
+        beginRun()
         SpeechManager.shared.stop()
         currentStepIndex = 0
         stepStarted = false
@@ -435,6 +614,11 @@ class AppModel {
         // These two default to on, so "never set" has to read as true.
         self.showCompanion = defaults.object(forKey: companionKey) as? Bool ?? true
         self.announceInstruments = defaults.object(forKey: announceKey) as? Bool ?? true
+        BackendClient.sessionID = runID
+        if let data = defaults.data(forKey: pendingKey),
+           let saved = try? JSONDecoder().decode([RunRecord].self, from: data) {
+            self.pendingUploads = saved
+        }
         Task { _ = try? await client.resetCompliance() }
         log("Session started", kind: .info)
     }

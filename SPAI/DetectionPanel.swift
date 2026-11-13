@@ -51,7 +51,7 @@ struct DetectionPanel: View {
 
     private var handTitle: String {
         switch handState {
-        case .waiting: return "Waiting for camera"
+        case .waiting: return "No camera feed"
         case .gloved:  return "Gloves on"
         case .bare:    return "Bare hand visible"
         case .none:    return "No hands in view"
@@ -60,7 +60,7 @@ struct DetectionPanel: View {
 
     private var handDetail: String {
         switch handState {
-        case .waiting: return "Start the camera or load test media"
+        case .waiting: return appModel.cameraNote ?? "SPAI isn't receiving video yet."
         case .gloved:  return "Contamination risk low"
         case .bare:    return "Contamination risk high"
         case .none:    return "Hold your hands in view of the camera"
@@ -108,6 +108,9 @@ struct DetectionPanel: View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             header
             handsRow
+            if handState == .waiting {
+                noFeedHelp
+            }
 
             if let instrument = service.identifiedInstrument {
                 divider
@@ -191,6 +194,29 @@ struct DetectionPanel: View {
                     .foregroundStyle(riskHigh ? SPAIColor.warning : SPAIColor.safe)
                     .accessibilityHidden(true)
             }
+        }
+    }
+
+    /// Shown when no video is arriving. "Waiting" told a first-time user
+    /// nothing; this says what to do about it.
+    private var noFeedHelp: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+            Text("Guidance still works. To turn on checks, connect a camera or try it with a photo.")
+                .font(SPAIFont.caption)
+                .foregroundStyle(SPAIText.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                appModel.panelVisibility[PanelID.upload] = true
+            } label: {
+                Label("Open Test Media", systemImage: "photo.badge.plus")
+                    .font(SPAIFont.button)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, SPAISpacing.m)
+                    .padding(.vertical, SPAISpacing.s + 2)
+                    .background(SPAIColor.primary.opacity(0.7), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            }
+            .buttonStyle(.plain)
+            .spaiHitTarget()
         }
     }
 

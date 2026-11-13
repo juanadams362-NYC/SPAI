@@ -38,12 +38,19 @@ struct StatusBarPanel: View {
             SterileNodeMark(size: 30)
                 .frame(width: 40, height: 40)
                 .background(SPAIColor.primary.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-            Text("SPAI")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("SPAI")
+                    .font(.system(size: 19, weight: .bold).width(.expanded))
+                    .foregroundStyle(.white)
+                // Whose run this is, so a shared headset is never ambiguous.
+                Text(appModel.runMode == .practice ? "\(appModel.learnerDisplayName) · practice" : appModel.learnerDisplayName)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(SPAIText.secondary)
+                    .lineLimit(1)
+            }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("SPAI")
+        .accessibilityLabel("SPAI. Signed in as \(appModel.learnerDisplayName)\(appModel.runMode == .practice ? ", practice run" : "")")
     }
 
     private var sessionTimeBlock: some View {
@@ -180,7 +187,12 @@ struct StatusBarPanel: View {
                     appModel.layout = appModel.layout == .focus ? .everything : .focus
                 } label: {
                     Label(appModel.layout == .focus ? "Show Everything" : "Back to Focus",
-                          systemImage: appModel.layout == .focus ? "rectangle.3.group" : "scope")
+                          systemImage: appModel.layout == .focus ? "rectangle.3.group" : "rectangle.center.inset.filled")
+                }
+                Button {
+                    appModel.requestRecenter()
+                } label: {
+                    Label("Bring Panels to Me", systemImage: "scope")
                 }
                 Button {
                     appModel.requestTour()
