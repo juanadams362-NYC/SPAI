@@ -223,7 +223,7 @@ const story = `<g text-anchor="middle" font-family="Playfair Display" font-style
   <text x="660" y="88" font-size="11" fill="${GOLD}" font-style="normal" font-family="Lato" font-weight="900" letter-spacing="3">✦ HANDMADE IN SMALL BATCHES ✦</text>
 </g>`;
 
-const label = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%">
+function makeLabel({ W, FX, BX, seam, surfboard, edgeLines, bandY }) { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%">
 <defs>
   <linearGradient id="sky" x1="0" y1="0" x2="0" y2="${HZ}" gradientUnits="userSpaceOnUse">
     <stop offset="0" stop-color="#241540"/><stop offset="0.3" stop-color="#5e2759"/><stop offset="0.55" stop-color="#b8405a"/>
@@ -267,12 +267,14 @@ ${seaLinesBg}${boat2}${gulls}
 ${Array.from({ length: 180 }, (_, i) => `<circle cx="${f((i * 53.7) % W)}" cy="${f(380 + (i * 37.3) % 34)}" r="${0.4 + (i % 3) * 0.2}" fill="#b9733d" opacity="0.35"/>`).join('')}
 
 <!-- back scene -->
+<g transform="translate(${BX} 0)">
 ${story}
 ${sign}
-${surf}
+${surfboard ? surf : ''}
 <path d="M690 410 q2 -12 -4 -20 M694 410 q4 -10 12 -16" stroke="#2e7d4f" stroke-width="1.8" fill="none" stroke-linecap="round"/>${hibiscus(702, 401, 8, 15, '#e63946', '#8d1b2a')}${hibiscus(685, 405, 5.5, -20, '#ff6b81', '#a4243b')}
 <g transform="translate(640 400)"><ellipse cx="0" cy="0" rx="9" ry="2" fill="#9c5a2e" opacity="0.3"/><path d="M-7 0 Q-8 -8 0 -8 Q8 -8 7 0 Z" fill="#f2b6a0"/><path d="M-7 0 Q0 -2 7 0" stroke="#d98c74" stroke-width="0.8" fill="none"/><path d="M-3 -7 L-1 -1 M1 -7.6 L1 -1 M4 -6.6 L2.6 -1" stroke="#d98c74" stroke-width="0.6"/></g>
-${seamPalm}
+</g>
+${seam ? seamPalm : ''}
 
 <!-- front scene foreground -->
 <g transform="translate(${FX} 0)">
@@ -302,24 +304,28 @@ ${seamPalm}
 </g>
 
 <!-- continuous bottom band -->
-<rect x="0" y="414" width="${W}" height="36" fill="${INK}" opacity="0.94"/>
-<line x1="0" y1="414.4" x2="${W}" y2="414.4" stroke="${GOLD}" stroke-width="0.8"/>
+<rect x="0" y="${bandY}" width="${W}" height="${H - bandY}" fill="${INK}" opacity="0.94"/>
+<line x1="0" y1="${bandY + 0.4}" x2="${W}" y2="${bandY + 0.4}" stroke="${GOLD}" stroke-width="0.8"/>
 <g text-anchor="middle">
-  <text x="225" y="430" font-family="Playfair Display" font-style="italic" font-size="14" fill="${GOLD}">${TAG}</text>
-  <text x="225" y="442.5" font-family="Lato" font-weight="700" font-size="6.6" letter-spacing="2" fill="${CREAM}">${VOLUME.toUpperCase()}   ✦   HANDCRAFTED   ✦   SMALL BATCH</text>
-  <text x="660" y="430" font-family="Playfair Display" font-style="italic" font-size="14" fill="${GOLD}">Made with love, shared with family</text>
-  <text x="660" y="442.5" font-family="Lato" font-weight="700" font-size="6.6" letter-spacing="2" fill="${CREAM}">SHAKE WELL   ✦   SERVE CHILLED   ✦   KEEP REFRIGERATED</text>
+  <text x="${175 + FX}" y="${bandY + 16}" font-family="Playfair Display" font-style="italic" font-size="14" fill="${GOLD}">${TAG}</text>
+  <text x="${175 + FX}" y="${bandY + 28.5}" font-family="Lato" font-weight="700" font-size="6.6" letter-spacing="2" fill="${CREAM}">${VOLUME.toUpperCase()}   ✦   HANDCRAFTED   ✦   SMALL BATCH</text>
+  <text x="${660 + BX}" y="${bandY + 16}" font-family="Playfair Display" font-style="italic" font-size="14" fill="${GOLD}">Made with love, shared with family</text>
+  <text x="${660 + BX}" y="${bandY + 28.5}" font-family="Lato" font-weight="700" font-size="6.6" letter-spacing="2" fill="${CREAM}">SHAKE WELL   ✦   SERVE CHILLED   ✦   KEEP REFRIGERATED</text>
 </g>
-<g fill="none" stroke="${GOLD}">
+${edgeLines ? `<g fill="none" stroke="${GOLD}">
   <line x1="0" y1="7" x2="${W}" y2="7" stroke-width="0.9" opacity="0.85"/><line x1="0" y1="10" x2="${W}" y2="10" stroke-width="0.35" opacity="0.6"/>
   <line x1="0" y1="${H - 7}" x2="${W}" y2="${H - 7}" stroke-width="0.9" opacity="0.85"/><line x1="0" y1="${H - 10}" x2="${W}" y2="${H - 10}" stroke-width="0.35" opacity="0.6"/>
-</g>
-</svg>`;
+</g>` : ''}
+</svg>`; }
+const label = makeLabel({ W, FX, BX: 0, seam: true, surfboard: true, edgeLines: true, bandY: 414 });
+// 6in x 4in version (Vistaprint max size): front scene + What's Inside sign, text kept inside the 1/8in safe zone
+const label6 = makeLabel({ W: 675, FX: 0, BX: -148, seam: false, surfboard: false, edgeLines: false, bandY: 406 });
 
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=block');
 *{box-sizing:border-box;margin:0;padding:0} body{background:#fff}
-.label{width:9in;height:4.5in;overflow:hidden;position:relative}`;
+.label{width:9in;height:4.5in;overflow:hidden;position:relative}
+.label6{width:6in;height:4in;overflow:hidden;position:relative}`;
 const page = (body, pageCss) => `<!doctype html><html><head><meta charset="utf-8"><style>${css}${pageCss}</style></head><body>${body}</body></html>`;
 const labelDiv = `<div class="label">${label}</div>`;
 
@@ -336,6 +342,12 @@ const labelDiv = `<div class="label">${label}</div>`;
   // home printing: one label centered on landscape letter paper with cut guide
   await ready(page(`<div style="width:11in;height:8.5in;display:flex;align-items:center;justify-content:center"><div style="outline:0.5px dashed #999">${labelDiv}</div></div>`, '@page{size:11in 8.5in;margin:0}'));
   await p.pdf({ path: 'print/cremas-wrap-label-letter-landscape.pdf', width: '11in', height: '8.5in', printBackground: true, pageRanges: '1' });
+  const ctx6 = await browser.newContext({ deviceScaleFactor: 300 / 96, viewport: { width: 576, height: 384 } });
+  const p6 = await ctx6.newPage();
+  await p6.setContent(page(`<div class="label6">${label6}</div>`, '@page{size:6in 4in;margin:0}'), { waitUntil: 'networkidle' });
+  await p6.evaluate(() => document.fonts.ready);
+  await p6.locator('.label6').screenshot({ path: 'print/cremas-label-6x4in-300dpi.png' });
+  await p6.pdf({ path: 'print/cremas-label-6x4in.pdf', width: '6in', height: '4in', printBackground: true, pageRanges: '1' });
   await browser.close();
   console.log('done');
 })();
