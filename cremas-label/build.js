@@ -1,4 +1,4 @@
-// Builds the Crémas bottle labels: front + back (3.5" x 4.5"), PNG @300 DPI, PDFs, and a letter print sheet.
+// Builds the Crémas wraparound bottle label (one continuous 9" x 4.5" sticker): PNG @300 DPI + print-ready PDFs.
 // Edit the settings below, then run: node build.js
 const fs = require('fs');
 const { chromium } = require('playwright');
@@ -7,9 +7,8 @@ const BRAND   = 'Island Vibes';
 const NAME    = 'Crémas';
 const TAG     = 'Bringing the island to you';
 const VOLUME  = '750 mL';
-const ABV     = 'XX% ALC./VOL.';                // <-- put your real alcohol % here
 
-const W = 350, H = 450;
+const W = 900, H = 450;          // 9in x 4.5in wraparound (100 units = 1 inch)
 const INK = '#2b1424', INK2 = '#3f1d36', RIM = '#ff9a4d', GOLD = '#ffd27a', CREAM = '#fff6e4';
 const f = n => +n.toFixed(2);
 
@@ -160,7 +159,71 @@ const reflection = Array.from({ length: 11 }, (_, i) => { const y = HZ + 4 + i *
 const seaLines = [[14, 328, 26], [60, 335, 34], [120, 330, 22], [300, 333, 30], [10, 348, 30], [96, 352, 26], [318, 350, 24], [180, 362, 20]].map(([x, y, w]) => `<rect x="${x}" y="${y}" width="${w}" height="1" rx="0.5" fill="#bfe6ef" opacity="0.5"/>`).join('');
 const stars = [[40, 60, 1], [300, 40, 1.1], [325, 112, 0.8], [215, 24, 0.9], [14, 128, 0.9], [62, 30, 0.7], [150, 18, 0.8], [338, 170, 0.7], [276, 70, 0.6], [30, 170, 0.6], [110, 140, 0.6]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="0.75"/>`).join('') + sparkle(318, 72, 3.2, '#fff', 0.85) + sparkle(28, 92, 2.4, '#fff', 0.7);
 
-const front = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${W} ${H}" width="100%" height="100%">
+
+// ---------- WRAPAROUND COMPOSITION ----------
+// Left half (x 0-450) = front of bottle, right half (x 450-900) = back. Background is continuous, edges match at the seam.
+const FX = 50; // shift of the front scene (designed at 350 wide) into the 450-wide front panel
+const cloudsBg = [[480, 236, 70, 3.6], [590, 252, 50, 3], [850, 214, 60, 3.4], [760, 262, 44, 2.6], [440, 196, 40, 2.6], [880, 250, 30, 2.4]]
+  .map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="#ff9e7a" opacity="0.5"/><rect x="${x + w * 0.15}" y="${y - h * 0.35}" width="${w * 0.55}" height="${h * 0.6}" rx="${h * 0.3}" fill="#ffd0a3" opacity="0.55"/>`).join('');
+const starsBg = [[470, 30, 0.9], [520, 20, 0.7], [610, 26, 0.8], [740, 18, 0.9], [830, 34, 0.8], [880, 60, 0.7], [455, 120, 0.6], [890, 140, 0.7], [700, 110, 0.5]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="0.75"/>`).join('') + sparkle(865, 96, 2.6, '#fff', 0.8) + sparkle(478, 70, 2.2, '#fff', 0.7);
+const seaLinesBg = [[440, 330, 30], [520, 344, 26], [610, 334, 40], [700, 352, 24], [800, 338, 34], [870, 356, 20], [470, 362, 22], [760, 324, 22]].map(([x, y, w]) => `<rect x="${x}" y="${y}" width="${w}" height="1" rx="0.5" fill="#bfe6ef" opacity="0.5"/>`).join('');
+const boat2 = `<g transform="translate(600 ${HZ - 1}) scale(0.7)"><path d="M-9 0 L9 0 L6 3 L-6 3 Z" fill="#3a1a33"/><path d="M0 -1 L0 -19 L9 -2 Z" fill="#fff0d6" opacity="0.85"/></g>`;
+const gulls = `<g fill="none" stroke="${INK}" stroke-width="1.2" stroke-linecap="round" opacity="0.7"><path d="M840 250 q4 -4 8 0 q4 -4 8 0"/><path d="M862 236 q3 -3 6 0 q3 -3 6 0"/></g>`;
+
+// palm that straddles the seam (drawn at the right edge and again shifted -W so it continues on the left edge)
+const seamCrown = [884, 188];
+const seamPalmG = trunk([902, 470], [880, 380], [900, 280], seamCrown, 16, 9, INK, '#5a2d47') +
+  frond(...seamCrown, 200, 55, 26, INK2) + frond(...seamCrown, -20, 80, 34, INK2) +
+  frond(...seamCrown, 168, 64, 40, INK) + frond(...seamCrown, 218, 50, 10, INK) + frond(...seamCrown, 5, 92, 50, INK) + frond(...seamCrown, -45, 60, 8, INK) + frond(...seamCrown, 250, 44, 4, INK) +
+  `<circle cx="${seamCrown[0] + 4}" cy="${seamCrown[1] + 8}" r="5" fill="#4a2a1f"/><circle cx="${seamCrown[0] - 5}" cy="${seamCrown[1] + 9}" r="4.6" fill="#40241b"/>`;
+const seamPalm = `<g>${seamPalmG}</g><g transform="translate(${-W} 0)">${seamPalmG}</g>`;
+
+// surfboard planted in the sand
+const surf = `<g transform="translate(486 402) rotate(-8)">
+  <ellipse cx="2" cy="1" rx="14" ry="3" fill="#9c5a2e" opacity="0.3"/>
+  <path d="M0 0 C -11 -20 -11 -80 0 -108 C 11 -80 11 -20 0 0 Z" fill="#3f8ea6"/>
+  <path d="M0 0 C -11 -20 -11 -80 0 -108 C -3 -80 -3 -20 0 0 Z" fill="#fff" opacity="0.18"/>
+  <path d="M-8.6 -62 Q0 -66 8.6 -62 L8.2 -54 Q0 -58 -8.2 -54 Z" fill="#e07a3f"/><path d="M-8.2 -50 Q0 -54 8.2 -50 L7.8 -46 Q0 -50 -7.8 -46 Z" fill="${GOLD}"/>
+  <path d="M0 -104 L0 -4" stroke="#fff3dc" stroke-width="0.6" opacity="0.7"/>${hibiscus(0, -82, 4.5, 0, '#fff3dc', '#e63946')}
+  <path d="M-9 -104 C -6 -80 -6 -30 0 0" stroke="${RIM}" stroke-width="1" fill="none" opacity="0.8"/></g>`;
+
+// wooden beach sign with what's inside
+const sign = (() => {
+  const x0 = 512, x1 = 808, y0 = 112, y1 = 304, planks = 4, ph = (y1 - y0) / planks;
+  let s = '';
+  // posts
+  for (const px of [560, 760]) s += `<rect x="${px - 6}" y="${y1 - 10}" width="12" height="${400 - y1 + 10}" rx="2" fill="#5a3324"/><rect x="${px - 6}" y="${y1 - 10}" width="3" height="${400 - y1 + 10}" fill="${RIM}" opacity="0.45"/><ellipse cx="${px + 2}" cy="401" rx="12" ry="2.6" fill="#9c5a2e" opacity="0.35"/>`;
+  s += `<rect x="${x0 + 6}" y="${y0 + 8}" width="${x1 - x0}" height="${y1 - y0}" rx="6" fill="#14051a" opacity="0.35"/>`; // shadow
+  for (let i = 0; i < planks; i++) {
+    const y = y0 + i * ph, j = [0, 3, -2, 2][i];
+    s += `<path d="M${x0 + j} ${y + 1} Q${(x0 + x1) / 2} ${y - 1.5} ${x1 - j} ${y + 1} L${x1 - j + 1} ${y + ph - 1} Q${(x0 + x1) / 2} ${y + ph + 1} ${x0 + j - 1} ${y + ph - 1} Z" fill="url(#wood)"/>`;
+    for (let k = 0; k < 3; k++) { const gy = y + 9 + k * 12 + (i % 2) * 4; s += `<path d="M${x0 + 12 + k * 40} ${gy} q60 -3 120 1 t110 -1" stroke="#a8724a" stroke-width="0.6" fill="none" opacity="0.45"/>`; }
+    s += `<path d="M${x0 + j} ${y + 1} Q${(x0 + x1) / 2} ${y - 1.5} ${x1 - j} ${y + 1}" stroke="${RIM}" stroke-width="0.9" fill="none" opacity="0.55"/>`;
+    for (const nx of [x0 + 12, x1 - 12]) s += `<circle cx="${nx + j}" cy="${y + ph / 2}" r="1.6" fill="#3a2016"/><circle cx="${nx + j - 0.4}" cy="${y + ph / 2 - 0.4}" r="0.6" fill="#c9a07a"/>`;
+  }
+  // rope + flower on the corner
+  s += `<path d="M${x0 + 4} ${y0 + 10} q-8 6 -4 16 M${x0 + 4} ${y0 + 10} q4 10 -2 18" stroke="#d9b98a" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+  s += leaf(x1 - 20, y0 + 6, -150, 0.9, '#2e7d4f') + leaf(x1 - 14, y0 + 4, -60, 0.8, '#3c9a5f') + hibiscus(x1 - 16, y0 + 6, 11, 15, '#e63946', '#8d1b2a') + hibiscus(x1 - 34, y0 + 2, 7, -20, '#ff6b81', '#a4243b');
+  // text
+  const cx = (x0 + x1) / 2;
+  s += `<g text-anchor="middle" filter="url(#carve)">
+    <text x="${cx}" y="${y0 + 29}" font-family="Lato" font-weight="900" font-size="11" letter-spacing="4.5" fill="${GOLD}">WHAT'S INSIDE</text>
+    <text x="${cx}" y="${y0 + 70}" font-family="Pacifico" font-size="28" fill="${CREAM}">Rum <tspan font-size="13" fill="${GOLD}" dy="-8">✦</tspan><tspan dy="8"> Coconut Milk</tspan></text>
+    <text x="${cx}" y="${y0 + 108}" font-family="Pacifico" font-size="28" fill="${CREAM}"><tspan font-size="13" fill="${GOLD}" dy="-8">✦ </tspan><tspan dy="8">Sugar</tspan><tspan font-size="13" fill="${GOLD}" dy="-8"> ✦</tspan></text>
+    <text x="${cx}" y="${y0 + 138}" font-family="Playfair Display" font-style="italic" font-size="14" fill="#ffe2a8">and a whole lot of</text>
+    <text x="${cx}" y="${y0 + 176}" font-family="Pacifico" font-size="31" fill="#ff6b6b">Love ♥</text>
+  </g>`;
+  s += `<line x1="${cx - 120}" y1="${y0 + 36}" x2="${cx - 72}" y2="${y0 + 36}" stroke="${GOLD}" stroke-width="0.7" opacity="0"/>`;
+  return s;
+})();
+
+const story = `<g text-anchor="middle" font-family="Playfair Display" font-style="italic" fill="${CREAM}" filter="url(#ts)">
+  <text x="660" y="48" font-size="13">Close your eyes and take a sip —</text>
+  <text x="660" y="66" font-size="13">warm sand, a sea breeze, the sun on your face.</text>
+  <text x="660" y="88" font-size="11" fill="${GOLD}" font-style="normal" font-family="Lato" font-weight="900" letter-spacing="3">✦ HANDMADE IN SMALL BATCHES ✦</text>
+</g>`;
+
+const label = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%">
 <defs>
   <linearGradient id="sky" x1="0" y1="0" x2="0" y2="${HZ}" gradientUnits="userSpaceOnUse">
     <stop offset="0" stop-color="#241540"/><stop offset="0.3" stop-color="#5e2759"/><stop offset="0.55" stop-color="#b8405a"/>
@@ -170,144 +233,109 @@ const front = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w
   <linearGradient id="sand" x1="0" y1="370" x2="0" y2="450" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f6cf92"/><stop offset="1" stop-color="#d9955a"/></linearGradient>
   <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbe0"/><stop offset="1" stop-color="#ffd27a"/></linearGradient>
   <linearGradient id="title" x1="0" y1="0" x2="0" y2="1"><stop offset="0.2" stop-color="#fffaf0"/><stop offset="1" stop-color="#ffe2a8"/></linearGradient>
+  <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d4b2f"/><stop offset="1" stop-color="#5c3420"/></linearGradient>
   <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff2b3" stop-opacity="0.95"/><stop offset="0.4" stop-color="#ffc46b" stop-opacity="0.45"/><stop offset="1" stop-color="#ff8a5b" stop-opacity="0"/></radialGradient>
-  <radialGradient id="vig" cx="0.5" cy="0.55" r="0.75"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#14051a" stop-opacity="0.45"/></radialGradient>
   <mask id="sunStripes"><rect x="0" y="0" width="${W}" height="${H}" fill="#fff"/>${[[296, 1.6], [303, 2.1], [309, 2.6], [314.2, 3]].map(([y, h]) => `<rect x="0" y="${y}" width="${W}" height="${h}" fill="#000"/>`).join('')}</mask>
   <filter id="ts" x="-10%" y="-20%" width="120%" height="150%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.4" flood-color="#14051a" flood-opacity="0.6"/></filter>
+  <filter id="carve" x="-5%" y="-20%" width="110%" height="150%"><feDropShadow dx="0" dy="1.4" stdDeviation="0.6" flood-color="#1a0a06" flood-opacity="0.8"/></filter>
   <path id="arc" d="M90 56 Q175 22 260 56"/>
   <path id="ring" d="M -18.5 0 A 18.5 18.5 0 1 1 18.5 0 A 18.5 18.5 0 1 1 -18.5 0"/>
 </defs>
+
+<!-- continuous background -->
 <rect width="${W}" height="${H}" fill="url(#sky)"/>
-${stars}
-<circle cx="${SX}" cy="${SY}" r="125" fill="url(#glow)"/>
-${clouds}
-<circle cx="${SX}" cy="${SY}" r="50" fill="url(#sun)" mask="url(#sunStripes)"/>
-<g fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round" opacity="0.75">
-  <path d="M186 186 q4.5 -4.5 9 0 q4.5 -4.5 9 0"/><path d="M214 172 q3.5 -3.5 7 0 q3.5 -3.5 7 0"/><path d="M200 200 q3 -3 6 0 q3 -3 6 0"/>
-</g>
+${starsBg}${cloudsBg}
 <rect x="0" y="${HZ}" width="${W}" height="90" fill="url(#sea)"/>
-${island}${boat}${reflection}${seaLines}
-<path d="M0 370 Q 60 362 120 368 T 240 366 T ${W} 362 L ${W} ${H} L 0 ${H} Z" fill="#fff6e4" opacity="0.85"/>
-<path d="M0 373 q8 -3 16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 L ${W} ${H} L 0 ${H} Z" fill="#e9f6f4" opacity="0.6" transform="translate(0 -1)"/>
-<path d="M0 376 Q 70 368 140 374 T 260 371 T ${W} 368 L ${W} ${H} L 0 ${H} Z" fill="url(#sand)"/>
-${Array.from({ length: 70 }, (_, i) => `<circle cx="${(i * 53.7) % W}" cy="${380 + (i * 37.3) % 34}" r="${0.4 + (i % 3) * 0.2}" fill="#b9733d" opacity="0.35"/>`).join('')}
-<ellipse cx="175" cy="404" rx="120" ry="6" fill="#9c5a2e" opacity="0.28"/>
-${blanket}
-${palm}
-${P1}${P2}${P3}
-${sparkle(194, 312, 3.4)}<g stroke="#fff3c4" stroke-width="1.1" stroke-linecap="round"><line x1="194" y1="322" x2="194" y2="317"/><line x1="185" y1="324" x2="181" y2="320"/><line x1="203" y1="324" x2="207" y2="320"/></g>
-<g fill="#fff3c4" font-family="DejaVu Sans" opacity="0.9"><text x="132" y="304" font-size="10">♪</text><text x="144" y="292" font-size="8">♫</text></g>
-${pineapple}
-${dancer}
-<path d="M318 412 q2 -14 -4 -22 M322 412 q4 -12 12 -18 M326 412 q-1 -10 6 -14" stroke="#2e7d4f" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-${leaf(296, 408, -40, 0.9, '#2e7d4f')}${leaf(338, 410, -150, 0.8, '#3c9a5f')}
-${hibiscus(331, 399, 10, 20, '#e63946', '#8d1b2a')}${hibiscus(311, 404, 7, -30, '#ff6b81', '#a4243b')}
-${leaf(10, 410, -60, 0.8, '#2e7d4f')}${hibiscus(26, 403, 8, 40, '#ff6b81', '#a4243b')}
-<rect width="${W}" height="${H}" fill="url(#vig)"/>
-<g transform="translate(298 152) rotate(-10)">
-  <circle r="27" fill="${INK}" opacity="0.9"/><circle r="25" fill="none" stroke="${GOLD}" stroke-width="0.8"/><circle r="14.5" fill="none" stroke="${GOLD}" stroke-width="0.5" stroke-dasharray="1 1.4"/>
-  <text font-family="Lato" font-weight="900" font-size="4.4" fill="${GOLD}"><textPath href="#ring" textLength="114" lengthAdjust="spacing">HANDMADE ✦ SMALL BATCH ✦ WITH LOVE ✦</textPath></text>
-  <text y="-1.2" text-anchor="middle" font-family="Lato" font-weight="900" font-size="5.4" letter-spacing="0.5" fill="${CREAM}">REAL</text>
-  <text y="5" text-anchor="middle" font-family="Lato" font-weight="900" font-size="4" letter-spacing="0.1" fill="${CREAM}">COCONUT</text>
+${seaLinesBg}${boat2}${gulls}
+
+<!-- front scene -->
+<g transform="translate(${FX} 0)">
+  ${stars}
+  <circle cx="${SX}" cy="${SY}" r="125" fill="url(#glow)"/>
+  ${clouds}
+  <circle cx="${SX}" cy="${SY}" r="50" fill="url(#sun)" mask="url(#sunStripes)"/>
+  <g fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round" opacity="0.75">
+    <path d="M186 186 q4.5 -4.5 9 0 q4.5 -4.5 9 0"/><path d="M214 172 q3.5 -3.5 7 0 q3.5 -3.5 7 0"/><path d="M200 200 q3 -3 6 0 q3 -3 6 0"/>
+  </g>
+  ${island}${boat}${reflection}${seaLines}
 </g>
-<g filter="url(#ts)">
-  <text font-family="Lato" font-weight="900" font-size="10.5" letter-spacing="4.5" fill="${GOLD}"><textPath href="#arc" startOffset="50%" text-anchor="middle">✦ ${BRAND.toUpperCase()} ✦</textPath></text>
+
+<!-- continuous shoreline + sand -->
+<path d="M0 368 Q 112 360 225 366 T 450 364 T 675 364 T ${W} 368 L ${W} ${H} L 0 ${H} Z" fill="#fff6e4" opacity="0.85"/>
+<path d="M0 373 ${Array.from({ length: 57 }, () => 'q8 -3 16 0').join(' ')} L ${W} ${H} L 0 ${H} Z" fill="#e9f6f4" opacity="0.6" transform="translate(0 -1)"/>
+<path d="M0 376 Q 112 368 225 374 T 450 372 T 675 372 T ${W} 376 L ${W} ${H} L 0 ${H} Z" fill="url(#sand)"/>
+${Array.from({ length: 180 }, (_, i) => `<circle cx="${f((i * 53.7) % W)}" cy="${f(380 + (i * 37.3) % 34)}" r="${0.4 + (i % 3) * 0.2}" fill="#b9733d" opacity="0.35"/>`).join('')}
+
+<!-- back scene -->
+${story}
+${sign}
+${surf}
+<path d="M690 410 q2 -12 -4 -20 M694 410 q4 -10 12 -16" stroke="#2e7d4f" stroke-width="1.8" fill="none" stroke-linecap="round"/>${hibiscus(702, 401, 8, 15, '#e63946', '#8d1b2a')}${hibiscus(685, 405, 5.5, -20, '#ff6b81', '#a4243b')}
+<g transform="translate(640 400)"><ellipse cx="0" cy="0" rx="9" ry="2" fill="#9c5a2e" opacity="0.3"/><path d="M-7 0 Q-8 -8 0 -8 Q8 -8 7 0 Z" fill="#f2b6a0"/><path d="M-7 0 Q0 -2 7 0" stroke="#d98c74" stroke-width="0.8" fill="none"/><path d="M-3 -7 L-1 -1 M1 -7.6 L1 -1 M4 -6.6 L2.6 -1" stroke="#d98c74" stroke-width="0.6"/></g>
+${seamPalm}
+
+<!-- front scene foreground -->
+<g transform="translate(${FX} 0)">
+  <ellipse cx="175" cy="404" rx="120" ry="6" fill="#9c5a2e" opacity="0.28"/>
+  ${blanket}${palm}${P1}${P2}${P3}
+  ${sparkle(194, 312, 3.4)}<g stroke="#fff3c4" stroke-width="1.1" stroke-linecap="round"><line x1="194" y1="322" x2="194" y2="317"/><line x1="185" y1="324" x2="181" y2="320"/><line x1="203" y1="324" x2="207" y2="320"/></g>
+  <g fill="#fff3c4" font-family="DejaVu Sans" opacity="0.9"><text x="132" y="304" font-size="10">♪</text><text x="144" y="292" font-size="8">♫</text></g>
+  ${pineapple}${dancer}
+  <path d="M318 412 q2 -14 -4 -22 M322 412 q4 -12 12 -18 M326 412 q-1 -10 6 -14" stroke="#2e7d4f" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  ${leaf(296, 408, -40, 0.9, '#2e7d4f')}${leaf(338, 410, -150, 0.8, '#3c9a5f')}
+  ${hibiscus(331, 399, 10, 20, '#e63946', '#8d1b2a')}${hibiscus(311, 404, 7, -30, '#ff6b81', '#a4243b')}
+  ${hibiscus(-14, 404, 8, 40, '#ff6b81', '#a4243b')}
+  <g transform="translate(298 152) rotate(-10)">
+    <circle r="27" fill="${INK}" opacity="0.9"/><circle r="25" fill="none" stroke="${GOLD}" stroke-width="0.8"/><circle r="14.5" fill="none" stroke="${GOLD}" stroke-width="0.5" stroke-dasharray="1 1.4"/>
+    <text font-family="Lato" font-weight="900" font-size="4.4" fill="${GOLD}"><textPath href="#ring" textLength="114" lengthAdjust="spacing">HANDMADE ✦ SMALL BATCH ✦ WITH LOVE ✦</textPath></text>
+    <text y="-1.2" text-anchor="middle" font-family="Lato" font-weight="900" font-size="5.4" letter-spacing="0.5" fill="${CREAM}">REAL</text>
+    <text y="5" text-anchor="middle" font-family="Lato" font-weight="900" font-size="4" letter-spacing="0.1" fill="${CREAM}">COCONUT</text>
+  </g>
+  <g filter="url(#ts)"><text font-family="Lato" font-weight="900" font-size="10.5" letter-spacing="4.5" fill="${GOLD}"><textPath href="#arc" startOffset="50%" text-anchor="middle">✦ ${BRAND.toUpperCase()} ✦</textPath></text></g>
+  <text x="177.5" y="109.5" text-anchor="middle" font-family="Pacifico" font-size="64" fill="#e2574c" opacity="0.95">${NAME}</text>
+  <text x="175" y="107" text-anchor="middle" font-family="Pacifico" font-size="64" fill="url(#title)" filter="url(#ts)">${NAME}</text>
+  <g filter="url(#ts)">
+    <text x="175" y="133" text-anchor="middle" font-family="Lato" font-weight="900" font-size="9" letter-spacing="3.4" fill="${GOLD}">COCONUT CREAM LIQUEUR</text>
+    <line x1="80" y1="143" x2="160" y2="143" stroke="${GOLD}" stroke-width="0.6" opacity="0.7"/><line x1="190" y1="143" x2="270" y2="143" stroke="${GOLD}" stroke-width="0.6" opacity="0.7"/>
+    ${hibiscus(175, 143, 4.4, 0, '#e63946', '#8d1b2a')}
+  </g>
 </g>
-<text x="177.5" y="109.5" text-anchor="middle" font-family="Pacifico" font-size="64" fill="#e2574c" opacity="0.95">${NAME}</text>
-<text x="175" y="107" text-anchor="middle" font-family="Pacifico" font-size="64" fill="url(#title)" filter="url(#ts)">${NAME}</text>
-<g filter="url(#ts)">
-  <text x="175" y="133" text-anchor="middle" font-family="Lato" font-weight="900" font-size="9" letter-spacing="3.4" fill="${GOLD}">COCONUT CREAM LIQUEUR</text>
-  <line x1="80" y1="143" x2="160" y2="143" stroke="${GOLD}" stroke-width="0.6" opacity="0.7"/><line x1="190" y1="143" x2="270" y2="143" stroke="${GOLD}" stroke-width="0.6" opacity="0.7"/>
-  ${hibiscus(175, 143, 4.4, 0, '#e63946', '#8d1b2a')}
-</g>
+
+<!-- continuous bottom band -->
 <rect x="0" y="414" width="${W}" height="36" fill="${INK}" opacity="0.94"/>
 <line x1="0" y1="414.4" x2="${W}" y2="414.4" stroke="${GOLD}" stroke-width="0.8"/>
-<text x="175" y="430" text-anchor="middle" font-family="Playfair Display" font-style="italic" font-size="14" fill="${GOLD}">${TAG}</text>
-<text x="175" y="442.5" text-anchor="middle" font-family="Lato" font-weight="700" font-size="6.6" letter-spacing="2" fill="${CREAM}">${VOLUME.toUpperCase()}   ✦   HANDCRAFTED   ✦   ${ABV}</text>
-<rect x="7" y="7" width="${W - 14}" height="${H - 14}" rx="9" fill="none" stroke="${GOLD}" stroke-width="0.9" opacity="0.85"/>
-<rect x="10" y="10" width="${W - 20}" height="${H - 20}" rx="7" fill="none" stroke="${GOLD}" stroke-width="0.35" opacity="0.6"/>
+<g text-anchor="middle">
+  <text x="225" y="430" font-family="Playfair Display" font-style="italic" font-size="14" fill="${GOLD}">${TAG}</text>
+  <text x="225" y="442.5" font-family="Lato" font-weight="700" font-size="6.6" letter-spacing="2" fill="${CREAM}">${VOLUME.toUpperCase()}   ✦   HANDCRAFTED   ✦   SMALL BATCH</text>
+  <text x="660" y="430" font-family="Playfair Display" font-style="italic" font-size="14" fill="${GOLD}">Made with love, shared with family</text>
+  <text x="660" y="442.5" font-family="Lato" font-weight="700" font-size="6.6" letter-spacing="2" fill="${CREAM}">SHAKE WELL   ✦   SERVE CHILLED   ✦   KEEP REFRIGERATED</text>
+</g>
+<g fill="none" stroke="${GOLD}">
+  <line x1="0" y1="7" x2="${W}" y2="7" stroke-width="0.9" opacity="0.85"/><line x1="0" y1="10" x2="${W}" y2="10" stroke-width="0.35" opacity="0.6"/>
+  <line x1="0" y1="${H - 7}" x2="${W}" y2="${H - 7}" stroke-width="0.9" opacity="0.85"/><line x1="0" y1="${H - 10}" x2="${W}" y2="${H - 10}" stroke-width="0.35" opacity="0.6"/>
+</g>
 </svg>`;
-
-// ---------- BACK ----------
-const header = `<svg class="hdr-scene" viewBox="0 0 350 110" preserveAspectRatio="xMidYMid slice">
-  <defs><linearGradient id="bsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#241540"/><stop offset="0.45" stop-color="#7b2d5e"/><stop offset="0.8" stop-color="#e9624b"/><stop offset="1" stop-color="#f7a046"/></linearGradient>
-  <mask id="bstr"><rect width="350" height="110" fill="#fff"/>${[[80, 1.4], [85, 1.8], [89.4, 2.2]].map(([y, h]) => `<rect y="${y}" width="350" height="${h}" fill="#000"/>`).join('')}</mask>
-  <radialGradient id="bglow"><stop offset="0" stop-color="#fff2b3" stop-opacity="0.9"/><stop offset="1" stop-color="#ff8a5b" stop-opacity="0"/></radialGradient></defs>
-  <rect width="350" height="110" fill="url(#bsky)"/>
-  <circle cx="175" cy="94" r="90" fill="url(#bglow)"/>
-  <circle cx="175" cy="94" r="30" fill="#fff0b8" mask="url(#bstr)"/>
-  <rect y="94" width="350" height="16" fill="#3f8ea6"/><rect y="94" width="350" height="3" fill="#e98a5b" opacity="0.7"/>
-  ${[0, 1, 2, 3].map(i => `<rect x="${163 - i * -3 - i * 3}" y="${97 + i * 3}" width="${24 - i * 5}" height="1.1" rx="0.5" fill="#fff3c4" opacity="0.8" transform="translate(${i * 2.5} 0)"/>`).join('')}
-  <g transform="translate(0 6)">${trunk([22, 112], [30, 80], [20, 50], [42, 30], 10, 6, INK, '#5a2d47')}${frond(42, 30, 200, 55, 18, INK)}${frond(42, 30, -15, 70, 22, INK)}${frond(42, 30, 20, 60, 34, INK)}${frond(42, 30, -60, 40, 4, INK)}${frond(42, 30, 240, 36, 4, INK)}</g>
-  <g transform="translate(350 6) scale(-1 1)">${trunk([22, 112], [30, 80], [20, 50], [40, 36], 9, 6, INK, '#5a2d47')}${frond(40, 36, 200, 50, 18, INK)}${frond(40, 36, -15, 64, 22, INK)}${frond(40, 36, 20, 54, 30, INK)}${frond(40, 36, -60, 36, 4, INK)}</g>
-  <path d="M0 104 q8 -4 16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0 L350 110 L0 110 Z" fill="#fdf3df"/>
-</svg>`;
-const ingredients = ['Real Coconut', 'Rum', 'Sugar', 'Evaporated Milk', 'Condensed Milk', 'Ginger', 'Cinnamon'];
-const back = `<div class="back">
-  ${header}
-  <div class="b-top"><div class="b-brand">✦ ${BRAND.toUpperCase()} ✦</div><div class="b-name">${NAME}</div></div>
-  <svg class="wm" viewBox="0 0 350 450" opacity="0.45">${frond(370, 470, 222, 190, 20, '#e9d3a8')}</svg>
-  <div class="in">
-    <p class="story">Close your eyes and take a sip — warm sand, a sea breeze, the sun on your face. Every bottle is handmade in small batches, <em>bringing the island vibe straight to you.</em></p>
-    <div class="hdr"><span>What's Inside</span></div>
-    <ul class="ing">${ingredients.map(i => `<li>${i}</li>`).join('')}<li class="love">&amp; lots of Love <span>♥</span></li></ul>
-    <div class="serve">Shake well &nbsp;✦&nbsp; Serve chilled &nbsp;✦&nbsp; Keep refrigerated</div>
-    <div class="contains"><b>Contains:</b> Milk &nbsp;|&nbsp; ${VOLUME} &nbsp;|&nbsp; ${ABV}</div>
-    <div class="batch"><span>Made by <i></i></span></div>
-    <div class="batch"><span>Batch No. <i></i></span><span>Bottled <i></i></span></div>
-    <p class="warn"><b>GOVERNMENT WARNING:</b> (1) ACCORDING TO THE SURGEON GENERAL, WOMEN SHOULD NOT DRINK ALCOHOLIC BEVERAGES DURING PREGNANCY BECAUSE OF THE RISK OF BIRTH DEFECTS. (2) CONSUMPTION OF ALCOHOLIC BEVERAGES IMPAIRS YOUR ABILITY TO DRIVE A CAR OR OPERATE MACHINERY, AND MAY CAUSE HEALTH PROBLEMS.</p>
-  </div>
-  <div class="frame"></div>
-</div>`;
 
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=block');
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#fff}
-.label{width:3.5in;height:4.5in;overflow:hidden;position:relative}
-.back{width:100%;height:100%;background:#fdf3df;position:relative;font-family:Lato;color:#2b1424}
-.hdr-scene{position:absolute;left:0;top:0;width:100%;height:1.1in;overflow:hidden}
-.b-top{position:absolute;left:0;right:0;top:0.07in;text-align:center;filter:drop-shadow(0 1.5px 1.5px rgba(20,5,26,.6))}
-.b-brand{font-weight:900;font-size:6.5pt;letter-spacing:3px;color:${GOLD};margin-top:4px}
-.b-name{font-family:Pacifico;font-size:26pt;line-height:1.25;color:${CREAM}}
-.back .wm{position:absolute;inset:0;width:100%;height:100%}
-.back .in{position:absolute;left:0.2in;right:0.2in;top:1.14in;bottom:0.16in;display:flex;flex-direction:column;align-items:center;text-align:center}
-.frame{position:absolute;inset:7px;border:1px solid #c9824a;border-radius:9px;pointer-events:none}
-.frame::after{content:'';position:absolute;inset:2.5px;border:.4px solid #c9824a;border-radius:7px;opacity:.6}
-.story{font-family:'Playfair Display';font-size:7.8pt;line-height:1.38;margin:0 0 6px}
-.story em{color:#b5452f}
-.hdr{width:100%;display:flex;align-items:center;gap:6px;font-weight:900;font-size:7.6pt;letter-spacing:2.5px;text-transform:uppercase;color:#145a73}
-.hdr::before,.hdr::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,#c9824a)}
-.hdr::after{background:linear-gradient(90deg,#c9824a,transparent)}
-.ing{list-style:none;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(4,auto) auto;grid-auto-flow:column;gap:2.5px 10px;width:100%;margin:6px 0 3px;padding-left:10px;font-size:8.8pt;font-weight:700;text-align:left}
-.ing li::before{content:'✿';color:#e07a3f;margin-right:5px;font-size:7pt}
-.ing li.love{grid-column:1/-1;grid-row:5;text-align:center;font-family:Pacifico;font-weight:400;font-size:14.5pt;color:#c0392b;margin-top:2px;padding-right:10px}
-.ing li.love::before{content:none}
-.serve{font-size:6.8pt;font-weight:700;letter-spacing:.5px;color:#145a73;margin-bottom:3px}
-.contains{font-size:6.6pt;margin-bottom:6px}
-.batch{display:flex;gap:12px;width:100%;font-size:6.6pt;margin-bottom:6px}
-.batch span{flex:1;display:flex;align-items:flex-end;gap:3px;white-space:nowrap}
-.batch i{flex:1;border-bottom:.8px solid #2b1424;height:8px}
-.warn{font-size:4.9pt;line-height:1.3;text-align:justify;margin-top:auto}
-`;
+*{box-sizing:border-box;margin:0;padding:0} body{background:#fff}
+.label{width:9in;height:4.5in;overflow:hidden;position:relative}`;
 const page = (body, pageCss) => `<!doctype html><html><head><meta charset="utf-8"><style>${css}${pageCss}</style></head><body>${body}</body></html>`;
-const frontDiv = `<div class="label">${front}</div>`, backDiv = `<div class="label">${back}</div>`;
+const labelDiv = `<div class="label">${label}</div>`;
 
 (async () => {
   fs.mkdirSync('print', { recursive: true });
+  for (const old of ['front-label-300dpi.png', 'back-label-300dpi.png', 'cremas-labels-3.5x4.5in.pdf', 'cremas-print-sheet-letter.pdf']) fs.rmSync('print/' + old, { force: true });
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ deviceScaleFactor: 300 / 96, viewport: { width: 336, height: 432 } });
+  const ctx = await browser.newContext({ deviceScaleFactor: 300 / 96, viewport: { width: 864, height: 432 } });
   const p = await ctx.newPage();
   const ready = async html => { await p.setContent(html, { waitUntil: 'networkidle' }); await p.evaluate(() => document.fonts.ready); };
-  await ready(page(frontDiv, '')); await p.locator('.label').screenshot({ path: 'print/front-label-300dpi.png' });
-  await ready(page(backDiv, ''));  await p.locator('.label').screenshot({ path: 'print/back-label-300dpi.png' });
-  // SVG ids must be unique when both labels share one page; back uses its own ids so this is fine.
-  await ready(page(frontDiv + backDiv, '@page{size:3.5in 4.5in;margin:0}'));
-  await p.pdf({ path: 'print/cremas-labels-3.5x4.5in.pdf', width: '3.5in', height: '4.5in', printBackground: true });
-  const cell = d => `<div style="outline:0.5px dashed #999">${d}</div>`;
-  const sheet = `<div style="width:8.5in;height:11in;display:grid;grid-template-columns:3.5in 3.5in;grid-template-rows:4.5in 4.5in;gap:0.25in;justify-content:center;align-content:center">${cell(frontDiv)}${cell(backDiv)}${cell(frontDiv)}${cell(backDiv)}</div>`;
-  await ready(page(sheet, '@page{size:letter;margin:0}'));
-  await p.pdf({ path: 'print/cremas-print-sheet-letter.pdf', format: 'Letter', printBackground: true });
+  await ready(page(labelDiv, ''));
+  await p.locator('.label').screenshot({ path: 'print/cremas-wrap-label-9x4.5in-300dpi.png' });
+  await p.pdf({ path: 'print/cremas-wrap-label-9x4.5in.pdf', width: '9in', height: '4.5in', printBackground: true, pageRanges: '1' });
+  // home printing: one label centered on landscape letter paper with cut guide
+  await ready(page(`<div style="width:11in;height:8.5in;display:flex;align-items:center;justify-content:center"><div style="outline:0.5px dashed #999">${labelDiv}</div></div>`, '@page{size:11in 8.5in;margin:0}'));
+  await p.pdf({ path: 'print/cremas-wrap-label-letter-landscape.pdf', width: '11in', height: '8.5in', printBackground: true, pageRanges: '1' });
   await browser.close();
   console.log('done');
 })();
