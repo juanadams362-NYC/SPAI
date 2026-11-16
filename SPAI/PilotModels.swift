@@ -22,7 +22,7 @@ struct RosterResponse: Codable {
 
 /// Whether a run counts.
 enum RunMode: String, Codable, CaseIterable, Identifiable {
-    /// Scored and sent to the instructor.
+    /// Scored and sent to the instructor. Needs a signed-in learner.
     case assessed
     /// A rehearsal. Still guided and checked, but kept off the record.
     case practice
@@ -95,8 +95,11 @@ struct RunEvent: Codable, Equatable {
 /// headset so the record survives the network dropping mid-session.
 struct RunRecord: Codable, Identifiable, Equatable {
     let id: String
-    var learnerID: String?
+    var learnerID: String
     var learnerName: String
+    /// Only set when the learner signed in while the headset was offline,
+    /// so the server can check the PIN when the run arrives.
+    var pin: String?
     var role: String
     var mode: String
     var headset: String
@@ -114,6 +117,7 @@ struct RunRecord: Codable, Identifiable, Equatable {
         case id, role, mode, headset, completed, events
         case learnerID = "learner_id"
         case learnerName = "learner_name"
+        case pin
         case startedAt = "started_at"
         case endedAt = "ended_at"
         case durationSeconds = "duration_s"

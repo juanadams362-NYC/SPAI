@@ -210,8 +210,10 @@ struct ChatPanel: View {
                     detectionSummary: detectionSummary
                 ))
                 messages.append(ChatMessage(role: .spai, text: response.answer))
+            } catch BackendError.unauthorized {
+                messages.append(ChatMessage(role: .error, text: "Ask SPAI needs this headset to be connected to your school. Connect it from the home screen."))
             } catch {
-                messages.append(ChatMessage(role: .error, text: "Couldn't reach SPAI. Check the backend connection and try again."))
+                messages.append(ChatMessage(role: .error, text: "Couldn't reach SPAI right now. Your steps and checks still work; try asking again in a moment."))
             }
             isWaiting = false
         }

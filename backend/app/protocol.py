@@ -10,14 +10,8 @@ new app build. Ask SPAI answers from the same text.
 from __future__ import annotations
 
 import copy
-import json
-import os
-from pathlib import Path
 
 from app import instruments, scoring
-from app.store import now_iso
-
-DEFAULT_PATH = Path(__file__).parent.parent / "data" / "protocol.json"
 
 # What the app can verify with the camera before letting a step advance.
 CONDITIONS = ("manual", "gloves_on", "instruments_present", "tray_loaded", "count_matches")
@@ -173,62 +167,37 @@ def validate(candidate: dict) -> dict:
     }
 
 
-class ProtocolStore:
-    def __init__(self, path: str | Path | None = None) -> None:
-        self.path = Path(path or os.getenv("SPAI_PROTOCOL") or DEFAULT_PATH)
-        self._cached: dict | None = None
-
-    def current(self) -> dict:
-        if self._cached is None:
-            self._cached = self._load()
-        return self._cached
-
-    def _load(self) -> dict:
-        if self.path.exists():
-            try:
-                saved = json.loads(self.path.read_text())
-                clean = validate(saved)
-                return {**clean, "version": int(saved.get("version", 2)),
-                        "updated_at": saved.get("updated_at"), "is_standard": False}
-            except (ValueError, OSError, TypeError):
-                # A damaged file must not take guidance down with it.
-                pass
+def for_org(org_id: str) -> dict:
+    """The protocol a school's headsets follow: its own if an admin has
+    edited it, the standard one otherwise. A stored protocol that no longer
+    validates (say, after an upgrade) falls back to standard rather than
+    leaving students with nothing to do."""
+    from app.store import get_store
+    saved = get_store().get_protocol(org_id)
+    if saved is None:
         return standard_protocol()
-
-    def save(self, candidate: dict) -> dict:
-        clean = validate(candidate)
-        saved = {**clean, "version": self.current()["version"] + 1, "updated_at": now_iso(), "is_standard": False}
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        # Write to a temporary file first so a crash can't leave half a protocol.
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(saved, indent=2))
-        tmp.replace(self.path)
-        self._cached = saved
-        return saved
-
-    def reset(self) -> dict:
-        if self.path.exists():
-            self.path.unlink()
-        self._cached = standard_protocol()
-        return self._cached
-
-    def steps_for(self, station: str) -> list[str] | None:
-        for s in self.current()["stations"]:
-            if s["key"] == station:
-                return [step["instruction"] for step in s["steps"]]
-        return None
+    try:
+        clean = validate(saved)
+    except (ProtocolError, TypeError, ValueError):
+        return standard_protocol()
+    return {**clean, "version": saved["version"], "updated_at": saved["updated_at"], "is_standard": False}
 
 
-_protocols: ProtocolStore | None = None
+def save_for_org(org_id: str, candidate: dict, updated_by: str) -> dict:
+    from app.store import get_store
+    clean = validate(candidate)
+    get_store().save_protocol(org_id, clean, updated_by)
+    return for_org(org_id)
 
 
-def get_protocols() -> ProtocolStore:
-    global _protocols
-    if _protocols is None:
-        _protocols = ProtocolStore()
-    return _protocols
+def reset_for_org(org_id: str) -> dict:
+    from app.store import get_store
+    get_store().delete_protocol(org_id)
+    return standard_protocol()
 
 
-def use_protocols(store: ProtocolStore | None) -> None:
-    global _protocols
-    _protocols = store
+def steps_for(protocol: dict, station: str) -> list[str] | None:
+    for s in protocol["stations"]:
+        if s["key"] == station:
+            return [step["instruction"] for step in s["steps"]]
+    return None

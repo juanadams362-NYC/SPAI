@@ -4,7 +4,9 @@ from typing import Optional
 import threading
 from collections import OrderedDict
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Depends, Header
+
+from app import security
 from pydantic import BaseModel
 
 from app.compliance.engine import ComplianceEngine
@@ -27,8 +29,10 @@ _engines: "OrderedDict[str, ComplianceEngine]" = OrderedDict()
 _engines_lock = threading.Lock()
 
 
-def _engine_for(session: str | None, fresh: bool = False) -> ComplianceEngine:
-    key = (session or DEFAULT_SESSION)[:64]
+def _engine_for(device: dict, session: str | None, fresh: bool = False) -> ComplianceEngine:
+    # Keyed by headset as well as run, so one school's headset can never
+    # reach another's workflow by guessing its run id.
+    key = f"{device['id']}:{(session or DEFAULT_SESSION)[:64]}"
     with _engines_lock:
         if fresh or key not in _engines:
             _engines[key] = ComplianceEngine()
@@ -56,15 +60,17 @@ def _state_payload(engine: ComplianceEngine) -> dict:
 
 
 @router.get("/state")
-def get_state(x_spai_session: Optional[str] = Header(default=None)) -> dict:
+def get_state(x_spai_session: Optional[str] = Header(default=None),
+              device: dict = Depends(security.current_device)) -> dict:
     """Return this session's workflow state."""
-    return _state_payload(_engine_for(x_spai_session))
+    return _state_payload(_engine_for(device, x_spai_session))
 
 
 @router.post("/event")
-def post_event(req: EventRequest, x_spai_session: Optional[str] = Header(default=None)) -> dict:
+def post_event(req: EventRequest, x_spai_session: Optional[str] = Header(default=None),
+               device: dict = Depends(security.current_device)) -> dict:
     """Send an event to this session's FSM and return the outcome plus new state."""
-    engine = _engine_for(x_spai_session)
+    engine = _engine_for(device, x_spai_session)
     result = engine.process(req.event, req.step)
     logger.info("Compliance event %s -> accepted=%s", req.event.value, result.accepted)
     return {
@@ -75,8 +81,9 @@ def post_event(req: EventRequest, x_spai_session: Optional[str] = Header(default
 
 
 @router.post("/reset")
-def reset(x_spai_session: Optional[str] = Header(default=None)) -> dict:
+def reset(x_spai_session: Optional[str] = Header(default=None),
+          device: dict = Depends(security.current_device)) -> dict:
     """Start a fresh workflow for this session only."""
-    engine = _engine_for(x_spai_session, fresh=True)
+    engine = _engine_for(device, x_spai_session, fresh=True)
     logger.info("Compliance engine reset.")
     return _state_payload(engine)

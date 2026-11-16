@@ -118,7 +118,7 @@ final class PilotTests: XCTestCase {
     }
 
     func testRunRecordEncodesWithServerFieldNames() throws {
-        let run = RunRecord(id: "run-1", learnerID: "abc", learnerName: "Avery", role: "Trainee", mode: "assessed",
+        let run = RunRecord(id: "run-1", learnerID: "abc", learnerName: "Avery", pin: "1234", role: "Trainee", mode: "assessed",
                             headset: "Lab 1", startedAt: "a", endedAt: "b", durationSeconds: 60, completed: true,
                             stationsCompleted: 5, events: [], instrumentsSeen: ["Operating Scissors"],
                             appVersion: "1.0", detectionMode: "On-Device")
@@ -127,5 +127,38 @@ final class PilotTests: XCTestCase {
         XCTAssertEqual(object?["duration_s"] as? Int, 60)
         XCTAssertEqual(object?["stations_completed"] as? Int, 5)
         XCTAssertNotNil(object?["instruments_seen"])
+        XCTAssertEqual(object?["pin"] as? String, "1234")
+    }
+
+    // MARK: - Sign-in
+
+    func testRunBelongsToWhoeverStartedIt() {
+        // Student A starts a run and leaves it unfinished; student B signs
+        // in. A's unfinished run must not be filed under B.
+        let model = AppModel()
+        let a = Learner(id: "a", name: "Avery", cohort: "")
+        let b = Learner(id: "b", name: "Blake", cohort: "")
+        model.signIn(a, pin: "1111", checkedOnline: true)
+        model.beginRun()
+        model.signIn(b, pin: "2222", checkedOnline: true)
+        XCTAssertEqual(model.learnerDisplayName, "Blake")
+        model.signOut()
+        XCTAssertFalse(model.isSignedIn)
+        XCTAssertEqual(model.runMode, .practice)
+    }
+
+    func testGuestsCanOnlyPractise() {
+        let model = AppModel()
+        model.signInAsGuest()
+        XCTAssertEqual(model.runMode, .practice)
+        XCTAssertEqual(model.learnerDisplayName, "Guest")
+    }
+
+    func testPinCheckDecodes() throws {
+        let locked = try JSONDecoder().decode(PinCheck.self, from: Data(#"{"ok": false, "reason": "locked", "retry_in": 540}"#.utf8))
+        XCTAssertEqual(locked.reason, "locked")
+        XCTAssertEqual(locked.retryIn, 540)
+        let wrong = try JSONDecoder().decode(PinCheck.self, from: Data(#"{"ok": false, "reason": "wrong", "attempts_left": 3}"#.utf8))
+        XCTAssertEqual(wrong.attemptsLeft, 3)
     }
 }

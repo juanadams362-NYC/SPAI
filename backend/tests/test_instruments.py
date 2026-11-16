@@ -10,7 +10,6 @@ from app.inference.detector import Detector
 from app.inference.tray_detector import tray_detector
 from app.main import app
 
-client = TestClient(app)
 
 TINY_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
@@ -115,18 +114,18 @@ def test_detector_reads_names_from_the_model_not_a_hardcoded_list():
 
 # --- Endpoints (stub mode) ---------------------------------------------------
 
-def test_instruments_endpoint_lists_all_six():
+def test_instruments_endpoint_lists_all_six(client):
     data = client.get("/instruments").json()
     assert data["count"] == 6
     assert {i["key"] for i in data["instruments"]} == {instruments.key_for(l) for l in MODEL_LABELS}
 
 
-def test_instrument_card_by_key_and_unknown():
+def test_instrument_card_by_key_and_unknown(client):
     assert client.get("/instruments/operating_scissors").json()["name"] == "Operating Scissors"
     assert client.get("/instruments/banana").status_code == 404
 
 
-def test_detect_tray_names_the_instrument():
+def test_detect_tray_names_the_instrument(client):
     data = client.post("/detect-tray", files={"image": ("t.png", TINY_PNG, "image/png")}).json()
     assert data["tray_state"] == "loaded"
     assert data["instrument_count"] == 1
@@ -137,7 +136,7 @@ def test_detect_tray_names_the_instrument():
     assert data["identified"]["certain"] is True
 
 
-def test_analyze_returns_ppe_instruments_and_identification():
+def test_analyze_returns_ppe_instruments_and_identification(client):
     response = client.post("/analyze", files={"image": ("t.png", TINY_PNG, "image/png")})
     assert response.status_code == 200
     data = response.json()
@@ -151,23 +150,27 @@ def test_analyze_returns_ppe_instruments_and_identification():
     assert data["mode"] == "stub"
 
 
-def test_analyze_rejects_non_image_and_empty_upload():
+def test_analyze_rejects_non_image_and_empty_upload(client):
     assert client.post("/analyze", files={"image": ("t.txt", b"nope", "text/plain")}).status_code == 400
     assert client.post("/analyze", files={"image": ("t.png", b"", "image/png")}).status_code == 400
 
 
-def test_settings_expose_and_update_identify_threshold():
+def test_settings_expose_and_update_identify_threshold(client, monkeypatch):
     original = tray_detector.identify_threshold
+    monkeypatch.setenv("SPAI_OPERATOR_KEY", "op-secret")
+    op = {"X-SPAI-Operator": "op-secret"}
     try:
-        data = client.patch("/settings", json={"identify_threshold": 0.8}).json()
+        # A school's headset can read the server-wide settings but not change them.
+        assert client.patch("/settings", json={"identify_threshold": 0.8}).status_code == 403
+        data = client.patch("/settings", json={"identify_threshold": 0.8}, headers=op).json()
         assert data["identify_threshold"] == 0.8
         assert client.get("/settings").json()["identify_threshold"] == 0.8
-        assert client.patch("/settings", json={"identify_threshold": 1.5}).status_code == 422
+        assert client.patch("/settings", json={"identify_threshold": 1.5}, headers=op).status_code == 422
     finally:
         tray_detector.identify_threshold = original
 
 
-def test_detections_are_counted_in_metrics():
+def test_detections_are_counted_in_metrics(client):
     before = client.get("/health/stats").json()["metrics"]["detection_count"]
     client.post("/detect", files={"image": ("t.png", TINY_PNG, "image/png")})
     after = client.get("/health/stats").json()

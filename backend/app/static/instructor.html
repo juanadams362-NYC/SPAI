@@ -129,6 +129,18 @@ textarea { resize: vertical; min-height: 62px; line-height: 1.45; }
   .step { grid-template-columns: 24px minmax(0, 1fr) 42px; } .step select { grid-column: 2 / 3; } .step .why { grid-column: 2 / 3; } .stat { border-right: 0; border-bottom: 1px solid var(--line); } }
 @media print { header.top, .actions, .banner, .crumb { display: none !important; } html, body { background: #fff; color: #000; }
   :root { --paper: #000; --stone: #333; --ash: #555; --line: #ccc; --line-strong: #999; --ink-2: #fff; --ink-3: #eee; } }
+
+.who { font: 500 12px/1.5 var(--f-mono); color: var(--stone); letter-spacing: .04em; text-align: right; }
+.who b { color: var(--paper); font-weight: 500; }
+.code { font: 700 clamp(36px, 8vw, 68px)/1 var(--f-mono); letter-spacing: .12em; margin: 10px 0 6px; }
+.pinsheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.pincard { border: 1px dashed var(--line-strong); border-radius: 12px; padding: 16px; break-inside: avoid; }
+.pincard .p { font: 700 30px/1 var(--f-mono); letter-spacing: .2em; margin-top: 8px; }
+.pincard small { display: block; font: 400 12px var(--f-mono); color: var(--ash); margin-top: 6px; }
+.flag { font: 500 11px var(--f-mono); color: var(--warn); letter-spacing: .06em; }
+.linkbox { font: 400 13px var(--f-mono); word-break: break-all; background: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: 12px; }
+.readonly { opacity: .75; pointer-events: none; }
+@media print { .who, nav { display: none !important; } }
 </style>
 </head>
 <body>
@@ -137,9 +149,12 @@ textarea { resize: vertical; min-height: 62px; line-height: 1.45; }
     <a class="mark" href="#class">SPAI<small>Instructor</small></a>
     <nav id="nav" hidden>
       <a href="#class" data-view="class">Class</a>
+      <a href="#headsets" data-view="headsets">Headsets</a>
+      <a href="#team" data-view="team">Team</a>
       <a href="#protocol" data-view="protocol">Protocol</a>
       <a href="#privacy" data-view="privacy">Privacy + data</a>
     </nav>
+    <div class="who" id="who" hidden></div>
     <button class="btn" id="signout" hidden>Sign out</button>
   </header>
   <main id="main"></main>
@@ -160,7 +175,7 @@ const RUBRIC = { contamination_penalty: 'Points lost per contamination', send_ba
 async function api(path, options = {}) {
   const res = await fetch(path, { credentials: 'same-origin', ...options,
     headers: options.body ? { 'Content-Type': 'application/json', ...(options.headers || {}) } : options.headers });
-  if (res.status === 401 && !path.endsWith('/login')) { signedIn = false; render(); throw new Error('Sign in first.'); }
+  if (res.status === 401 && path.startsWith('/instructor/api/')) { signedIn = false; render(); throw new Error('Your sign-in ended. Sign in again.'); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'That didn’t work. Try again.');
   return data;
@@ -182,21 +197,54 @@ function spark(scores) {
 }
 
 let signedIn = false, status = {};
+const isAdmin = () => status.instructor && status.instructor.role === 'admin';
+const msg = (el, text, ok) => { el.className = 'msg ' + (ok ? 'ok' : 'err'); el.textContent = text; };
 
 /* ---------------- sign in ---------------- */
 function viewSignIn() {
   main.innerHTML = `<div class="signin"><p class="eyebrow">Instructor dashboard</p>
     <h1 style="font-size:44px">Sign in</h1>
-    <p class="lede">Enter the instructor PIN for this site.</p>
-    <form id="f" style="margin-top:26px"><div class="field"><label for="pin">PIN</label>
-      <input id="pin" type="password" autocomplete="current-password" required></div>
-      <button class="btn solid">Open dashboard</button><p class="msg err" id="m" role="alert"></p></form></div>`;
+    <p class="lede">Use the work email and password for your SPAI account. New here? Your program's admin sends you an invite link.</p>
+    <form id="f" style="margin-top:26px">
+      <div class="field"><label for="email">Work email</label><input id="email" type="text" autocomplete="username" inputmode="email" required></div>
+      <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required></div>
+      <button class="btn solid">Sign in</button><p class="msg err" id="m" role="alert"></p></form></div>`;
   $('#f').onsubmit = async e => {
     e.preventDefault();
-    try { await api('/instructor/login', { method: 'POST', body: JSON.stringify({ pin: $('#pin').value }) }); signedIn = true; render(); }
+    try { await api('/instructor/login', { method: 'POST', body: JSON.stringify({ email: $('#email').value, password: $('#pw').value }) }); await boot(); }
     catch (err) { $('#m').textContent = err.message; }
   };
-  $('#pin').focus();
+  $('#email').focus();
+}
+
+async function viewInvite(token) {
+  let invite;
+  try { invite = await api('/instructor/invite/' + encodeURIComponent(token)); }
+  catch (err) { main.innerHTML = `<div class="signin"><h1 style="font-size:40px">Link expired</h1><p class="lede">${esc(err.message)}</p><a class="btn" href="#class" style="margin-top:20px">Go to sign in</a></div>`; return; }
+  main.innerHTML = `<div class="signin"><p class="eyebrow">${esc(invite.org_name)}</p>
+    <h1 style="font-size:44px">Set up your account</h1>
+    <p class="lede">You've been invited as ${invite.role === 'admin' ? 'an admin' : 'an instructor'}. Your sign-in will be <b style="color:var(--paper)">${esc(invite.email)}</b>.</p>
+    <form id="f" style="margin-top:26px">
+      <div class="field"><label for="nm">Your name</label><input id="nm" type="text" maxlength="120" autocomplete="name" required></div>
+      <div class="field"><label for="pw">Choose a password</label><input id="pw" type="password" minlength="10" autocomplete="new-password" required></div>
+      <p class="muted" style="font-size:14px;margin:-4px 0 16px">At least 10 characters.</p>
+      <button class="btn solid">Create account</button><p class="msg err" id="m" role="alert"></p></form></div>`;
+  $('#f').onsubmit = async e => {
+    e.preventDefault();
+    try { await api('/instructor/invite/' + encodeURIComponent(token), { method: 'POST', body: JSON.stringify({ name: $('#nm').value, password: $('#pw').value }) });
+          history.replaceState(null, '', '#class'); await boot(); }
+    catch (err) { $('#m').textContent = err.message; }
+  };
+}
+
+/* ---------------- PIN sheet ---------------- */
+// PINs are shown once, right after they're issued. The sheet is meant to be
+// printed and handed out, then the page left.
+function pinSheet(rows, title) {
+  return `<section><div class="headrow"><div><p class="eyebrow">Shown once</p><h2>${esc(title)}</h2></div><span class="sp"></span>
+      <div class="actions"><button class="btn" onclick="window.print()">Print PIN cards</button><a class="btn solid" href="#class">Done</a></div></div>
+    <p class="lede" style="margin-bottom:20px">Each learner picks their name on the headset and enters their PIN. SPAI only keeps a scrambled copy, so it can't show these again. If one is lost, issue a new PIN from the learner's page.</p>
+    <div class="pinsheet">${rows.map(r => `<div class="pincard"><b>${esc(r.name)}</b><div class="p">${esc(r.pin)}</div><small>${esc(r.cohort || status.organization.name)}</small></div>`).join('')}</div></section>`;
 }
 
 /* ---------------- class ---------------- */
@@ -204,19 +252,17 @@ async function viewClass() {
   const o = await api('/instructor/api/overview');
   const maxIssues = Math.max(1, ...o.station_trouble.map(s => s.issues));
   const banners = [];
-  if (!status.secured.instructor_pin || !status.secured.headset_key)
-    banners.push(`<div class="banner warn"><span><b>This server is not locked.</b> Anyone who can reach it can open this page${status.secured.headset_key ? '' : ' and upload runs'}. Set <code>SPAI_INSTRUCTOR_PIN</code> and <code>SPAI_API_KEY</code> before using it with real students.</span></div>`);
-  if (o.has_demo_data)
-    banners.push(`<div class="banner"><span><b>Sample data.</b> The "Sample cohort" learners and their runs are invented, for demonstration.</span><span class="sp"></span><button class="btn" id="rmdemo">Remove sample data</button></div>`);
+  if (!o.headsets) banners.push(`<div class="banner"><span><b>No headsets connected yet.</b> ${isAdmin() ? 'Connect one so students can sign in and their runs come here.' : 'Ask your admin to connect your program’s headsets.'}</span><span class="sp"></span>${isAdmin() ? '<a class="btn" href="#headsets">Connect a headset</a>' : ''}</div>`);
+  if (o.has_demo_data) banners.push(`<div class="banner"><span><b>Sample data.</b> The "Sample cohort" learners and their runs are invented, for demonstration.</span><span class="sp"></span>${isAdmin() ? '<button class="btn" id="rmdemo">Remove sample data</button>' : ''}</div>`);
 
   const rows = o.roster.map(r => `<tr class="link" data-id="${esc(r.id)}" tabindex="0">
-      <td class="name">${esc(r.name)}<small>${esc(r.cohort || 'No cohort')}${r.is_demo ? ' · sample' : ''}</small></td>
-      <td>${pill(r.latest_verdict, r.latest_verdict_label)}</td>
+      <td class="name">${esc(r.name)}<small>${esc(r.cohort || 'No cohort')}${r.is_demo ? ' · sample' : ''}${r.locked ? ' · <span class="flag">PIN locked</span>' : ''}</small></td>
+      <td>${pill(r.latest_verdict, r.latest_verdict_label)}${r.unconfirmed_runs ? ` <span class="flag" title="Signed in offline with the wrong PIN">${r.unconfirmed_runs} unconfirmed</span>` : ''}</td>
       <td class="num">${r.latest_score ?? '—'}</td><td class="num">${r.best_score ?? '—'}</td>
       <td class="num">${r.runs}</td><td>${spark(r.scores)}</td><td class="muted">${when(r.last_run_at)}</td></tr>`).join('');
 
   main.innerHTML = `${banners.join('')}
-    <section><p class="eyebrow">Your class</p>
+    <section><p class="eyebrow">${esc(status.organization.name)}</p>
       <div class="headrow"><h1><span class="thin">Who's ready,</span>who needs a hand.</h1><span class="sp"></span>
         <div class="actions"><a class="btn" href="/instructor/api/export.csv">Export CSV</a></div></div></section>
     <section><div class="stats">
@@ -230,28 +276,25 @@ async function viewClass() {
         ${o.sessions ? `<div class="trouble">${o.station_trouble.map(s => `<div class="trow ${s.issues === maxIssues && s.issues ? 'max' : ''}">
           <span>${esc(s.title)}</span><div class="bar"><i style="width:${(s.issues / maxIssues * 100).toFixed(0)}%"></i></div><b>${s.issues}</b></div>`).join('')}</div>
           <p class="lede" style="font-size:15px">${o.hardest_station ? `Alerts, redos and send-backs across all runs. <b style="color:var(--paper)">${esc(o.hardest_station)}</b> is the one to re-teach first.` : 'No alerts, redos or send-backs recorded yet.'}</p>`
-        : '<p class="muted">Appears after the first run is uploaded from a headset.</p>'}</div>
+        : '<p class="muted">Appears after the first assessed run arrives from a headset.</p>'}</div>
       <div class="card"><h2>Add learners</h2>
         <form id="add"><div class="field"><label for="names">Names, one per line</label><textarea id="names" rows="4" required placeholder="Avery Chen&#10;Jordan Okafor"></textarea></div>
           <div class="field"><label for="cohort">Cohort or class</label><input id="cohort" type="text" maxlength="60" placeholder="Fall 2026 · Section A"></div>
-          <button class="btn solid">Add to roster</button><p class="msg" id="addmsg" role="status"></p></form></div>
+          <button class="btn solid">Add and print PINs</button><p class="msg" id="addmsg" role="status"></p></form></div>
     </section>
     <section><h2>Roster</h2>
       ${o.roster.length ? `<div class="tablewrap"><table><thead><tr><th>Learner</th><th>Latest result</th><th class="num">Latest</th><th class="num">Best</th><th class="num">Runs</th><th>Trend</th><th>Last run</th></tr></thead><tbody>${rows}</tbody></table></div>`
-        : '<div class="card empty">No learners yet. Add your class above; they’ll appear in the sign-in list on every headset.</div>'}
+        : '<div class="card empty">No learners yet. Add your class above; each gets a 4-digit PIN to sign in on any of your headsets.</div>'}
     </section>`;
 
-  main.querySelectorAll('tr.link').forEach(tr => {
-    const go = () => location.hash = 'learner/' + tr.dataset.id;
-    tr.onclick = go; tr.onkeydown = e => e.key === 'Enter' && go();
-  });
+  main.querySelectorAll('tr.link').forEach(tr => { const go = () => location.hash = 'learner/' + tr.dataset.id; tr.onclick = go; tr.onkeydown = e => e.key === 'Enter' && go(); });
   $('#add').onsubmit = async e => {
-    e.preventDefault(); const m = $('#addmsg');
+    e.preventDefault();
     try {
       const names = $('#names').value.split('\n').map(s => s.trim()).filter(Boolean);
       const r = await api('/instructor/api/learners', { method: 'POST', body: JSON.stringify({ names, cohort: $('#cohort').value }) });
-      m.className = 'msg ok'; m.textContent = `Added ${r.added.length}.`; setTimeout(render, 600);
-    } catch (err) { m.className = 'msg err'; m.textContent = err.message; }
+      main.innerHTML = pinSheet(r.added, `PINs for ${r.added.length} new learner${r.added.length === 1 ? '' : 's'}`); window.scrollTo(0, 0);
+    } catch (err) { msg($('#addmsg'), err.message); }
   };
   const rm = $('#rmdemo'); if (rm) rm.onclick = async () => { await api('/instructor/api/demo', { method: 'DELETE' }); render(); };
 }
@@ -260,14 +303,14 @@ async function viewClass() {
 async function viewLearner(id) {
   const { learner, sessions } = await api('/instructor/api/learners/' + encodeURIComponent(id));
   const assessed = sessions.filter(s => s.mode === 'assessed');
-  const competent = assessed.some(s => s.verdict === 'competent');
+  const competent = assessed.some(s => s.verdict === 'competent' && s.identity === 'verified');
   const rows = sessions.map(s => `<tr class="link" data-id="${esc(s.id)}" tabindex="0"><td>${whenLong(s.started_at)}</td>
-    <td>${pill(s.verdict, s.verdict_label)}${s.mode === 'practice' ? ' <span class="pill sample">Practice</span>' : ''}</td>
+    <td>${pill(s.verdict, s.verdict_label)}${s.identity !== 'verified' ? ' <span class="flag">PIN not confirmed</span>' : ''}</td>
     <td class="num">${s.score}</td><td class="num">${s.stations_completed} / 5</td><td class="num">${s.contamination_count}</td><td class="num">${mins(s.duration_s)}</td></tr>`).join('');
   main.innerHTML = `<section><a class="crumb" href="#class">← Class</a>
-      <div class="headrow"><div><p class="eyebrow">${esc(learner.cohort || 'No cohort')}${learner.is_demo ? ' · sample data' : ''}</p><h1>${esc(learner.name)}</h1></div><span class="sp"></span>
-        <div class="actions"><a class="btn" href="/instructor/api/learners/${encodeURIComponent(id)}/export">Export record</a>
-          <button class="btn danger" id="del">Delete learner</button></div></div>
+      <div class="headrow"><div><p class="eyebrow">${esc(learner.cohort || 'No cohort')}${learner.is_demo ? ' · sample data' : ''}${learner.locked ? ' · PIN locked after wrong tries' : ''}</p><h1>${esc(learner.name)}</h1></div><span class="sp"></span>
+        <div class="actions"><button class="btn" id="pin">New PIN</button><a class="btn" href="/instructor/api/learners/${encodeURIComponent(id)}/export">Export record</a>
+          ${isAdmin() ? '<button class="btn danger" id="del">Delete learner</button>' : ''}</div></div>
       <p class="msg err" id="delmsg" role="alert"></p></section>
     <section><div class="stats">
       <div class="stat"><div class="n">${competent ? 'Yes' : 'Not yet'}</div><div class="l">Shown competent</div></div>
@@ -276,10 +319,14 @@ async function viewLearner(id) {
       <div class="stat"><div class="n">${spark(assessed.map(s => s.score).reverse())}</div><div class="l">Score, oldest to newest</div></div>
     </div></section>
     <section><h2>Runs</h2>${sessions.length ? `<div class="tablewrap"><table><thead><tr><th>When</th><th>Result</th><th class="num">Score</th><th class="num">Stations</th><th class="num">Contamination</th><th class="num">Time</th></tr></thead><tbody>${rows}</tbody></table></div>`
-      : '<div class="card empty">No runs yet. They appear here as soon as this learner finishes a session in the headset.</div>'}</section>`;
+      : '<div class="card empty">No runs yet. They appear here as soon as this learner finishes an assessed run on a headset.</div>'}</section>`;
   main.querySelectorAll('tr.link').forEach(tr => { const go = () => location.hash = 'run/' + tr.dataset.id; tr.onclick = go; tr.onkeydown = e => e.key === 'Enter' && go(); });
+  $('#pin').onclick = async () => {
+    const r = await api(`/instructor/api/learners/${encodeURIComponent(id)}/reset-pin`, { method: 'POST' });
+    main.innerHTML = pinSheet([{ ...r.learner, pin: r.pin }], `New PIN for ${r.learner.name}`); window.scrollTo(0, 0);
+  };
   const del = $('#del'); let armed = false;
-  del.onclick = async () => {
+  if (del) del.onclick = async () => {
     // Two presses, not a browser dialog: the second press is the confirmation.
     if (!armed) { armed = true; del.textContent = 'Press again to erase everything'; $('#delmsg').textContent = `This permanently deletes ${learner.name} and all ${sessions.length} of their runs.`; return; }
     await api('/instructor/api/learners/' + encodeURIComponent(id), { method: 'DELETE' }); location.hash = 'class';
@@ -298,7 +345,8 @@ async function viewRun(id) {
       <div class="s">${!st.completed ? 'Not completed' : st.clean ? 'Clean' : esc(issues.join(' · '))}</div></div>`;
   }).join('');
   main.innerHTML = `<section><a class="crumb" href="${s.learner_id ? '#learner/' + encodeURIComponent(s.learner_id) : '#class'}">← ${esc(s.learner_name)}</a>
-      <div class="headrow"><div><p class="eyebrow">${whenLong(s.started_at)} · ${mins(s.duration_s)} · ${esc(s.headset || 'headset')}${s.mode === 'practice' ? ' · practice' : ''}</p>
+      ${s.identity !== 'verified' ? '<div class="banner warn"><span><b>PIN not confirmed.</b> This run was started offline and the PIN entered didn’t match when it arrived. It doesn’t count toward competency.</span></div>' : ''}
+      <div class="headrow"><div><p class="eyebrow">${whenLong(s.started_at)} · ${mins(s.duration_s)} · ${esc(s.headset || 'headset')}</p>
         <h1><span class="thin">${esc(s.learner_name)}</span>${esc(s.verdict_label)}</h1></div><span class="sp"></span>
         <div class="actions"><button class="btn" onclick="window.print()">Print report</button></div></div></section>
     <section class="grid2">
@@ -311,9 +359,80 @@ async function viewRun(id) {
     <section><h2>What happened</h2><div class="card timeline">${s.events.length ? s.events.map(e => `<div class="ev ${esc(e.kind)}"><time>${clock(e.at)}</time><i></i><span>${esc(e.message || e.kind)}</span></div>`).join('') : '<p class="muted">No events were recorded for this run.</p>'}</div></section>`;
 }
 
+/* ---------------- headsets ---------------- */
+async function viewHeadsets() {
+  const { headsets } = await api('/instructor/api/headsets');
+  const rows = headsets.map(h => `<tr><td class="name">${esc(h.name)}<small>Connected ${when(h.created_at)}</small></td>
+      <td class="muted">${h.last_seen_at ? 'Last seen ' + whenLong(h.last_seen_at) : 'Not seen yet'}</td>
+      <td style="text-align:right">${isAdmin() ? `<button class="btn danger" data-revoke="${esc(h.id)}">Disconnect</button>` : ''}</td></tr>`).join('');
+  main.innerHTML = `<section><p class="eyebrow">Headsets</p><h1><span class="thin">Every headset,</span>signed in to your school.</h1>
+      <p class="lede">A connected headset can show your roster to students, check their PINs and send their runs here. Disconnecting one stops it immediately; the runs it already sent stay.</p></section>
+    ${isAdmin() ? `<section class="card" id="pairbox"><h2>Connect a headset</h2>
+        <p class="muted" style="margin-top:0">On the headset, open SPAI → Connect to your school, and enter the server address and code below. The code works once and lasts ten minutes.</p>
+        <button class="btn solid" id="newcode">Show a pairing code</button><div id="codeout" role="status"></div></section>` : ''}
+    <section><h2>Connected</h2>${headsets.length ? `<div class="tablewrap"><table><thead><tr><th>Headset</th><th>Activity</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<div class="card empty">No headsets connected yet.</div>'}<p class="msg" id="hmsg" role="status"></p></section>`;
+  const nc = $('#newcode');
+  if (nc) nc.onclick = async () => {
+    const c = await api('/instructor/api/headsets/pairing-code', { method: 'POST' });
+    $('#codeout').innerHTML = `<p class="eyebrow" style="margin-top:24px">Server address</p><div class="linkbox">${esc(c.server)}</div>
+      <p class="eyebrow" style="margin-top:20px">Pairing code</p><div class="code">${esc(c.code)}</div><p class="muted">Expires at ${new Date(c.expires_at * 1000).toLocaleTimeString()}. Refresh this page after pairing to see the headset in the list.</p>`;
+  };
+  main.querySelectorAll('[data-revoke]').forEach(btn => { let armed = false; btn.onclick = async () => {
+    if (!armed) { armed = true; btn.textContent = 'Press again'; return; }
+    await api('/instructor/api/headsets/' + encodeURIComponent(btn.dataset.revoke), { method: 'DELETE' }); render();
+  }; });
+}
+
+/* ---------------- team ---------------- */
+async function viewTeam() {
+  const { instructors, you } = await api('/instructor/api/team');
+  const activity = isAdmin() ? (await api('/instructor/api/activity')).events : [];
+  const rows = instructors.map(m => `<tr><td class="name">${esc(m.name)}<small>${esc(m.email)}</small></td>
+      <td>${m.role === 'admin' ? 'Admin' : 'Instructor'}${m.disabled ? ' · <span class="flag">no access</span>' : ''}</td>
+      <td style="text-align:right">${isAdmin() && m.id !== you ? `<div class="actions" style="justify-content:flex-end">
+        <button class="btn" data-role="${esc(m.id)}" data-to="${m.role === 'admin' ? 'instructor' : 'admin'}">Make ${m.role === 'admin' ? 'instructor' : 'admin'}</button>
+        <button class="btn ${m.disabled ? '' : 'danger'}" data-access="${esc(m.id)}" data-off="${m.disabled ? 'false' : 'true'}">${m.disabled ? 'Restore access' : 'Remove access'}</button></div>` : m.id === you ? '<span class="muted">You</span>' : ''}</td></tr>`).join('');
+  main.innerHTML = `<section><p class="eyebrow">${esc(status.organization.name)}</p><h1><span class="thin">Who can see</span>your students.</h1>
+      <p class="lede">Instructors can see the class, add learners and issue PINs. Admins can also connect headsets, invite people, edit the protocol and delete records.</p></section>
+    <section><div class="tablewrap"><table><thead><tr><th>Name</th><th>Access</th><th></th></tr></thead><tbody>${rows}</tbody></table></div><p class="msg" id="tmsg" role="status"></p></section>
+    <section class="grid2">
+      ${isAdmin() ? `<div class="card"><h2>Invite someone</h2><form id="inv">
+          <div class="field"><label for="iemail">Their work email</label><input id="iemail" type="text" inputmode="email" required></div>
+          <div class="field"><label for="irole">Access</label><select id="irole"><option value="instructor">Instructor</option><option value="admin">Admin</option></select></div>
+          <button class="btn solid">Create invite link</button><div id="invout" role="status"></div></form></div>` : ''}
+      <div class="card"><h2>Your password</h2><form id="pwf">
+          <div class="field"><label for="cur">Current password</label><input id="cur" type="password" autocomplete="current-password" required></div>
+          <div class="field"><label for="npw">New password</label><input id="npw" type="password" minlength="10" autocomplete="new-password" required></div>
+          <button class="btn">Change password</button><p class="msg" id="pwmsg" role="status"></p></form>
+          <p class="muted" style="font-size:14px">Changing it signs you out of every other browser.</p></div>
+    </section>
+    ${isAdmin() ? `<section><h2>Activity</h2><div class="card timeline">${activity.length ? activity.map(e => `<div class="ev"><time>${when(e.at)}</time><i></i><span><b style="font-weight:600">${esc(e.actor)}</b> ${esc(e.action)}${e.detail ? ' · <span class="muted">' + esc(e.detail) + '</span>' : ''}</span></div>`).join('') : '<p class="muted">Nothing yet.</p>'}</div></section>` : ''}`;
+  const inv = $('#inv');
+  if (inv) inv.onsubmit = async e => {
+    e.preventDefault();
+    try { const r = await api('/instructor/api/team/invite', { method: 'POST', body: JSON.stringify({ email: $('#iemail').value, role: $('#irole').value }) });
+      $('#invout').innerHTML = `<p class="muted" style="margin:16px 0 8px">Send this link to them. It works once, for ${r.expires_in_days} days.</p><div class="linkbox" id="lnk">${esc(r.link)}</div><button type="button" class="btn" id="cp" style="margin-top:10px">Copy link</button>`;
+      $('#cp').onclick = async () => { try { await navigator.clipboard.writeText(r.link); $('#cp').textContent = 'Copied'; } catch { getSelection().selectAllChildren($('#lnk')); } };
+    } catch (err) { $('#invout').innerHTML = `<p class="msg err">${esc(err.message)}</p>`; }
+  };
+  $('#pwf').onsubmit = async e => {
+    e.preventDefault();
+    try { await api('/instructor/api/account/password', { method: 'POST', body: JSON.stringify({ current: $('#cur').value, new: $('#npw').value }) }); msg($('#pwmsg'), 'Password changed.', true); e.target.reset(); }
+    catch (err) { msg($('#pwmsg'), err.message); }
+  };
+  const update = async (id, body) => { try { await api('/instructor/api/team/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }); render(); } catch (err) { msg($('#tmsg'), err.message); } };
+  main.querySelectorAll('[data-role]').forEach(b => b.onclick = () => update(b.dataset.role, { role: b.dataset.to }));
+  main.querySelectorAll('[data-access]').forEach(b => { let armed = b.dataset.off === 'false'; b.onclick = () => {
+    if (!armed) { armed = true; b.textContent = 'Press again'; return; }
+    update(b.dataset.access, { disabled: b.dataset.off === 'true' });
+  }; });
+}
+
 /* ---------------- protocol ---------------- */
 async function viewProtocol() {
   const p = await api('/instructor/api/protocol');
+  const editable = isAdmin();
   const stepRow = (s, i) => `<div class="step"><span class="n">${i + 1}</span>
       <textarea class="ins" maxlength="400" aria-label="Instruction, step ${i + 1}">${esc(s.instruction)}</textarea>
       <select class="cond" aria-label="Check for step ${i + 1}">${Object.entries(CHECKS).map(([k, v]) => `<option value="${k}" ${k === s.condition ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -322,8 +441,9 @@ async function viewProtocol() {
   const sheet = p.count_sheets[0];
   main.innerHTML = `<section><p class="eyebrow">Protocol · version ${p.version}${p.is_standard ? ' · standard' : ''}</p>
       <h1><span class="thin">Your procedure,</span>your words.</h1>
-      <p class="lede">This is what SPAI says at each station and what it checks before a step can advance. Changes reach every headset the next time it opens. Each instruction is read aloud, so keep it to a sentence or two.</p></section>
-    <form id="pf">
+      <p class="lede">This is what SPAI says at each station and what it checks before a step can advance. Changes reach every headset the next time it opens. Each instruction is read aloud, so keep it to a sentence or two.</p>
+      ${editable ? '' : '<div class="banner"><span>Only an admin can change the protocol. You’re seeing what students see.</span></div>'}</section>
+    <form id="pf" class="${editable ? '' : 'readonly'}">
       ${p.stations.map(st => `<section data-station="${st.key}"><h2>${STATION_NUM[st.key]} · ${esc(st.title)}</h2>
         <div class="card"><div class="steps">${st.steps.map(stepRow).join('')}</div>
         <button type="button" class="btn addstep" style="margin-top:16px">Add a step</button></div></section>`).join('')}
@@ -331,9 +451,10 @@ async function viewProtocol() {
         <div class="rub">${(p.catalog || sheet.items).map(it => `<div class="field"><label for="cs-${it.key}">${esc(it.name)}</label><input type="number" min="0" max="20" id="cs-${it.key}" data-key="${it.key}" class="cs" value="${(sheet.items.find(x => x.key === it.key) || { count: 0 }).count}"></div>`).join('')}</div></div></section>
       <section><h2>Scoring</h2><div class="card"><p class="muted" style="margin-top:0">Every run starts at 100. These decide what's lost and what counts as competent.</p>
         <div class="rub">${Object.entries(RUBRIC).map(([k, label]) => `<div class="field"><label for="rb-${k}">${label}</label><input type="number" min="0" max="100" id="rb-${k}" data-key="${k}" class="rb" value="${p.rubric[k]}"></div>`).join('')}</div></div></section>
-      <section><div class="actions"><button class="btn solid">Save protocol</button><button type="button" class="btn" id="reset">Reset to standard</button></div>
-        <p class="msg" id="pmsg" role="status"></p></section>
+      ${editable ? `<section><div class="actions"><button class="btn solid">Save protocol</button><button type="button" class="btn" id="reset">Reset to standard</button></div>
+        <p class="msg" id="pmsg" role="status"></p></section>` : ''}
     </form>`;
+  if (!editable) return;
   const renumber = box => box.querySelectorAll('.step .n').forEach((n, i) => n.textContent = i + 1);
   // Assigned, not added: this view can render many times and must not stack handlers.
   main.onclick = e => {
@@ -341,7 +462,7 @@ async function viewProtocol() {
     if (e.target.classList.contains('addstep')) { const box = e.target.previousElementSibling; box.insertAdjacentHTML('beforeend', stepRow({ instruction: '', condition: 'manual', why: '' }, box.children.length)); box.lastElementChild.querySelector('textarea').focus(); }
   };
   $('#pf').onsubmit = async e => {
-    e.preventDefault(); const m = $('#pmsg');
+    e.preventDefault();
     const body = {
       name: p.is_standard ? 'Custom protocol' : p.name,
       stations: [...main.querySelectorAll('section[data-station]')].map(sec => ({ key: sec.dataset.station,
@@ -349,8 +470,8 @@ async function viewProtocol() {
       count_sheets: [{ id: sheet.id, name: sheet.name, items: [...main.querySelectorAll('.cs')].map(i => ({ key: i.dataset.key, count: Number(i.value) })) }],
       rubric: Object.fromEntries([...main.querySelectorAll('.rb')].map(i => [i.dataset.key, Number(i.value)])),
     };
-    try { const saved = await api('/instructor/api/protocol', { method: 'PUT', body: JSON.stringify(body) }); m.className = 'msg ok'; m.textContent = `Saved as version ${saved.version}. Headsets pick it up next time they open.`; }
-    catch (err) { m.className = 'msg err'; m.textContent = err.message; }
+    try { const saved = await api('/instructor/api/protocol', { method: 'PUT', body: JSON.stringify(body) }); msg($('#pmsg'), `Saved as version ${saved.version}. Headsets pick it up next time they open.`, true); }
+    catch (err) { msg($('#pmsg'), err.message); }
   };
   let armed = false;
   $('#reset').onclick = async e => {
@@ -367,33 +488,41 @@ async function viewPrivacy() {
       <p class="lede">Written for an IT or privacy office. The same statement is available without signing in at <code>/privacy</code>.</p></section>
     <section class="grid2"><div class="card"><h2>Camera</h2><p class="muted" style="margin:0 0 24px">${esc(p.camera_frames)}</p>
         <h2>Stored</h2>${list(p.stored)}</div>
-      <div class="card"><h2>Never collected</h2>${list(p.not_collected)}</div></section>
-    <section class="grid2"><div class="card"><h2>How long</h2><p class="muted" style="margin:0">${esc(p.retention)}</p></div>
+      <div class="card"><h2>Never collected</h2>${list(p.not_collected)}<h2 style="margin-top:24px">Other services</h2><p class="muted" style="margin:0">${esc(p.third_parties)}</p></div></section>
+    <section class="grid2"><div class="card"><h2>Separation</h2><p class="muted" style="margin:0 0 24px">${esc(p.separation)}</p><h2>How long</h2><p class="muted" style="margin:0">${esc(p.retention)}</p></div>
       <div class="card"><h2>Erasing and exporting</h2>${list([p.erasure, p.export])}</div></section>`;
 }
 
 /* ---------------- router ---------------- */
 async function render() {
-  $('#nav').hidden = $('#signout').hidden = !signedIn;
-  $('#signout').hidden = !signedIn || !status.pin_required;
-  if (!signedIn) return viewSignIn();
   const [view, id] = (location.hash.slice(1) || 'class').split('/');
+  if (view === 'invite' && id) { $('#nav').hidden = $('#who').hidden = $('#signout').hidden = true; return viewInvite(decodeURIComponent(id)); }
+  $('#nav').hidden = $('#who').hidden = $('#signout').hidden = !signedIn;
+  if (!signedIn) return viewSignIn();
+  $('#who').innerHTML = `<b>${esc(status.instructor.name)}</b><br>${esc(status.organization.name)}`;
   document.querySelectorAll('nav a').forEach(a => a.setAttribute('aria-current', a.dataset.view === (view === 'learner' || view === 'run' ? 'class' : view) ? 'page' : 'false'));
+  main.onclick = null;
   try {
     if (view === 'learner' && id) await viewLearner(decodeURIComponent(id));
     else if (view === 'run' && id) await viewRun(decodeURIComponent(id));
+    else if (view === 'headsets') await viewHeadsets();
+    else if (view === 'team') await viewTeam();
     else if (view === 'protocol') await viewProtocol();
     else if (view === 'privacy') await viewPrivacy();
     else await viewClass();
-    if (view !== 'protocol') main.onclick = null;
     window.scrollTo(0, 0);
   } catch (err) {
     if (signedIn) main.innerHTML = `<section><a class="crumb" href="#class">← Class</a><h1 style="font-size:40px">Couldn't load that.</h1><p class="lede">${esc(err.message)}</p></section>`;
   }
 }
+async function boot() {
+  status = await api('/instructor/status');
+  signedIn = status.signed_in;
+  render();
+}
 $('#signout').onclick = async () => { await api('/instructor/logout', { method: 'POST' }); signedIn = false; render(); };
 addEventListener('hashchange', render);
-(async () => { status = await api('/instructor/status'); signedIn = status.signed_in; render(); })();
+boot();
 </script>
 </body>
 </html>

@@ -12,6 +12,8 @@ import SwiftUI
 /// sent to the instructor, where the server's score is the one of record.
 struct SessionReportPanel: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.openWindow) private var openWindow
 
     private var result: CompetencyResult? { appModel.lastResult }
 
@@ -91,10 +93,34 @@ struct SessionReportPanel: View {
                     .foregroundStyle(SPAIText.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
+            }
+
+            HStack(spacing: SPAISpacing.s) {
+                Spacer()
+                // Hands the headset to the next person: signs out and goes
+                // back to the sign-in screen.
+                Button {
+                    Task {
+                        appModel.signOut()
+                        appModel.immersiveSpaceState = .inTransition
+                        await dismissImmersiveSpace()
+                        openWindow(id: "home")
+                    }
+                } label: {
+                    Label("Next Student", systemImage: "person.2.fill")
+                        .font(SPAIFont.button)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, SPAISpacing.l)
+                        .padding(.vertical, SPAISpacing.s + 2)
+                        .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                }
+                .buttonStyle(.plain)
+                .spaiHitTarget()
+
                 Button {
                     appModel.resetWorkflow()
                 } label: {
-                    Label("New Run", systemImage: "arrow.clockwise")
+                    Label("Run Again", systemImage: "arrow.clockwise")
                         .font(SPAIFont.button)
                         .foregroundStyle(.white)
                         .padding(.horizontal, SPAISpacing.l)
@@ -150,6 +176,8 @@ struct SessionReportPanel: View {
         case .sending:     return "icloud.and.arrow.up"
         case .waiting:     return "icloud.slash"
         case .notRecorded: return "lock.fill"
+        case .needsPairing: return "link.badge.plus"
+        case .learnerRemoved: return "person.crop.circle.badge.xmark"
         case .none:        return "icloud"
         }
     }
@@ -157,7 +185,7 @@ struct SessionReportPanel: View {
     private var uploadColor: Color {
         switch appModel.uploadState {
         case .sent:    return SPAIColor.safe
-        case .waiting: return SPAIColor.warning
+        case .waiting, .needsPairing, .learnerRemoved: return SPAIColor.warning
         default:       return SPAIText.secondary
         }
     }
@@ -167,7 +195,9 @@ struct SessionReportPanel: View {
         case .sent:        return "Sent to your instructor."
         case .sending:     return "Sending to your instructor…"
         case .waiting:     return "Saved on this headset. It will send when the server is reachable."
-        case .notRecorded: return "Practice run. Not sent to your instructor."
+        case .notRecorded: return appModel.isSignedIn ? "Practice run. Not sent to your instructor." : "Guest practice. Not scored or sent anywhere."
+        case .needsPairing: return "Saved on this headset. It will send once the headset is connected to your school again."
+        case .learnerRemoved: return "Not recorded: this name is no longer on the class roster."
         case .none:        return ""
         }
     }

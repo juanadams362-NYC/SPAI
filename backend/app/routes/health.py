@@ -2,7 +2,6 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-from app import security
 from app.inference.detector import detector
 from app.inference.tray_detector import tray_detector
 from app.metrics import metrics
@@ -23,7 +22,6 @@ def health_stats() -> dict:
         "status": "ok",
         "model": detector.status(),
         "instrument_model": tray_detector.status(),
-        "secured": security.is_secured(),
         "metrics": metrics.snapshot(),
     }
 

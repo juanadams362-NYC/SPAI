@@ -306,18 +306,53 @@ class AppModel {
     // MARK: - Who is working
 
     /// The roster entry signed in on this headset, or nil for a guest.
-    var learner: Learner?
-    /// Name typed by someone who isn't on the roster.
-    var guestName: String = ""
-    var runMode: RunMode = .assessed
+    private(set) var learner: Learner?
+    /// The PIN typed at sign-in, kept only when it couldn't be checked
+    /// because the headset was offline. The server checks it when the run
+    /// arrives; it is never shown and never kept after the run is sent.
+    private var uncheckedPin: String?
+    /// Guests can only practise: a run has to belong to someone on the
+    /// roster to be scored and sent.
+    var runMode: RunMode = .practice
 
-    var learnerDisplayName: String {
-        if let learner { return learner.name }
-        let typed = guestName.trimmingCharacters(in: .whitespaces)
-        return typed.isEmpty ? "Guest" : typed
+    var learnerDisplayName: String { learner?.name ?? "Guest" }
+    var isSignedIn: Bool { learner != nil }
+
+    func signIn(_ learner: Learner, pin: String, checkedOnline: Bool) {
+        self.learner = learner
+        role = .trainee
+        uncheckedPin = checkedOnline ? nil : pin
+        runMode = .assessed
+    }
+
+    func signInAsGuest() {
+        learner = nil
+        role = .trainee
+        uncheckedPin = nil
+        runMode = .practice
+    }
+
+    /// Closes any run in progress (it is recorded as incomplete) and clears
+    /// the headset for the next person. A shared headset must never carry
+    /// one student's sign-in over to the next.
+    func signOut() {
+        endRunEarly()
+        learner = nil
+        uncheckedPin = nil
+        runMode = .practice
     }
 
     // MARK: - The run being recorded
+
+    /// Who a run belongs to, fixed when the run starts. Reading the sign-in
+    /// when the run *ends* would let a run be filed under whoever signed in
+    /// next.
+    private struct RunOwner {
+        let learner: Learner?
+        let pin: String?
+        let mode: RunMode
+    }
+    private var runOwner = RunOwner(learner: nil, pin: nil, mode: .practice)
 
     /// What happened this run, in a form the server can score. Kept
     /// alongside `eventLog` (which is for display) because scoring needs to
@@ -339,20 +374,22 @@ class AppModel {
         case sent
         /// Couldn't reach the server; saved on the headset to send later.
         case waiting
-        /// Practice runs and guest runs stay on the headset.
+        /// Practice and guest runs stay on the headset.
         case notRecorded
+        /// The headset isn't paired with a school any more. Runs are kept
+        /// and sent once it is paired again.
+        case needsPairing
+        /// The learner was removed from the roster, so the server refused
+        /// the run.
+        case learnerRemoved
     }
     private(set) var uploadState: UploadState = .none
 
-    private let pendingKey = "pendingRunUploads"
-    /// Finished runs the server hasn't confirmed yet. Survives the app
-    /// closing, so a run finished in a dead spot still reaches the instructor.
+    /// Finished runs the server hasn't confirmed yet, in a protected file.
+    /// Survives the app closing, so a run finished in a dead spot still
+    /// reaches the instructor.
     private(set) var pendingUploads: [RunRecord] = [] {
-        didSet {
-            if let data = try? JSONEncoder().encode(pendingUploads) {
-                UserDefaults.standard.set(data, forKey: pendingKey)
-            }
-        }
+        didSet { PendingRuns.save(pendingUploads) }
     }
 
     private func record(_ kind: String, _ message: String, station: SterileStep? = nil) {
@@ -377,6 +414,7 @@ class AppModel {
 
     /// Starts a fresh run with a fresh server-side workflow.
     func beginRun() {
+        runOwner = RunOwner(learner: learner, pin: uncheckedPin, mode: learner == nil ? .practice : runMode)
         runID = UUID().uuidString
         BackendClient.sessionID = runID
         runEvents = []
@@ -406,19 +444,20 @@ class AppModel {
         )
 
         // Practice is a rehearsal and stays on the headset, as promised on
-        // the sign-in screen.
-        guard runMode == .assessed else {
+        // the sign-in screen. So does anything a guest did.
+        guard runOwner.mode == .assessed, let owner = runOwner.learner else {
             uploadState = .notRecorded
             return
         }
 
         pendingUploads.append(RunRecord(
             id: runID,
-            learnerID: learner?.id,
-            learnerName: learnerDisplayName,
+            learnerID: owner.id,
+            learnerName: owner.name,
+            pin: runOwner.pin,
             role: role.rawValue,
-            mode: runMode.rawValue,
-            headset: UIDevice.current.name,
+            mode: RunMode.assessed.rawValue,
+            headset: SchoolConnection.shared.headsetName ?? UIDevice.current.name,
             startedAt: RunClock.stamp(sessionStart),
             endedAt: RunClock.stamp(),
             durationSeconds: Int(Date().timeIntervalSince(sessionStart)),
@@ -436,17 +475,32 @@ class AppModel {
     /// the server replaces a run it already has, so a retry can't duplicate.
     func flushUploads() async {
         guard !pendingUploads.isEmpty, uploadState != .sending else { return }
+        guard SchoolConnection.shared.isPaired else {
+            uploadState = .needsPairing
+            return
+        }
         uploadState = .sending
+        var removedLearner = false
         for run in pendingUploads {
             do {
                 _ = try await client.uploadRun(run)
                 pendingUploads.removeAll { $0.id == run.id }
+            } catch BackendError.notFound {
+                // The learner was deleted from the roster. Retrying will
+                // never work, and their data was meant to be erased.
+                pendingUploads.removeAll { $0.id == run.id }
+                removedLearner = true
+                log("A run wasn't recorded: \(run.learnerName) is no longer on the class roster", kind: .warning)
+            } catch BackendError.unauthorized {
+                SchoolConnection.shared.forget()
+                uploadState = .needsPairing
+                return
             } catch {
                 uploadState = .waiting
                 return
             }
         }
-        uploadState = .sent
+        uploadState = removedLearner ? .learnerRemoved : .sent
     }
 
     // MARK: - Workflow state
@@ -615,11 +669,37 @@ class AppModel {
         self.showCompanion = defaults.object(forKey: companionKey) as? Bool ?? true
         self.announceInstruments = defaults.object(forKey: announceKey) as? Bool ?? true
         BackendClient.sessionID = runID
-        if let data = defaults.data(forKey: pendingKey),
-           let saved = try? JSONDecoder().decode([RunRecord].self, from: data) {
-            self.pendingUploads = saved
-        }
+        self.pendingUploads = PendingRuns.load()
         Task { _ = try? await client.resetCompliance() }
         log("Session started", kind: .info)
+    }
+}
+
+/// Finished runs waiting to be sent, kept in a file the system encrypts
+/// while the headset is locked. A run can carry a PIN typed offline, so
+/// it doesn't belong in plain preferences.
+enum PendingRuns {
+    private static var url: URL? {
+        guard let folder = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                                        appropriateFor: nil, create: true) else { return nil }
+        return folder.appendingPathComponent("pending-runs.json")
+    }
+
+    static func load() -> [RunRecord] {
+        // Runs saved by builds before schools and PINs can't be attributed
+        // to anyone; drop them rather than guess.
+        UserDefaults.standard.removeObject(forKey: "pendingRunUploads")
+        guard let url, let data = try? Data(contentsOf: url) else { return [] }
+        return (try? JSONDecoder().decode([RunRecord].self, from: data)) ?? []
+    }
+
+    static func save(_ runs: [RunRecord]) {
+        guard let url else { return }
+        if runs.isEmpty {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(runs) else { return }
+        try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 }

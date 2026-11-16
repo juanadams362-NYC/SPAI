@@ -330,8 +330,9 @@ struct ImmersiveView: View {
         appModel.spotlightPanel = nil
         appModel.isTourActive = false
         guide.detach()
-        // Leaving mid-run still records the run, as incomplete.
-        appModel.endRunEarly()
+        // Leaving mid-run still records the run, as incomplete, and the
+        // headset is cleared for the next student.
+        appModel.signOut()
         #if !targetEnvironment(simulator)
         handTracking.stop()
         headsetCamera.stop()

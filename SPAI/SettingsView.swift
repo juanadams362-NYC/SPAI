@@ -9,17 +9,16 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
 
     @AppStorage("backendURL") private var backendURL =  "http://127.0.0.1:8000"
-    @AppStorage("confidenceThreshold") private var confidenceThreshold = 0.25
     @AppStorage("streamingFPS") private var streamingFPS = 5.0
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
     @AppStorage("speakSteps") private var speakSteps = false
-    @AppStorage("apiKey") private var apiKey = ""
     @AppStorage("detectOnDevice") private var detectOnDevice = true
     @AppStorage("useHeadsetCamera") private var useHeadsetCamera = true
     @AppStorage("voiceCommands") private var voiceCommands = true
     @State private var connectionStatus: String?
+    @State private var school = SchoolConnection.shared
+    @State private var confirmDisconnect = false
 
-    @State private var pushStatus: String?
     private let client = BackendClient()
 
     var body: some View {
@@ -160,35 +159,57 @@ struct SettingsView: View {
                 .accessibilityHint("Needs Apple's main camera access for enterprise. Takes effect next time the workspace opens.")
 
             sectionDivider
-            sectionTitle("Server")
+            sectionTitle("School")
 
-            settingBlock(title: "Server address") {
-                TextField( "http://127.0.0.1:8000", text: $backendURL)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 14, design: .monospaced))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .accessibilityLabel("Server address")
-            }
+            if school.isPaired {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(school.schoolName ?? "Connected")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("This headset: \(school.headsetName ?? "Headset") · \(backendURL)")
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
-            settingBlock(title: "Site key") {
-                SecureField("From your SPAI administrator", text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Site key")
-            }
+                Button {
+                    Task { await testConnection() }
+                } label: {
+                    Label("Test connection", systemImage: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, SPAISpacing.l)
+                        .padding(.vertical, SPAISpacing.s + 2)
+                        .background(SPAIColor.secondary.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                }
+                .buttonStyle(.plain)
+                .spaiHitTarget()
 
-            Button {
-                Task { await testConnection() }
-            } label: {
-                Label("Test connection", systemImage: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, SPAISpacing.l)
-                    .padding(.vertical, SPAISpacing.s + 2)
-                    .background(SPAIColor.secondary.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                // Two presses: disconnecting means an admin has to pair the
+                // headset again before students can sign in.
+                Button {
+                    if confirmDisconnect {
+                        Task { await disconnect() }
+                    } else {
+                        confirmDisconnect = true
+                    }
+                } label: {
+                    Label(confirmDisconnect ? "Press again to disconnect" : "Disconnect this headset",
+                          systemImage: "link.badge.plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(SPAIColor.critical)
+                        .padding(.horizontal, SPAISpacing.l)
+                        .padding(.vertical, SPAISpacing.s + 2)
+                        .overlay { RoundedRectangle(cornerRadius: SPAIRadius.small).stroke(SPAIColor.critical.opacity(0.6)) }
+                }
+                .buttonStyle(.plain)
+                .spaiHitTarget()
+            } else {
+                Text("Not connected. Connect from the home screen with a code from your school's instructor dashboard.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
 
             if let connectionStatus {
                 Text(connectionStatus)
@@ -200,37 +221,12 @@ struct SettingsView: View {
             sectionDivider
             sectionTitle("Detection")
 
-            settingBlock(title: "Confidence threshold: \(String(format: "%.2f", confidenceThreshold))") {
-                Slider(value: $confidenceThreshold, in: 0.05...0.95, step: 0.05)
-                    .tint(SPAIColor.primary)
-                    .accessibilityLabel("Confidence threshold")
-            }
-
             settingBlock(title: "Streaming FPS: \(Int(streamingFPS))") {
                 Slider(value: $streamingFPS, in: 1...30, step: 1)
                     .tint(SPAIColor.accent)
                     .accessibilityLabel("Streaming frames per second")
             }
 
-            Button {
-                Task { await pushThreshold() }
-            } label: {
-                Label("Apply to backend", systemImage: "arrow.up.circle.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, SPAISpacing.l)
-                    .padding(.vertical, SPAISpacing.s + 2)
-                    .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-            }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
-            .accessibilityLabel("Apply confidence threshold to backend")
-
-            if let pushStatus {
-                Text(pushStatus)
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
         }
     }
 
@@ -270,20 +266,19 @@ struct SettingsView: View {
     private func testConnection() async {
         connectionStatus = "Checking…"
         switch await client.connection() {
-        case .connected:   connectionStatus = "Connected. This headset is accepted by the server."
-        case .unreachable: connectionStatus = "Nothing answered at that address. Check it, and that the headset is on the same network."
-        case .wrongKey:    connectionStatus = "The server answered but didn't accept the site key."
-        case .outdated:    connectionStatus = "Connected, but the server is an older version without class records."
+        case .connected:   connectionStatus = "Connected to \(school.schoolName ?? "your school")."
+        case .unpaired:    connectionStatus = "This headset was disconnected from the dashboard. Connect it again from the home screen."
+        case .unreachable: connectionStatus = "The server didn't answer. Check this headset is online."
+        case .outdated:    connectionStatus = "The server is an older version without schools and sign-in."
         }
     }
 
-    private func pushThreshold() async {
-        do {
-            let updated = try await client.updateConfidenceThreshold(confidenceThreshold)
-            pushStatus = "Backend now at \(String(format: "%.2f", updated.confidenceThreshold))"
-        } catch {
-            pushStatus = "Failed to reach backend"
-        }
+    private func disconnect() async {
+        await client.unpair()
+        SchoolConnection.shared.forget()
+        RosterCache.clear()
+        confirmDisconnect = false
+        connectionStatus = "Disconnected."
     }
 }
 

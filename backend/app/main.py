@@ -7,7 +7,6 @@ Run locally with:
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.inference.detector import detector
 from app.inference.tray_detector import tray_detector
@@ -63,13 +62,10 @@ async def lifespan(app: FastAPI):
     if retention and retention.isdigit():
         purged = store.purge_older_than(int(retention))
         logger.info("Retention: removed %d run(s) older than %s days", purged, retention)
-    secured = security.is_secured()
-    if not all(secured.values()):
-        logger.warning(
-            "Running without %s. Fine on a desk; set SPAI_API_KEY and SPAI_INSTRUCTOR_PIN before putting this online.",
-            " or ".join(name for name, ok in (("a headset key", secured["headset_key"]),
-                                               ("an instructor PIN", secured["instructor_pin"])) if not ok),
-        )
+    if not store.list_orgs():
+        logger.warning("No organizations yet. Create one with: python -m app.admin create-org --help")
+    if not os.getenv("SPAI_OPERATOR_KEY"):
+        logger.info("SPAI_OPERATOR_KEY is not set; server-wide detection settings are locked.")
 
     yield
     logger.info("Shutting down SPAI backend.")
@@ -78,19 +74,21 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="SPAI Backend",
     description="Sterile Processing AI — detection API for the visionOS app.",
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    # The headset is a native app and the dashboard is served from this same
-    # origin, so nothing legitimate needs cross-site cookies.
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# No CORS: the headsets are a native app and the dashboard is served from
+# this same origin, so no other website ever needs to call this server.
+
+
+@app.middleware("http")
+async def no_store(request, call_next):
+    """Nothing this server returns should be cached by a shared proxy or a
+    browser's back button: it is all student records or live state."""
+    response = await call_next(request)
+    response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 @app.middleware("http")
 async def count_requests(request, call_next):
@@ -102,25 +100,27 @@ async def count_requests(request, call_next):
     return response
 
 
-# Register the route modules. Each one defines a router; attach them all.
+# Register the route modules.
 #
-# Open to anyone: liveness and the dashboard page itself (which asks for the
-# PIN). Everything a headset calls needs the site's key when one is set.
-headset = [Depends(security.require_headset)]
+# Open to anyone: liveness, the privacy statement, headset pairing (which
+# needs a one-time code) and the dashboard page itself (which asks for a
+# sign-in). Everything that reads or writes a school's data checks either a
+# headset token or an instructor sign-in, inside the route.
+headset = [Depends(security.current_device)]
 app.include_router(health.router)
-app.include_router(sessions.public)                           # /privacy
-app.include_router(instructor.router)                         # dashboard page + sign-in
-app.include_router(instructor.api)                            # dashboard data (instructor PIN)
+app.include_router(sessions.public)                           # /privacy, /device/pair
+app.include_router(instructor.router)                         # dashboard page, sign-in, invites
+app.include_router(instructor.api)                            # dashboard data
+app.include_router(sessions.router)                           # roster, PIN check, protocol, run upload
+app.include_router(compliance.router)                         # per-headset workflow state
+app.include_router(ask.router)                                # AI trainer chat
 app.include_router(model.router, dependencies=headset)
 app.include_router(detect.router, dependencies=headset)
-app.include_router(detect_tray.router, dependencies=headset)  # tray-state detection
-app.include_router(analyze.router, dependencies=headset)      # PPE + instruments + identification
-app.include_router(instruments.router, dependencies=headset)  # instrument reference cards
-app.include_router(compliance.router, dependencies=headset)
+app.include_router(detect_tray.router, dependencies=headset)
+app.include_router(analyze.router, dependencies=headset)
+app.include_router(instruments.router, dependencies=headset)
 app.include_router(batch.router, dependencies=headset)
 app.include_router(settings.router, dependencies=headset)
-app.include_router(ask.router, dependencies=headset)          # AI trainer chat
-app.include_router(sessions.router, dependencies=headset)     # roster, protocol, run upload
 
 
 @app.get("/")
@@ -128,7 +128,7 @@ def root() -> dict:
     """Friendly landing message."""
     return {
         "name": "SPAI Backend",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "docs": "/docs",
         "instructor": "/instructor",
     }

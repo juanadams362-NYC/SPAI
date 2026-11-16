@@ -15,36 +15,29 @@ The app works without the server: guidance, on-headset checks and scoring
 all run locally. The server is what turns individual runs into a class
 record.
 
-## 1. Server
+## 1. Server (once, by SPAI)
 
-1. Deploy `backend/` somewhere with **persistent disk** and **HTTPS**.
-2. Set `SPAI_API_KEY`, `SPAI_INSTRUCTOR_PIN` and `SPAI_SECRET`
-   (see `backend/README.md`). The dashboard shows a warning until the first
-   two are set.
-3. Open `<server>/instructor`, sign in, and add the class under **Add
-   learners**.
-4. Optional: open **Protocol** and replace the standard wording with your
-   own procedure, set the tray's count sheet, and adjust scoring.
+Deploy `backend/` with persistent disk and HTTPS, then create the school:
+`python -m app.admin create-org --name "<school>" --admin-email <director> --url <server>`.
+Send the printed link to the program director. Details:
+[how-spai-connects.md](how-spai-connects.md).
 
-## 2. Each headset
+## 2. The school's admin (once)
 
-1. Install SPAI and open **Settings** from the home screen.
-2. Enter the **server address** and the **site key**, then **Test
-   connection**.
-3. Leave **Keep camera frames on this headset** on unless you have agreed
-   otherwise with your privacy office.
+1. Open the invite link and set a password.
+2. **Team**: invite each instructor.
+3. **Class**: add the students and print their PIN cards.
+4. **Headsets**: connect each Vision Pro with a pairing code.
+5. Optional: **Protocol**, to use your own wording, count sheet and scoring.
 
 ## 3. A session
 
-1. The student picks their name, chooses **Assessed run** or **Practice**,
-   and enters the workspace.
+1. The student taps their name on the headset and enters their PIN.
 2. Pip gives a 30-second tour the first time.
-3. At each station the student presses **Start Step** and follows the
-   spoken and written steps. "Next", "repeat", "why" and "what is this"
-   work by voice.
-4. When the run ends the student sees their result and what to work on.
-   Assessed runs appear on the dashboard; if the network was down they are
-   held on the headset and sent later.
+3. At each station: **Start Step**, then follow the spoken and written steps.
+   "Next", "repeat", "why" and "what is this" work by voice.
+4. At the end the student sees their result, then presses **Next Student**.
+   The run appears on the dashboard.
 
 ## What is and isn't recorded
 
@@ -62,6 +55,6 @@ dashboard erases all of their runs.
   images**, not yet on real handheld footage. Measuring that is part of
   what a pilot is for. See `model-training/v5_instruments.md`.
 - **Six instruments** are recognised today.
-- **One server, one institution.** There are no separate accounts per
-  instructor yet; everyone with the PIN sees the whole roster.
+- **No single sign-on or password-reset email yet.** An admin re-invites
+  anyone who forgets their password.
 - SPAI is a training and workflow-guidance tool, not a medical device.

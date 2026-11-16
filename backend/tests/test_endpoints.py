@@ -2,10 +2,9 @@
 from fastapi.testclient import TestClient
 from app.main import app
 
-client = TestClient(app)
 
 
-def test_root_returns_metadata():
+def test_root_returns_metadata(client):
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
@@ -13,13 +12,13 @@ def test_root_returns_metadata():
     assert data["docs"] == "/docs"
 
 
-def test_health_returns_ok():
+def test_health_returns_ok(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_model_status_reports_stub_mode():
+def test_model_status_reports_stub_mode(client):
     response = client.get("/model/status")
     assert response.status_code == 200
     data = response.json()
@@ -29,7 +28,7 @@ def test_model_status_reports_stub_mode():
     assert "hand" in data["classes"]
 
 
-def test_detect_returns_stub_detections():
+def test_detect_returns_stub_detections(client):
     fake_png = (
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
         b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00"
@@ -48,7 +47,7 @@ def test_detect_returns_stub_detections():
     assert data["mode"] == "stub"
 
 
-def test_detect_rejects_non_image():
+def test_detect_rejects_non_image(client):
     response = client.post(
         "/detect",
         files={"image": ("test.txt", b"not an image", "text/plain")},

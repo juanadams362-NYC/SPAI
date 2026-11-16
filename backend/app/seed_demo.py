@@ -1,13 +1,13 @@
 """
-Fill the dashboard with a sample cohort, for demos and screenshots.
+A demo school with a sample cohort, for demos and screenshots.
 
-    python -m app.seed_demo            # add the sample cohort
-    python -m app.seed_demo --clear    # remove it again
+    python -m app.seed_demo            # create "Demo School" with sample data
+    python -m app.seed_demo --clear    # remove the sample learners again
 
-Every learner it creates is flagged as demo data and the dashboard labels
-the cohort "Sample data" — these are invented people and invented runs, and
-must never be mistaken for a real class. "Remove sample data" in the
-dashboard deletes all of it.
+Prints a sign-in for the dashboard and a code to pair a headset. Every
+learner it creates is flagged as demo data and labelled "Sample cohort" in
+the dashboard — invented people and invented runs, never to be mistaken for
+a real class.
 """
 from __future__ import annotations
 
@@ -17,10 +17,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from app import scoring
-from app.protocol import get_protocols
-from app.store import Store, get_store
+from app import protocol
+from app.store import Store, StoreError, get_store
 
 COHORT = "Sample cohort"
+ORG_NAME = "Demo School"
+ADMIN_EMAIL = "demo-admin@example.com"
+ADMIN_PASSWORD = "demo-password-1"
 
 # (name, starting skill 0..1, how fast they improve per run, number of runs)
 LEARNERS = [
@@ -75,27 +78,47 @@ def _run(rng: random.Random, skill: float, started: datetime) -> dict:
     }
 
 
-def seed(store: Store | None = None, seed_value: int = 7) -> int:
+def demo_org(store: Store) -> dict:
+    """The demo school, created with an admin account the first time."""
+    for org in store.list_orgs():
+        if org["name"] == ORG_NAME:
+            return org
+    org = store.create_org(ORG_NAME)
+    try:
+        store.create_instructor(org["id"], ADMIN_EMAIL, "Demo Admin", "admin", ADMIN_PASSWORD)
+    except StoreError:
+        pass
+    return org
+
+
+def seed(store: Store | None = None, seed_value: int = 7, org_id: str | None = None) -> int:
     store = store or get_store()
-    store.delete_demo_data()
+    org_id = org_id or demo_org(store)["id"]
+    store.delete_demo_data(org_id)
     rng = random.Random(seed_value)
-    rubric = get_protocols().current()["rubric"]
+    rubric = protocol.for_org(org_id)["rubric"]
     now = datetime.now(timezone.utc).replace(microsecond=0)
     total = 0
     for name, skill, growth, runs in LEARNERS:
-        learner = store.add_learner(name, COHORT, is_demo=True)
+        learner = store.add_learner(org_id, name, COHORT, is_demo=True)
         for i in range(runs):
             # Spread runs over the last six weeks, most recent last.
             started = now - timedelta(days=(runs - i) * rng.uniform(4, 7), hours=rng.uniform(0, 6))
             record = _run(rng, min(0.97, skill + growth * i), started)
-            record.update(learner_id=learner["id"], learner_name=name)
-            store.save_session(record, rubric)
+            record.update(learner_id=learner["id"])
+            store.save_session(org_id, None, record, rubric)
             total += 1
     return total
 
 
 if __name__ == "__main__":
+    store = get_store()
     if "--clear" in sys.argv:
-        print(f"Removed {get_store().delete_demo_data()} sample learners.")
+        print(f"Removed {store.delete_demo_data(demo_org(store)['id'])} sample learners.")
     else:
-        print(f"Added {len(LEARNERS)} sample learners and {seed()} sample runs (cohort: '{COHORT}').")
+        org = demo_org(store)
+        runs = seed(store, org_id=org["id"])
+        code = store.create_pairing_code(org["id"])
+        print(f"{ORG_NAME}: {len(LEARNERS)} sample learners, {runs} sample runs.")
+        print(f"Dashboard sign-in: {ADMIN_EMAIL} / {ADMIN_PASSWORD}  (demo only — change it for anything real)")
+        print(f"Headset pairing code (10 minutes): {code['code']}")

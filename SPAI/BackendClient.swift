@@ -148,9 +148,8 @@ final class BackendClient {
         request.httpMethod = method
         request.timeoutInterval = timeout
         request.setValue(Self.sessionID, forHTTPHeaderField: "X-SPAI-Session")
-        let key = (UserDefaults.standard.string(forKey: "apiKey") ?? "").trimmingCharacters(in: .whitespaces)
-        if !key.isEmpty {
-            request.setValue(key, forHTTPHeaderField: "X-SPAI-Key")
+        if let token = SchoolConnection.shared.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         return request
     }
@@ -171,7 +170,9 @@ final class BackendClient {
         switch http.statusCode {
         case 200: return
         case 401: throw BackendError.unauthorized
-        case 404, 405: throw BackendError.endpointMissing
+        case 404: throw BackendError.notFound
+        case 405: throw BackendError.endpointMissing
+        case 429: throw BackendError.rateLimited
         default: throw BackendError.badResponse
         }
     }
@@ -225,9 +226,10 @@ final class BackendClient {
 
     // MARK: Health
 
-    /// Whether the server is reachable, and whether it accepts this
-    /// headset's key — two different problems with two different fixes.
+    /// Whether the server is reachable, and whether this headset is still
+    /// paired with a school on it — different problems with different fixes.
     func connection() async -> BackendConnection {
+        guard SchoolConnection.shared.isPaired else { return .unpaired }
         var probe = makeRequest("health", timeout: 5)
         probe.cachePolicy = .reloadIgnoringLocalCacheData
         do {
@@ -237,10 +239,16 @@ final class BackendClient {
             return .unreachable
         }
         do {
-            let _: RosterResponse = try await send(makeRequest("learners", timeout: 5))
+            let me: DeviceInfo = try await send(makeRequest("device/me", timeout: 5))
+            SchoolConnection.shared.refresh(school: me.organization.name, headset: me.device.name)
             return .connected
         } catch BackendError.unauthorized {
-            return .wrongKey
+            // The dashboard disconnected this headset. Forget the dead token
+            // so the home screen asks to pair again instead of failing quietly.
+            SchoolConnection.shared.forget()
+            return .unpaired
+        } catch BackendError.notFound {
+            return .outdated
         } catch BackendError.endpointMissing {
             return .outdated
         } catch {
@@ -249,18 +257,43 @@ final class BackendClient {
     }
 
     func health() async -> Bool {
-        await connection() != .unreachable
+        await connection() == .connected
+    }
+
+    // MARK: Pairing
+
+    /// Trades a one-time code from the dashboard for this headset's token.
+    func pair(server: String, code: String, headsetName: String) async throws -> DevicePairing {
+        let trimmed = server.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let base = URL(string: trimmed), base.scheme == "https" || base.scheme == "http", base.host != nil else {
+            throw BackendError.badAddress
+        }
+        var request = URLRequest(url: base.appendingPathComponent("device/pair"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["code": code, "name": headsetName])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw BackendError.badResponse }
+        switch http.statusCode {
+        case 200: return try JSONDecoder().decode(DevicePairing.self, from: data)
+        case 400: throw BackendError.badCode
+        case 429: throw BackendError.rateLimited
+        case 404, 405: throw BackendError.endpointMissing
+        default: throw BackendError.badResponse
+        }
+    }
+
+    /// Disconnects this headset on the server. Best effort: the local token
+    /// is forgotten whatever the server says.
+    func unpair() async {
+        _ = try? await URLSession.shared.data(for: makeRequest("device/me", method: "DELETE", timeout: 8))
     }
 
     // MARK: Settings
 
     func getSettings() async throws -> BackendSettings {
         try await send(makeRequest("settings"))
-    }
-
-    func updateConfidenceThreshold(_ value: Double) async throws -> BackendSettings {
-        try await send(makeRequest("settings", method: "PATCH"),
-                       body: JSONEncoder().encode(["confidence_threshold": value]))
     }
 
     // MARK: Compliance
@@ -288,6 +321,17 @@ final class BackendClient {
         return response.learners
     }
 
+    /// Checks a learner's PIN. Throws when the server can't be reached, so
+    /// the caller can fall back to checking it when the run is sent.
+    func verifyPin(learnerID: String, pin: String) async throws -> PinCheck {
+        do {
+            return try await send(makeRequest("learners/\(learnerID)/verify-pin", method: "POST", timeout: 8),
+                                  body: JSONEncoder().encode(["pin": pin]))
+        } catch BackendError.notFound {
+            return PinCheck(ok: false, reason: "unknown", attemptsLeft: nil, retryIn: nil)
+        }
+    }
+
     /// The institution's station scripts, count sheets and rubric.
     func fetchProtocol() async throws -> SiteProtocol {
         try await send(makeRequest("protocol"))
@@ -310,12 +354,39 @@ final class BackendClient {
 
 enum BackendConnection: Equatable {
     case connected
-    /// Nothing answered at the address in Settings.
+    /// This headset has never been paired with a school, or was disconnected.
+    case unpaired
+    /// Nothing answered at the school's server address.
     case unreachable
-    /// The server answered but refused this headset's key.
-    case wrongKey
-    /// The server is an older version without the pilot features.
+    /// The server is an older version without schools and pairing.
     case outdated
+}
+
+struct DeviceInfo: Codable {
+    struct Device: Codable { let id: String; let name: String }
+    struct Organization: Codable { let id: String; let name: String }
+    let device: Device
+    let organization: Organization
+}
+
+struct DevicePairing: Codable {
+    let token: String
+    let device: DeviceInfo.Device
+    let organization: DeviceInfo.Organization
+}
+
+struct PinCheck: Codable, Equatable {
+    let ok: Bool
+    /// "wrong", "locked" or "unknown" when not ok.
+    let reason: String?
+    let attemptsLeft: Int?
+    let retryIn: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, reason
+        case attemptsLeft = "attempts_left"
+        case retryIn = "retry_in"
+    }
 }
 
 struct AskRequest: Codable {
@@ -347,6 +418,12 @@ enum BackendError: Error {
     case badResponse
     /// The backend is reachable but doesn't have this route (an older deploy).
     case endpointMissing
-    /// The site key in Settings is missing or wrong.
+    /// This headset isn't paired, or was disconnected from the dashboard.
     case unauthorized
+    /// The thing asked about doesn't exist (for a run: the learner was
+    /// removed from the roster).
+    case notFound
+    case rateLimited
+    case badCode
+    case badAddress
 }

@@ -1,7 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 """Settings endpoint — read and update runtime detector settings."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from app import security
 from pydantic import BaseModel, Field
 
 from app.inference.detector import detector
@@ -38,7 +40,9 @@ def get_settings() -> dict:
     return _payload()
 
 
-@router.patch("")
+# Detection thresholds apply to every school on this server, so only the
+# operator may change them. Headsets can read them.
+@router.patch("", dependencies=[Depends(security.require_operator)])
 def update_settings(update: SettingsUpdate) -> dict:
     """Update runtime settings. Only provided fields change."""
     if update.confidence_threshold is not None:

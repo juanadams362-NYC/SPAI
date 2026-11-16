@@ -43,46 +43,42 @@ base is `app/instruments.py`; the app carries a matching copy in
 
 ## The pilot platform
 
-Beyond detection, the backend is what makes SPAI usable by a class:
+One server holds any number of schools ("organizations"), each completely
+separate. See [docs/how-spai-connects.md](../docs/how-spai-connects.md) for
+the whole picture.
 
-| Route | Who | What it does |
+| Who | Proves who they are with | Can reach |
 | --- | --- | --- |
-| `GET /instructor` | Instructor | The dashboard: roster, results, score trends, where the class slips, run reports, protocol editor |
-| `GET /learners` | Headset | The roster, for the sign-in list |
-| `GET /protocol` | Headset | The institution's station scripts, count sheets and scoring rubric |
-| `PUT /sessions/{id}` | Headset | Upload a finished run; the server scores it. Safe to retry |
-| `GET /privacy` | Anyone | What this server stores, in plain language |
-| `/compliance/*` | Headset | Workflow state, now kept **per headset** via the `X-SPAI-Session` header |
+| Headset | Its own token, from a one-time pairing code (`Authorization: Bearer`) | Its school's roster, PIN checks, protocol, run upload, detection, Ask SPAI |
+| Instructor | Email and password; HttpOnly, SameSite=Strict session cookie | Their school's dashboard |
+| Admin | Same, with the admin role | Also headsets, team, protocol edits, deletions, activity log |
+| Operator | `X-SPAI-Operator` = `SPAI_OPERATOR_KEY` | Server-wide detection settings |
 
-Records live in a SQLite file at `backend/data/spai.db` (override with
-`SPAI_DB`). Camera frames are never written anywhere.
+### Run it for real
 
-### Before real students use it
+    pip install -r requirements.txt
+    export SPAI_DB=/persistent/spai.db          # must survive restarts
+    export SPAI_OPERATOR_KEY=<long random>       # optional
+    export SPAI_RETENTION_DAYS=730               # optional
+    export GEMINI_API_KEY=<key>                  # for Ask SPAI
+    uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
 
-Set these environment variables on the server:
+Serve it over HTTPS (any host's TLS, or a proxy in front). Then onboard a
+school:
 
-| Variable | Purpose |
-| --- | --- |
-| `SPAI_API_KEY` | Shared key the headsets send. Enter the same value in SPAI Settings |
-| `SPAI_INSTRUCTOR_PIN` | PIN for the instructor dashboard |
-| `SPAI_SECRET` | Any long random string; keeps instructors signed in across restarts |
-| `SPAI_RETENTION_DAYS` | Optional. Delete runs this many days after they end |
-| `GEMINI_API_KEY` | For Ask SPAI |
+    python -m app.admin create-org --name "Riverside College" \
+        --admin-email director@riverside.edu --url https://app.example.com
 
-Without the first two the server runs open and says so on the dashboard and
-at startup.
+Back up daily:
 
-**Storage must be persistent.** The database is a file. A host that wipes
-the disk on restart (a free Hugging Face Space does) will lose every run.
-For a pilot, use a host with a persistent volume and point `SPAI_DB` and
-`SPAI_PROTOCOL` at it, and serve over HTTPS.
+    python -m app.admin backup /backups/spai-$(date +%F).db
 
-### A sample class for demos
+### A demo school
 
-    python -m app.seed_demo            # 12 invented learners, ~50 runs
-    python -m app.seed_demo --clear
+    python -m app.seed_demo
 
-Sample learners are flagged in the database and labelled in the dashboard.
+Creates "Demo School" with a flagged sample cohort, a demo admin sign-in
+and a headset pairing code, all printed. Not for real data.
 
 ## Tests
 

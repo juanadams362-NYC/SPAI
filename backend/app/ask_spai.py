@@ -7,7 +7,6 @@ when all 5 stations get real content.
 
 from app import instruments
 from app.llm_client import ask_llm, LLMError
-from app.protocol import get_protocols
 
 # Step scripts per station. Short placeholder wording for now.
 # Keys have to match the app's station names exactly or lookup fails.
@@ -56,12 +55,13 @@ If the question cannot be answered from the provided information, say you are no
 Never invent sterile processing procedure. Never tell the user to skip a step."""
 
 
-def build_context(station: str, step_index: int, detection_summary: str, question: str) -> str:
+def build_context(station: str, step_index: int, detection_summary: str, question: str,
+                  steps: list[str] | None = None) -> str:
     # Everything the model needs, packed into one prompt string.
-    # The institution's own protocol, if they've edited it; the standard
-    # wording otherwise. Ask SPAI must answer from what the student is
+    # `steps` is the school's own wording for this station, when it has
+    # edited its protocol. Ask SPAI must answer from what the student is
     # actually being told at the station.
-    steps = get_protocols().steps_for(station) or STATION_SCRIPTS.get(station)
+    steps = steps or STATION_SCRIPTS.get(station)
     if steps is None:
         known = ", ".join(STATION_SCRIPTS)
         raise ValueError(f"Unknown station '{station}'. Known stations: {known}")
@@ -92,8 +92,9 @@ def build_context(station: str, step_index: int, detection_summary: str, questio
     )
 
 
-def ask_spai(station: str, step_index: int, detection_summary: str, question: str) -> str:
-    prompt = build_context(station, step_index, detection_summary, question)
+def ask_spai(station: str, step_index: int, detection_summary: str, question: str,
+             steps: list[str] | None = None) -> str:
+    prompt = build_context(station, step_index, detection_summary, question, steps)
     return ask_llm(SYSTEM_PROMPT, prompt)
 
 

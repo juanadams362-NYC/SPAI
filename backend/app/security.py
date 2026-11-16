@@ -1,78 +1,124 @@
 """
 Who is allowed to call what.
 
-Two secrets, both set as environment variables on the server:
+Three kinds of caller, each proving who they are differently:
 
-  SPAI_API_KEY         shared by the headsets. Sent as the X-SPAI-Key header.
-  SPAI_INSTRUCTOR_PIN  typed by an instructor to open the dashboard.
+  Headset     A paired Vision Pro. Sends `Authorization: Bearer <token>`.
+              The token was issued once, when an admin's pairing code was
+              entered on the headset; it belongs to one organization and can
+              be revoked from the dashboard at any time.
 
-If neither is set the server runs open, which is right for a laptop on a
-desk and wrong for anything on the internet. The dashboard says so in a
-banner, and /health/stats reports it, so an unsecured deployment is never
-a surprise.
+  Instructor  A person signed in to the dashboard with email and password.
+              Holds an HttpOnly session cookie. Admins can also manage
+              headsets, instructors, the protocol and deletions.
+
+  Operator    Whoever runs the server (SPAI). Sends `X-SPAI-Operator` matching
+              the SPAI_OPERATOR_KEY environment variable. Only needed for
+              settings that affect every school on the server.
+
+There is no "open" mode. Every route that touches a school's data needs a
+headset token or an instructor login for that school.
 """
 from __future__ import annotations
 
-import hashlib
 import hmac
 import os
-import secrets
+import threading
+import time
+from collections import defaultdict, deque
 
-from fastapi import Cookie, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 
-COOKIE_NAME = "spai_instructor"
+from app.store import get_store
 
-# Signs instructor cookies. Regenerated on restart unless SPAI_SECRET is set,
-# which only means instructors sign in again after a redeploy.
-_SECRET = (os.getenv("SPAI_SECRET") or secrets.token_hex(32)).encode()
-
-
-def api_key() -> str | None:
-    return os.getenv("SPAI_API_KEY") or None
+COOKIE_NAME = "spai_session"
 
 
-def instructor_pin() -> str | None:
-    return os.getenv("SPAI_INSTRUCTOR_PIN") or None
+# --- Rate limiting --------------------------------------------------------------
+
+class RateLimiter:
+    """At most `limit` attempts per key in a sliding `window` of seconds.
+
+    In memory, so it resets on restart and is per process. That is enough to
+    make guessing a password, a PIN or a pairing code impractical; the stored
+    lockouts (PINs) and single-use codes cover the rest.
+    """
+
+    def __init__(self, limit: int, window: float) -> None:
+        self.limit, self.window = limit, window
+        self._hits: dict[str, deque] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def hit(self, key: str) -> bool:
+        """Record an attempt. False means the caller has used up their tries."""
+        now = time.monotonic()
+        with self._lock:
+            q = self._hits[key]
+            while q and now - q[0] > self.window:
+                q.popleft()
+            if len(q) >= self.limit:
+                return False
+            q.append(now)
+            return True
+
+    def reset(self) -> None:
+        with self._lock:
+            self._hits.clear()
 
 
-def is_secured() -> dict:
-    return {"headset_key": api_key() is not None, "instructor_pin": instructor_pin() is not None}
+login_limiter = RateLimiter(limit=8, window=300)      # per email and per address
+pairing_limiter = RateLimiter(limit=10, window=300)   # per address
+pin_limiter = RateLimiter(limit=20, window=300)       # per headset, on top of the per-learner lockout
 
 
-def _same(a: str, b: str) -> bool:
-    return hmac.compare_digest(a.encode(), b.encode())
+def client_address(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 
-def instructor_token() -> str:
-    """Cookie value proving the PIN was entered. Changes if the PIN changes."""
-    return hmac.new(_SECRET, (instructor_pin() or "").encode(), hashlib.sha256).hexdigest()
+# --- Headsets -------------------------------------------------------------------
+
+def current_device(authorization: str | None = Header(default=None)) -> dict:
+    token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    device = get_store().device_for_token(token)
+    if device is None:
+        raise HTTPException(
+            status_code=401,
+            detail="This headset isn't connected to a school, or was disconnected. Pair it again from Settings.",
+        )
+    return device
 
 
-def check_pin(pin: str) -> bool:
-    expected = instructor_pin()
-    return expected is None or _same(pin, expected)
+# --- Instructors ----------------------------------------------------------------
 
-
-def _is_instructor(cookie: str | None) -> bool:
-    return instructor_pin() is None or (cookie is not None and _same(cookie, instructor_token()))
-
-
-def require_headset(
-    x_spai_key: str | None = Header(default=None),
-    spai_instructor: str | None = Cookie(default=None),
-) -> None:
-    """Routes the headsets call. A signed-in instructor is also let through,
-    so the dashboard can read the same data."""
-    expected = api_key()
-    if expected is None:
-        return
-    if x_spai_key and _same(x_spai_key, expected):
-        return
-    if instructor_pin() is not None and _is_instructor(spai_instructor):
-        return
-    raise HTTPException(status_code=401, detail="Missing or wrong access key. Enter this site's key in SPAI Settings.")
-
-
-def require_instructor(spai_instructor: str | None = Cookie(default=None)) -> None:
-    if not _is_instructor(spai_instructor):
+def current_instructor(request: Request) -> dict:
+    instructor = get_store().instructor_for_login(request.cookies.get(COOKIE_NAME))
+    if instructor is None:
         raise HTTPException(status_code=401, detail="Sign in to the instructor dashboard first.")
+    # Requests that change something must come from this site's own pages.
+    # The cookie is SameSite=Strict as well; this is the second lock.
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("origin")
+        if origin and origin.rstrip("/") != str(request.base_url).rstrip("/"):
+            raise HTTPException(status_code=403, detail="That request didn't come from the SPAI dashboard.")
+    return instructor
+
+
+def require_admin(instructor: dict = Depends(current_instructor)) -> dict:
+    if instructor["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only an admin can do that. Ask your program's SPAI admin.")
+    return instructor
+
+
+def is_https(request: Request) -> bool:
+    # Behind a proxy (most hosts), the original scheme arrives in a header.
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").split(",")[0].strip() == "https"
+
+
+# --- Operator -------------------------------------------------------------------
+
+def require_operator(x_spai_operator: str | None = Header(default=None)) -> None:
+    expected = os.getenv("SPAI_OPERATOR_KEY")
+    if not expected or not x_spai_operator or not hmac.compare_digest(x_spai_operator, expected):
+        raise HTTPException(status_code=403, detail="Only the server operator can change this.")

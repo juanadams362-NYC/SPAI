@@ -1,7 +1,7 @@
 # Prompt: update spai-vision.pages.dev to match the current app
 
 Paste everything below the line into the session that edits the website.
-Fill in the two `[YOU FILL IN]` items first.
+Fill in the three `[YOU FILL IN]` items first.
 
 ---
 
@@ -53,7 +53,10 @@ Update my website, spai-vision.pages.dev, so it describes SPAI as it works today
 - **Instructor dashboard:** the class roster with each learner's latest result, best score, number of runs and a score trend; how many learners are competent; average score; contamination alerts; and "where the class slips", a per-station count of alerts, redos and send-backs that names the station to re-teach first.
 - Per-learner history; a printable report for every run with a station-by-station breakdown, the timeline of what happened and coaching notes; CSV export of every run for a gradebook.
 - **Your protocol, your words:** edit each station's steps, what the camera checks before a step can advance, the tray's count sheet and the scoring. Changes reach every headset the next time it opens, and Ask SPAI answers from the same wording.
-- **Signed in with an instructor PIN.** Today one PIN sees the whole roster; separate instructor accounts aren't built yet.
+- **Accounts:** each instructor has their own sign-in (work email and password), invited by the program's admin. Admins also connect headsets, invite colleagues, edit the protocol and delete records; every such action is in an activity log. Removing someone's access signs them out everywhere at once.
+- **Students sign in with a 4-digit PIN** the instructor prints on cards. Five wrong tries lock that student for ten minutes; an instructor can issue a new PIN any time.
+- **Headsets are connected to the school once**, with a one-time code from the dashboard, and can be disconnected instantly (for a lost headset, say).
+- **Each school's records are completely separate**, even on a shared SPAI server.
 
 ### Privacy and data — for the FAQ's Privacy + data section
 
@@ -63,9 +66,13 @@ Update my website, spai-vision.pages.dev, so it describes SPAI as it works today
 - Deleting a learner permanently erases them and all their runs. An instructor can export every run as CSV, or one learner's full record as JSON. An optional retention period deletes runs automatically after a set number of days.
 - Every SPAI server has a plain-language privacy statement at `/privacy` that an IT office can read without signing in.
 - **Ask SPAI uses an external AI service (Google Gemini).** When a student asks a question, the question, the current station's steps and a short text summary of what the camera sees (for example "gloves detected, holding Operating Scissors") are sent to it. No images and no names are sent.
-- Headsets connect with a site key; the dashboard needs the instructor PIN.
+- Instructors sign in with their own accounts. Passwords, PINs and headset keys are only ever stored scrambled.
+- Each school's records are kept separate; instructors and headsets only ever see their own school's data.
 
 ## Page-by-page changes
+
+**Every page (navigation and footer)**
+- Add an **"Instructor sign-in"** link to the header (next to "Book a demo") and the footer, pointing to **[YOU FILL IN — your SPAI server address]/instructor**. The website itself holds no student data; this link is the only connection between them.
 
 **Home (`/`)**
 - "v4 · instrument model / Primary detection" block: SPAI now names each instrument, not just counts them. Model "YOLOv8n → Core ML"; endpoint `/analyze`. Example readout: "Mayo-Hegar Needle Holder · 91%" in place of the generic "Instrument 0.77" labels.
@@ -104,7 +111,8 @@ Update my website, spai-vision.pages.dev, so it describes SPAI as it works today
 - "How accurate is it?": glove model as now; instrument model 89% correctly named on held-out tray photos, 72% on handheld-style test images, real-world accuracy measured in the pilot.
 - "Does video leave the headset?": no, by default (see Privacy and data).
 - Add "Does Ask SPAI send anything outside our network?" with the Gemini answer above.
-- Add "Can we delete a student's data?" and "Can we use our own procedure?"
+- Add "Can we delete a student's data?", "Can we use our own procedure?", and "How do students sign in on a shared headset?" (tap your name, enter your 4-digit PIN; Next Student signs you out).
+- Add "What if a headset is lost?" (an admin disconnects it from the dashboard and it stops working immediately).
 - "Is SPAI HIPAA compliant?": keep the current answer.
 
 **About the maker**
@@ -126,6 +134,7 @@ Download from the SPAI GitHub repo, branch `claude/serene-volta-76ikau`, folder 
 - `dashboard-run-report.png`: one run's report
 - `dashboard-learner.png`: one learner's history
 - `dashboard-protocol-editor.png`: protocol editor
+- `dashboard-headsets.png`: connecting a headset with a one-time code
 
 They're 2× captures of a 1280px-wide browser. Every name in them is invented sample data, which the "Sample data" banner in the shots states. Keep the "shown with sample data" caption wherever they appear.
 
