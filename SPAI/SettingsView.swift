@@ -13,7 +13,7 @@ struct SettingsView: View {
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
     @AppStorage("speakSteps") private var speakSteps = false
     @AppStorage("detectOnDevice") private var detectOnDevice = true
-    @AppStorage("useHeadsetCamera") private var useHeadsetCamera = true
+    @AppStorage("useHeadsetCamera") private var useHeadsetCamera = false
     @AppStorage("voiceCommands") private var voiceCommands = true
     @State private var connectionStatus: String?
     @State private var school = SchoolConnection.shared
@@ -156,7 +156,15 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             settingToggle("Use the headset's camera", isOn: $useHeadsetCamera, tint: SPAIColor.safe)
-                .accessibilityHint("Needs Apple's main camera access for enterprise. Takes effect next time the workspace opens.")
+                .accessibilityHint("Takes effect next time the workspace opens.")
+            Text("Needs Apple's enterprise main-camera entitlement and license file in this build. Otherwise use an iPhone camera or test media.")
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+
+            sectionDivider
+            sectionTitle("Before a session")
+            SystemCheckView()
 
             sectionDivider
             sectionTitle("School")

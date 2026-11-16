@@ -48,7 +48,9 @@ struct GuidedStepPanel: View {
         case .manual:
             return true
         case .glovesOn:
-            return detectionService.detections.contains { DetectionService.isGloveClass($0.className) }
+            // Gloves seen and no bare hand: one gloved hand doesn't pass the
+            // step while the other is bare.
+            return detectionService.ppePassing
         case .instrumentsPresent:
             return detectionService.hasInstrumentDetection
         case .trayLoaded:

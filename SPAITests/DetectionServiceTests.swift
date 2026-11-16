@@ -142,4 +142,44 @@ final class DetectionServiceTests: XCTestCase {
     func testBorderNormalWhenNoResult() {
         XCTAssertEqual(borderLevel(forRisk: 0.85, hasResult: false), "normal")
     }
+
+    // MARK: - One hand, two boxes
+
+    /// Boxes measured from the real glove model on demo/test-media/bare-hand.jpg.
+    func testDoubleLabelledHandIsResolvedByConfidence() {
+        let frame = [
+            BackendDetection(classId: 1, className: "hand", confidence: 0.80, box: [135, 23, 224, 115]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.28, box: [135, 19, 224, 120]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.73, box: [12, 101, 178, 199]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.61, box: [16, 121, 187, 199]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.31, box: [68, 112, 177, 175])
+        ]
+        let hands = DetectionService.resolveHands(frame)
+        XCTAssertEqual(hands.bare, 1, "The clearly bare hand must count even though a glove is also in view")
+        XCTAssertGreaterThanOrEqual(hands.gloved, 1)
+
+        let service = DetectionService()
+        service.detections = frame
+        service.hasResult = true
+        XCTAssertEqual(service.contaminationRisk, 0.85, accuracy: 0.001)
+        XCTAssertFalse(service.ppePassing)
+    }
+
+    /// Measured on docs/sprint-notes/week2-screenshots/pov_test_no_detections.jpg:
+    /// the same gloved hand labelled both ways.
+    func testSameHandLabelledBothWaysIsAGlove() {
+        let frame = [
+            BackendDetection(classId: 0, className: "glove", confidence: 0.90, box: [18, 17, 91, 123]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.74, box: [18, 16, 91, 122]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.67, box: [64, 115, 124, 174])
+        ]
+        let hands = DetectionService.resolveHands(frame)
+        XCTAssertEqual(hands.bare, 0)
+        XCTAssertEqual(hands.gloved, 2)
+    }
+
+    func testFaintBareHandDoesNotHaltTheWorkflow() {
+        let frame = [BackendDetection(classId: 1, className: "hand", confidence: 0.35, box: [0, 0, 50, 50])]
+        XCTAssertEqual(DetectionService.resolveHands(frame).bare, 0)
+    }
 }

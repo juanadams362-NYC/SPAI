@@ -3,6 +3,8 @@ A demo school with a sample cohort, for demos and screenshots.
 
     python -m app.seed_demo            # create "Demo School" with sample data
     python -m app.seed_demo --clear    # remove the sample learners again
+    python -m app.seed_demo --live-run "Avery Chen" [--rough]
+                                       # a sample run arriving now, for a live dashboard demo
 
 Prints a sign-in for the dashboard and a code to pair a headset. Every
 learner it creates is flagged as demo data and labelled "Sample cohort" in
@@ -91,8 +93,12 @@ def demo_org(store: Store) -> dict:
     return org
 
 
+PINS: dict[str, str] = {}
+
+
 def seed(store: Store | None = None, seed_value: int = 7, org_id: str | None = None) -> int:
     store = store or get_store()
+    PINS.clear()
     org_id = org_id or demo_org(store)["id"]
     store.delete_demo_data(org_id)
     rng = random.Random(seed_value)
@@ -101,6 +107,7 @@ def seed(store: Store | None = None, seed_value: int = 7, org_id: str | None = N
     total = 0
     for name, skill, growth, runs in LEARNERS:
         learner = store.add_learner(org_id, name, COHORT, is_demo=True)
+        PINS[name] = learner["pin"]
         for i in range(runs):
             # Spread runs over the last six weeks, most recent last.
             started = now - timedelta(days=(runs - i) * rng.uniform(4, 7), hours=rng.uniform(0, 6))
@@ -111,8 +118,30 @@ def seed(store: Store | None = None, seed_value: int = 7, org_id: str | None = N
     return total
 
 
+def live_run(store: Store, name: str, clean: bool = True) -> dict:
+    """Add one run, timed now, for a sample learner — so a dashboard demo
+    can show a run arriving without a headset in the room. Only works on
+    sample learners, so it can never put an invented run on a real student."""
+    org = demo_org(store)
+    learner = next((l for l in store.list_learners(org["id"]) if l["is_demo"] and l["name"].lower() == name.lower()), None)
+    if learner is None:
+        raise SystemExit(f"No sample learner called {name!r}. Run python -m app.seed_demo first.")
+    rng = random.Random()
+    started = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=18)
+    record = _run(rng, 0.97 if clean else 0.35, started)
+    record["learner_id"] = learner["id"]
+    return store.save_session(org["id"], None, record, protocol.for_org(org["id"])["rubric"])
+
+
 if __name__ == "__main__":
     store = get_store()
+    if "--live-run" in sys.argv:
+        args = sys.argv[sys.argv.index("--live-run") + 1:]
+        if not args:
+            raise SystemExit('Usage: python -m app.seed_demo --live-run "Avery Chen" [--rough]')
+        run = live_run(store, args[0], clean="--rough" not in sys.argv)
+        print(f"Added a run for {run['learner_name']}: {run['verdict_label']}, {run['score']}. Refresh the dashboard.")
+        raise SystemExit(0)
     if "--clear" in sys.argv:
         print(f"Removed {store.delete_demo_data(demo_org(store)['id'])} sample learners.")
     else:
@@ -122,3 +151,6 @@ if __name__ == "__main__":
         print(f"{ORG_NAME}: {len(LEARNERS)} sample learners, {runs} sample runs.")
         print(f"Dashboard sign-in: {ADMIN_EMAIL} / {ADMIN_PASSWORD}  (demo only — change it for anything real)")
         print(f"Headset pairing code (10 minutes): {code['code']}")
+        print("Sample learner PINs (for signing in on the headset during a demo):")
+        for name, pin in PINS.items():
+            print(f"  {pin}  {name}")

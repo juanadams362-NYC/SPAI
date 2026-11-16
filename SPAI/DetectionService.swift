@@ -83,17 +83,62 @@ final class DetectionService {
 
     var contaminationRisk: Double {
         guard hasResult else { return 0 }
-        let hasHand = detections.contains { Self.isHandClass($0.className) }
-        let hasGlove = detections.contains { Self.isGloveClass($0.className) }
-        if hasHand && !hasGlove { return 0.85 }
-        if hasGlove { return 0.10 }
+        let hands = Self.resolveHands(detections)
+        if hands.bare > 0 { return 0.85 }
+        if hands.gloved > 0 { return 0.10 }
         return 0
     }
 
     var ppePassing: Bool {
-        let hasHand = detections.contains { Self.isHandClass($0.className) }
-        let hasGlove = detections.contains { Self.isGloveClass($0.className) }
-        return hasGlove && !hasHand
+        let hands = Self.resolveHands(detections)
+        return hands.gloved > 0 && hands.bare == 0
+    }
+
+    /// Counts gloved and bare hands in a frame.
+    ///
+    /// The glove model often puts two boxes on one hand, one "glove" and one
+    /// "hand", almost exactly on top of each other. The old rule ("any glove
+    /// in view means safe") hid that, but also hid a genuinely bare hand
+    /// next to a gloved one, which is exactly the contamination SPAI exists
+    /// to catch. Here, boxes that overlap heavily are one hand, and the more
+    /// confident label decides what it is. A tie goes to "glove", so an
+    /// ambiguous frame doesn't halt the workflow by itself; a bare hand has
+    /// to be seen clearly (confidence at least `bareHandConfidence`).
+    static func resolveHands(_ detections: [BackendDetection]) -> (gloved: Int, bare: Int) {
+        let candidates = detections
+            .filter { isPPEClass($0.className) && $0.box.count == 4 }
+            .sorted { $0.confidence > $1.confidence }
+        var kept: [BackendDetection] = []
+        for detection in candidates where !kept.contains(where: { iou($0.box, detection.box) >= sameHandOverlap }) {
+            kept.append(detection)
+        }
+        // Same confidence, same place: prefer glove.
+        let resolved = kept.map { winner -> BackendDetection in
+            if isHandClass(winner.className),
+               candidates.contains(where: { isGloveClass($0.className) && $0.confidence >= winner.confidence
+                                            && iou($0.box, winner.box) >= sameHandOverlap }) {
+                return BackendDetection(classId: 0, className: "glove", confidence: winner.confidence, box: winner.box)
+            }
+            return winner
+        }
+        let gloved = resolved.filter { isGloveClass($0.className) }.count
+        let bare = resolved.filter { isHandClass($0.className) && $0.confidence >= bareHandConfidence }.count
+        return (gloved, bare)
+    }
+
+    /// Boxes overlapping at least this much (intersection over union) are
+    /// treated as the same hand.
+    static let sameHandOverlap = 0.5
+    /// A bare hand only counts when the model is at least this sure.
+    static let bareHandConfidence = 0.5
+
+    private static func iou(_ a: [Int], _ b: [Int]) -> Double {
+        guard a.count == 4, b.count == 4 else { return 0 }
+        let width = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+        let height = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+        let intersection = Double(width * height)
+        let union = Double((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1])) - intersection
+        return union > 0 ? intersection / union : 0
     }
 
     /// Runs detection on one frame.

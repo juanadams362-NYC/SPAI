@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import ARKit
 import RealityKit
 import RealityKitContent
 import simd
@@ -21,7 +22,7 @@ struct ImmersiveView: View {
     /// Parent of every room panel and of Pip. Moving this one entity moves
     /// the whole workspace, which is how it is fitted to the user.
     @State private var workspace = Entity()
-    @AppStorage("useHeadsetCamera") private var useHeadsetCamera = true
+    @AppStorage("useHeadsetCamera") private var useHeadsetCamera = false
     /// The "press Start Step" nudge is only worth saying once per session.
     @State private var hasNudgedToStart = false
 
@@ -272,8 +273,15 @@ struct ImmersiveView: View {
     /// nothing but the headset. Requires Apple's main-camera entitlement;
     /// without it the camera reports why and the other sources still work.
     private func startHeadsetCamera() {
+        // Off unless switched on in Settings: it needs Apple's enterprise
+        // main-camera entitlement and license file in the build. Without
+        // them, asking for the camera fails at best.
         guard useHeadsetCamera else {
             appModel.cameraNote = nil
+            return
+        }
+        guard CameraFrameProvider.isSupported else {
+            appModel.cameraNote = "This build can't use the headset camera. Use an iPhone camera or test media instead."
             return
         }
         headsetCamera.onFrameForDetection = { buffer in
