@@ -54,8 +54,8 @@ struct FeatureCard: View {
                     .foregroundStyle(tint)
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, minHeight: 196, alignment: .topLeading)
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
         .background {
             ZStack {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)

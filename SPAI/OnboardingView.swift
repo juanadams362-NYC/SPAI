@@ -534,5 +534,5 @@ struct ConfidenceBar: View {
 #Preview {
     OnboardingView()
         .environment(AppModel())
-        .frame(width: 1040, height: 680)
+        .frame(width: 1040, height: 720)
 }

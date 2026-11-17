@@ -74,7 +74,7 @@ struct HomeView: View {
     // MARK: - Hero
 
     private var hero: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Sterile processing assistant")
                 .spaiEyebrow(SPAIColor.primaryBright)
 
@@ -84,8 +84,8 @@ struct HomeView: View {
                 Text("guided by AI.")
                     .foregroundStyle(SPAIGradient.aurora)
             }
-            .font(.system(size: 56, weight: .bold))
-            .tracking(-1.2)
+            .font(.system(size: 52, weight: .bold))
+            .tracking(-1.1)
 
             Text("SPAI checks PPE, confirms each step, and flags contamination risk in real time — right in the space around you.")
                 .font(.system(size: 18))
@@ -244,5 +244,5 @@ private struct HomeFeature {
 #Preview {
     HomeView()
         .environment(AppModel())
-        .frame(width: 1040, height: 680)
+        .frame(width: 1040, height: 720)
 }
