@@ -54,6 +54,13 @@ v1 trains on `shlokraval/ppe-dataset-yolov8` from Kaggle, filtered to keep only 
 
 This is construction PPE, not medical. See [Dataset Notes](../docs/dataset-notes.md) for the full reasoning and the planned path to medical-domain fine-tuning in v2+.
 
+## v5 — way better models
+
+Start here: [`v5/README.md`](v5/README.md). It documents the glove/hand double-labeling found in the
+shipped model, the fixes already in the app and backend, and a one-notebook retrain
+(`notebooks/spai_v5_training.ipynb`) with label auditing, YOLO11s, SPAI-tuned augmentation and a
+ship-only-if-better gate.
+
 ## Roadmap
 
 - **v1** Glove detection (in progress)

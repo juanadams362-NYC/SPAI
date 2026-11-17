@@ -33,22 +33,24 @@ final class OnDeviceDetector {
     var isAvailable: Bool { ppeModel != nil }
     var hasInstruments: Bool { instrumentModel != nil }
 
-    /// PPE detection — gloves and hands.
+    /// PPE detection — gloves and hands. Returns candidates from 0.2 so DetectionService can
+    /// arbitrate duplicate glove/hand labels before applying its 0.5 reporting threshold.
     func detect(image: UIImage) async -> [BackendDetection] {
         guard let ppeModel else { return [] }
-        return await run(ppeModel, on: image) { label in
+        return await run(ppeModel, on: image, minConfidence: 0.2) { label in
             label == "glove" ? 0 : 1
         }
     }
 
     func detectInstruments(image: UIImage) async -> [BackendDetection] {
         guard let instrumentModel else { return [] }
-        return await run(instrumentModel, on: image) { _ in 0 }
+        return await run(instrumentModel, on: image, minConfidence: 0.5) { _ in 0 }
     }
 
     private func run(
         _ model: VNCoreMLModel,
         on image: UIImage,
+        minConfidence: Float,
         classId: @escaping (String) -> Int
     ) async -> [BackendDetection] {
         guard let cgImage = image.cgImage else { return [] }
@@ -66,7 +68,7 @@ final class OnDeviceDetector {
 
                 let detections = observations.compactMap { obs -> BackendDetection? in
                     guard let label = obs.labels.first else { return nil }
-                    guard label.confidence >= 0.5 else { return nil }
+                    guard label.confidence >= minConfidence else { return nil }
 
                     let box = obs.boundingBox
                     let x1 = Int(box.minX * width)

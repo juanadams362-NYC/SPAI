@@ -29,6 +29,14 @@ INSTRUMENT_LABEL = "instrument"
 class TrayDetector(Detector):
     """Same inference machinery as Detector, pointed at the instrument model."""
 
+    # Every detection is reported as "instrument", so per-class NMS only let the same
+    # instrument be counted twice under two names (e.g. Babcock + Adson on one forceps),
+    # inflating instrument_count. Class-agnostic NMS counts each instrument once.
+    agnostic_nms = True
+    # No containment arbitration here: instruments legitimately overlap on a tray
+    # (scissors resting on forceps), and suppressing those would undercount.
+    arbitrate_overlaps = False
+
     def __init__(self) -> None:
         super().__init__()
         self.model_path = TRAY_MODEL_PATH

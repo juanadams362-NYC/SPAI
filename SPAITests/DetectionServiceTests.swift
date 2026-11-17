@@ -142,4 +142,54 @@ final class DetectionServiceTests: XCTestCase {
     func testBorderNormalWhenNoResult() {
         XCTAssertEqual(borderLevel(forRisk: 0.85, hasResult: false), "normal")
     }
+
+    // MARK: - PPE overlap arbitration (real model outputs on images-18.jpeg)
+
+    private func ppe(_ className: String, _ confidence: Double, _ box: [Int]) -> BackendDetection {
+        BackendDetection(classId: className == "glove" ? 0 : 1, className: className, confidence: confidence, box: box)
+    }
+
+    func testDuplicateHandOnGlovedHandIsRemoved() {
+        let out = DetectionService.resolvePPEOverlaps([
+            ppe("glove", 0.73, [12, 101, 178, 199]),
+            ppe("hand", 0.61, [16, 121, 187, 199])
+        ])
+        XCTAssertEqual(out.map(\.className), ["glove"])
+    }
+
+    func testGhostGloveOnBareHandIsRemoved() {
+        let out = DetectionService.resolvePPEOverlaps([
+            ppe("glove", 0.28, [135, 19, 224, 120]),
+            ppe("hand", 0.80, [135, 23, 224, 115])
+        ])
+        XCTAssertEqual(out.map(\.className), ["hand"])
+    }
+
+    func testFragmentInsideStrongerBoxIsRemoved() {
+        let out = DetectionService.resolvePPEOverlaps([
+            ppe("glove", 0.73, [12, 101, 178, 199]),
+            ppe("hand", 0.31, [68, 112, 177, 175])
+        ])
+        XCTAssertEqual(out.map(\.className), ["glove"])
+    }
+
+    func testTwoDifferentHandsAreBothKept() {
+        let out = DetectionService.resolvePPEOverlaps([
+            ppe("hand", 0.80, [135, 23, 224, 115]),
+            ppe("glove", 0.73, [12, 101, 178, 199])
+        ])
+        XCTAssertEqual(Set(out.map(\.className)), ["hand", "glove"])
+    }
+
+    func testGlovedFrameNowPassesPPE() {
+        // POV frame: before arbitration the duplicate "hand" made ppePassing false.
+        let service = DetectionService()
+        service.detections = DetectionService.resolvePPEOverlaps([
+            ppe("glove", 0.90, [18, 17, 91, 123]),
+            ppe("hand", 0.74, [18, 16, 91, 122]),
+            ppe("glove", 0.67, [64, 115, 124, 174])
+        ])
+        service.hasResult = true
+        XCTAssertTrue(service.ppePassing)
+    }
 }
