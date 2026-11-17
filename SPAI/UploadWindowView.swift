@@ -51,80 +51,76 @@ struct UploadWindowView: View {
         VStack(spacing: SPAISpacing.m) {
             header
 
-            if let videoURL {
-                videoPreview(videoURL)
-            } else if let image {
-                imageWithBoxes(image)
-            } else {
-                placeholder
+            Group {
+                if let videoURL {
+                    videoPreview(videoURL)
+                } else if let image {
+                    imageWithBoxes(image)
+                } else {
+                    placeholder
+                }
             }
+            .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
 
-            PhotosPicker(selection: $selectedItem,
-                         matching: .any(of: [.images, .videos])) {
-                Label(hasMedia ? "Choose another" : "Choose image or video",
-                      systemImage: "photo.badge.plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SPAISpacing.s + 2)
-                    .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-            }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            HStack(spacing: 10) {
+                PhotosPicker(selection: $selectedItem,
+                             matching: .any(of: [.images, .videos])) {
+                    Label(hasMedia ? "Choose another" : "Photos", systemImage: "photo.badge.plus")
+                }
+                .buttonStyle(.spai(.primary, fullWidth: true))
 
-            Button {
-                isFileImporterPresented = true
-            } label: {
-                Label("Import from Files", systemImage: "folder.badge.plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SPAISpacing.s + 2)
-                    .background(SPAIColor.secondary.opacity(0.8), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                Button {
+                    isFileImporterPresented = true
+                } label: {
+                    Label("Files", systemImage: "folder.badge.plus")
+                }
+                .buttonStyle(.spai(.glass, fullWidth: true))
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
 
             #if !targetEnvironment(simulator)
             Button {
-                showContinuityCamera.toggle()
+                withAnimation(.snappy) { showContinuityCamera.toggle() }
             } label: {
-                Label(showContinuityCamera ? "Hide Camera" : "Use Live Camera", systemImage: "iphone.and.arrow.forward")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SPAISpacing.s + 2)
-                    .background(SPAIColor.accent.opacity(0.6), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                Label(showContinuityCamera ? "Hide Live Camera" : "Use Live iPhone Camera",
+                      systemImage: "iphone.and.arrow.forward")
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spai(.tinted(SPAIColor.accent), fullWidth: true))
 
             if showContinuityCamera {
-                Divider().padding(.vertical, SPAISpacing.s)
                 ContinuityCameraMini()
+                    .transition(AnyTransition.opacity.combined(with: AnyTransition.move(edge: .top)))
             }
             #endif
 
-            if isLoadingMedia {
-                ProgressView("Loading media…")
-            } else if let loadError {
-                Text(loadError)
-                    .font(.footnote)
-                    .foregroundStyle(SPAIColor.warning)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if service.isLoading {
-                ProgressView("Detecting…")
-            } else if videoURL != nil {
-                videoSummary
-            } else if service.hasResult {
-                resultSummary
-            } else if let error = service.errorMessage {
-                Text(error).foregroundStyle(SPAIColor.warning)
+            Group {
+                if isLoadingMedia {
+                    statusLine(text: "Loading media…", tint: SPAIColor.primaryBright, busy: true)
+                } else if let loadError {
+                    Label(loadError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(SPAIColor.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if service.isLoading {
+                    statusLine(text: "Detecting…", tint: SPAIColor.primaryBright, busy: true)
+                } else if videoURL != nil {
+                    videoSummary
+                } else if service.hasResult {
+                    resultSummary
+                } else if let error = service.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(SPAIColor.warning)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(SPAISpacing.l)
+        .frame(width: 520)
+        .frame(minHeight: 600)
+        .spaiWindowBackground(cornerRadius: 36, aurora: false)
         .onChange(of: selectedItem) { _, newItem in
             guard let newItem else { return }
             Task { await load(newItem) }
@@ -151,6 +147,18 @@ struct UploadWindowView: View {
                 loadError = "Couldn't import file: \(error.localizedDescription)"
                 print("[Upload] file import failed: \(error)")
             }
+        }
+    }
+
+    private func statusLine(text: String, tint: Color, busy: Bool) -> some View {
+        HStack(spacing: 10) {
+            if busy {
+                TypingDots(color: tint)
+            }
+            Text(text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(SPAIColor.textSecondary)
+            Spacer()
         }
     }
 
@@ -305,42 +313,71 @@ struct UploadWindowView: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 12) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(SPAIColor.onFill)
+                .frame(width: 42, height: 42)
+                .background(SPAIGradient.ai, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: SPAIColor.secondary.opacity(0.45), radius: 10)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Test Detection").font(.title2.bold())
-                Text("Upload images/videos or use live camera")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("Test Detection")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(SPAIColor.textPrimary)
+                Text("Run SPAI on photos, videos or a live camera")
+                    .font(.system(size: 13))
+                    .foregroundStyle(SPAIColor.textTertiary)
             }
             Spacer()
             Button {
                 dismissWindow(id: "upload")
                 appModel.isUploadWindowOpen = false
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2).foregroundStyle(.secondary)
+                Image(systemName: "xmark")
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spaiIcon(tint: .white, size: 40))
+            .accessibilityLabel("Close")
         }
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: SPAIRadius.medium)
-            .fill(SPAIColor.neutralMid.opacity(0.2))
-            .frame(height: 220)
+        RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
+            .fill(SPAIColor.surface)
+            .frame(height: 230)
             .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: "photo.on.rectangle.angled").font(.system(size: 40))
-                    Text("Choose an image or video to run detection")
-                }
-                .foregroundStyle(.secondary)
+                RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
+                    .strokeBorder(SPAIColor.primary.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [7, 6]))
             }
+            .overlay {
+                VStack(spacing: 10) {
+                    Image(systemName: "viewfinder")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(SPAIColor.primaryBright)
+                    Text("Choose an image or video to run detection")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(SPAIColor.textSecondary)
+                    HStack(spacing: 14) {
+                        legendDot("Glove", SPAIColor.safe)
+                        legendDot("Bare hand", SPAIColor.critical)
+                        legendDot("Instrument", SPAIColor.primary)
+                    }
+                }
+            }
+    }
+
+    private func legendDot(_ title: String, _ color: Color) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(SPAIColor.textTertiary)
+        }
     }
 
     private func videoPreview(_ url: URL) -> some View {
         VideoPlayer(player: player)
             .frame(height: 260)
-            .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium))
+            .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
             .onAppear {
                 if player == nil { player = AVPlayer(url: url) }
             }
@@ -350,56 +387,50 @@ struct UploadWindowView: View {
         VStack(alignment: .leading, spacing: SPAISpacing.s) {
             HStack(spacing: 8) {
                 Image(systemName: "film")
+                    .foregroundStyle(SPAIColor.accent)
                 Text("Video loaded")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SPAIColor.textPrimary)
                 Spacer()
                 Text(String(format: "%.1fs", videoDuration))
-                    .font(.subheadline.monospaced())
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(SPAIColor.textTertiary)
             }
 
             if videoService.isRunning {
                 HStack(spacing: SPAISpacing.s) {
-                    ProgressView().controlSize(.small)
+                    LiveDot(color: SPAIColor.critical, size: 7)
                     Text(String(format: "%.1fs · %d frames · %d skipped", videoService.currentTime, videoService.framesProcessed, videoService.framesSkipped))
-                        .font(.footnote.monospaced())
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(SPAIColor.textSecondary)
                     Spacer()
                     Button {
                         videoService.stop()
                     } label: {
                         Label("Stop", systemImage: "stop.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, SPAISpacing.m)
-                            .padding(.vertical, SPAISpacing.xs)
-                            .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
-                    .buttonStyle(.plain)
-                    .spaiHitTarget()
+                    .buttonStyle(.spai(.tinted(SPAIColor.critical), size: .small))
                 }
             } else {
                 Button {
                     runVideo()
                 } label: {
                     Label("Run detection on video", systemImage: "play.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SPAISpacing.s + 2)
-                        .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
-                .buttonStyle(.plain)
-                .spaiHitTarget()
+                .buttonStyle(.spai(.success, fullWidth: true))
 
                 if videoService.framesProcessed > 0 {
                     Text("\(videoService.framesProcessed) frames processed, \(videoService.framesSkipped) skipped. Watch the detection and workflow panels.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(SPAIColor.textTertiary)
                 }
             }
         }
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous))
     }
 
     private var shouldPreferOnDeviceForVideo: Bool {
@@ -446,18 +477,22 @@ struct UploadWindowView: View {
                     let y = CGFloat(det.box[1]) * scale
                     let w = CGFloat(det.box[2] - det.box[0]) * scale
                     let h = CGFloat(det.box[3] - det.box[1]) * scale
+                    let color = boxColor(det.className)
 
-                    Rectangle()
-                        .stroke(boxColor(det.className), lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .strokeBorder(color, lineWidth: 2)
+                        .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
                         .frame(width: w, height: h)
+                        .shadow(color: color.opacity(0.7), radius: 4)
                         .overlay(alignment: .topLeading) {
                             Text("\(det.className) \(Int(det.confidence * 100))%")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4).padding(.vertical, 1)
-                                .background(boxColor(det.className).opacity(0.9))
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                                .offset(y: -16)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(SPAIColor.onFill)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(color, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .fixedSize()
+                                .offset(y: -18)
                         }
                         .offset(x: x, y: y)
                 }
@@ -468,41 +503,45 @@ struct UploadWindowView: View {
     }
 
     private var resultSummary: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.xs) {
-            Text("Found \(service.detections.count) object\(service.detections.count == 1 ? "" : "s")")
-                .font(.subheadline.weight(.semibold))
-            if let tray = service.trayState?.capitalized {
-                HStack(spacing: 8) {
-                    Image(systemName: tray.lowercased() == "loaded" ? "tray.full" : "tray")
-                        .foregroundStyle(.white)
-                    Text("Tray: \(tray)")
-                        .font(.subheadline.weight(.semibold))
-                    if let count = service.instrumentCount {
-                        Text("(\(count))")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Found \(service.detections.count) object\(service.detections.count == 1 ? "" : "s")")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SPAIColor.textPrimary)
+                Spacer()
+                if let tray = service.trayState?.capitalized {
+                    SPAIChip(text: "Tray: \(tray)\(service.instrumentCount.map { " (\($0))" } ?? "")",
+                             icon: tray.lowercased() == "loaded" ? "tray.full.fill" : "tray",
+                             tint: tray.lowercased() == "loaded" ? SPAIColor.safe : Color.white.opacity(0.75))
                 }
             }
             ForEach(service.detections) { det in
-                HStack {
-                    Circle().fill(boxColor(det.className)).frame(width: 10, height: 10)
+                HStack(spacing: 10) {
+                    Circle().fill(boxColor(det.className)).frame(width: 9, height: 9)
                     Text(det.className)
-                    Spacer()
-                    Text("\(Int(det.confidence * 100))%").foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(SPAIColor.textPrimary)
+                        .lineLimit(1)
+                        .frame(width: 140, alignment: .leading)
+                    ConfidenceBar(value: det.confidence, color: boxColor(det.className))
+                    Text("\(Int(det.confidence * 100))%")
+                        .font(.system(size: 13, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(SPAIColor.textSecondary)
+                        .frame(width: 40, alignment: .trailing)
                 }
-                .font(.footnote)
             }
         }
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous))
     }
 
+    /// Box colors carry meaning: green = gloved, rose = bare hand, cyan = instrument.
     private func boxColor(_ className: String) -> Color {
-        switch className.lowercased() {
-        case "glove": return SPAIColor.primary
-        case "hand":  return SPAIColor.accent
-        default:      return SPAIColor.warning
-        }
+        if DetectionService.isGloveClass(className) { return SPAIColor.safe }
+        if DetectionService.isHandClass(className) { return SPAIColor.critical }
+        return SPAIColor.primary
     }
 }
 
@@ -516,35 +555,39 @@ struct ContinuityCameraMini: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             HStack {
-                Text("LIVE CAMERA")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(.white.opacity(0.7))
+                HStack(spacing: 6) {
+                    LiveDot(color: cameraService.status.color, size: 6, animating: cameraService.isRunning)
+                        .id(cameraService.isRunning)
+                    Text("Live camera")
+                        .spaiEyebrow()
+                }
                 Spacer()
                 Text(cameraService.status.label)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(cameraService.status.color)
+                    .lineLimit(1)
             }
 
             ZStack {
-                RoundedRectangle(cornerRadius: SPAIRadius.small)
-                    .fill(.white.opacity(0.05))
-                    .frame(height: 140)
+                RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous)
+                    .fill(Color.black.opacity(0.35))
+                    .frame(height: 150)
 
                 if let img = cameraService.latestImage {
                     Image(uiImage: img)
                         .resizable()
                         .scaledToFill()
-                        .frame(height: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.small))
+                        .frame(height: 150)
+                        .clipShape(RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous))
                 } else {
                     VStack(spacing: 6) {
                         Image(systemName: "iphone.radiowaves.left.and.right")
                             .font(.system(size: 28))
-                            .foregroundStyle(.white.opacity(0.4))
-                        Text("Waiting for device...")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(SPAIColor.textTertiary)
+                            .symbolEffect(.pulse)
+                        Text("Waiting for device…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(SPAIColor.textTertiary)
                     }
                 }
             }
@@ -554,27 +597,15 @@ struct ContinuityCameraMini: View {
                     cameraService.start()
                 } label: {
                     Label("Start", systemImage: "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SPAISpacing.xs + 2)
-                        .background(SPAIColor.safe, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
-                .buttonStyle(.plain)
-                .spaiHitTarget()
+                .buttonStyle(.spai(.success, size: .small, fullWidth: true))
 
                 Button {
                     cameraService.stop()
                 } label: {
                     Label("Stop", systemImage: "stop.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SPAISpacing.xs + 2)
-                        .background(SPAIColor.critical, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                 }
-                .buttonStyle(.plain)
-                .spaiHitTarget()
+                .buttonStyle(.spai(.tinted(SPAIColor.critical), size: .small, fullWidth: true))
             }
 
             Toggle(isOn: Binding(
@@ -582,14 +613,18 @@ struct ContinuityCameraMini: View {
                 set: { cameraService.detectionEnabled = $0 }
             )) {
                 Text("Run detection on feed")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(SPAIColor.textPrimary)
             }
             .toggleStyle(.switch)
             .tint(SPAIColor.primary)
         }
         .padding(SPAISpacing.m)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
+        .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
+                .strokeBorder(SPAIColor.hairline, lineWidth: 1)
+        }
         .onAppear {
             cameraService.onFrameForDetection = { ui in
                 await detectionService.detect(

@@ -13,10 +13,7 @@ struct DetectionUploadPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            Text("SIM TEST")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.5))
+            PanelHeader("Test Detection", icon: "photo.on.rectangle.angled", tint: SPAIColor.secondary)
 
             Button {
                 if appModel.isUploadWindowOpen {
@@ -27,41 +24,51 @@ struct DetectionUploadPanel: View {
                     appModel.isUploadWindowOpen = true
                 }
             } label: {
-                Label(appModel.isUploadWindowOpen ? "Close upload panel" : "Upload test media",
+                Label(appModel.isUploadWindowOpen ? "Close test window" : "Open test media",
                       systemImage: appModel.isUploadWindowOpen ? "xmark.circle" : "photo.badge.plus")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .padding(.horizontal, SPAISpacing.l)
-                    .padding(.vertical, SPAISpacing.s + 2)
-                    .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spai(appModel.isUploadWindowOpen ? .glass : .tinted(SPAIColor.secondary), fullWidth: true))
 
-            if service.isLoading {
-                Text("Detecting…")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
-            } else if let error = service.errorMessage {
-                Text(error)
-                    .font(.system(size: 12))
-                    .foregroundStyle(SPAIColor.warning)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if service.hasResult {
-                Text("\(service.detections.count) detection(s)")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
-                if let tray = service.trayState?.capitalized {
-                    Text("Tray: \(tray)\(service.instrumentCount.map { " (\($0))" } ?? "")")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-            }
+            status
         }
         .padding(SPAISpacing.l)
-        .frame(width: 260)
+        .frame(width: 280)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        if service.isLoading {
+            HStack(spacing: 10) {
+                TypingDots(color: SPAIColor.primaryBright)
+                Text("Detecting…")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(SPAIColor.textSecondary)
+            }
+        } else if let error = service.errorMessage {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(SPAIColor.warning)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if service.hasResult {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("\(service.detections.count) detection\(service.detections.count == 1 ? "" : "s")",
+                      systemImage: "viewfinder")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SPAIColor.textSecondary)
+                if let tray = service.trayState?.capitalized {
+                    Label("Tray: \(tray)\(service.instrumentCount.map { " (\($0))" } ?? "")",
+                          systemImage: tray.lowercased() == "loaded" ? "tray.full.fill" : "tray")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(tray.lowercased() == "loaded" ? SPAIColor.safe : SPAIColor.textSecondary)
+                }
+            }
+        } else {
+            Text("Run detection on photos, videos or a live iPhone camera.")
+                .font(.system(size: 12))
+                .foregroundStyle(SPAIColor.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

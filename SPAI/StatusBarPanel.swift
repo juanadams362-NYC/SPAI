@@ -16,58 +16,110 @@ struct StatusBarPanel: View {
     @State private var sessionSeconds: Int = 0
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
+    private var borderState: BorderState { appModel.isHalted ? .critical : .normal }
+
     var body: some View {
-        HStack(spacing: SPAISpacing.l) {
+        HStack(spacing: 10) {
             identityBlock
-            divider
-            sessionTimeBlock
-            divider
-            roleBlock
-            divider
-            modeBlock
-            Spacer(minLength: SPAISpacing.xl)
+            SPAIDivider(vertical: true)
+            sessionTimeChip
+            if appModel.isHalted {
+                haltedChip
+                    .transition(AnyTransition.scale(scale: 0.8).combined(with: AnyTransition.opacity))
+            } else {
+                stationChip
+                    .transition(AnyTransition.opacity)
+            }
+            roleMenu
+            modeChip
+            Spacer(minLength: SPAISpacing.s)
             controlButtons
         }
         .padding(.horizontal, SPAISpacing.l)
-        .padding(.vertical, SPAISpacing.m)
+        .padding(.vertical, 14)
         .frame(width: 1200)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .ledBorder(borderState, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: appModel.isHalted)
         .onReceive(timer) { _ in sessionSeconds += 1 }
+        .onChange(of: appModel.sessionStart) { _, _ in sessionSeconds = 0 }
     }
+
+    // MARK: - Blocks
 
     private var identityBlock: some View {
-        HStack(spacing: SPAISpacing.s + 4) {
-            SterileNodeMark(size: 38)
-                .frame(width: 48, height: 48)
-                .background(SPAIColor.primary.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        HStack(spacing: 12) {
+            SterileNodeMark(size: 44)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text("SPAI")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
-                Text("SPD — OR Suite 3")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 21, weight: .bold))
+                    .foregroundStyle(SPAIColor.textPrimary)
+                Text("SPD · OR Suite 3")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(SPAIColor.textTertiary)
             }
         }
+        .accessibilityElement(children: .combine)
     }
 
-    private var sessionTimeBlock: some View {
+    private var sessionTimeChip: some View {
         HStack(spacing: 8) {
-            Text("SESSION TIME")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.7))
+            Image(systemName: "timer")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(SPAIColor.primaryBright)
             Text(formattedTime)
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(SPAIColor.textPrimary)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: sessionSeconds)
         }
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s)
-        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(SPAIColor.surfaceStrong, in: Capsule())
+        .overlay { Capsule().strokeBorder(SPAIColor.hairline, lineWidth: 1) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Session time \(formattedTime)")
     }
 
-    private var roleBlock: some View {
+    private var stationChip: some View {
+        let step = appModel.currentStep
+        let total = SterileStep.allCases.count
+        return HStack(spacing: 8) {
+            Image(systemName: step.icon)
+                .font(.system(size: 13, weight: .semibold))
+            Text("\(step.rawValue + 1)/\(total) · \(step.title)")
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(SPAIColor.primaryBright)
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(SPAIColor.primary.opacity(0.14), in: Capsule())
+        .overlay { Capsule().strokeBorder(SPAIColor.primary.opacity(0.3), lineWidth: 1) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Station \(step.rawValue + 1) of \(total), \(step.title)")
+    }
+
+    private var haltedChip: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.octagon.fill")
+                .font(.system(size: 14, weight: .bold))
+                .symbolEffect(.pulse)
+            Text("Workflow halted")
+                .font(.system(size: 14, weight: .bold))
+        }
+        .foregroundStyle(SPAIColor.critical)
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(SPAIColor.critical.opacity(0.18), in: Capsule())
+        .overlay { Capsule().strokeBorder(SPAIColor.critical.opacity(0.55), lineWidth: 1) }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var roleMenu: some View {
         Menu {
             ForEach(TechRole.allCases) { role in
                 Button {
@@ -82,43 +134,78 @@ struct StatusBarPanel: View {
             }
         } label: {
             HStack(spacing: 8) {
-                Circle().fill(SPAIColor.accent).frame(width: 8, height: 8)
+                Image(systemName: roleIcon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SPAIColor.accent)
                 Text(appModel.role.rawValue)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.95))
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .foregroundStyle(SPAIColor.textPrimary)
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(SPAIColor.textTertiary)
             }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(SPAIColor.surfaceStrong, in: Capsule())
+            .overlay { Capsule().strokeBorder(SPAIColor.hairline, lineWidth: 1) }
         }
         .buttonStyle(.plain)
-        .spaiHitTarget()
+        .spaiHitTarget(cornerRadius: 22)
+        .accessibilityLabel("Role: \(appModel.role.rawValue)")
+        .accessibilityHint("Changes what you can do in this session")
     }
 
-    private var modeBlock: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(detectionService.mode == .cloud ? SPAIColor.safe :
-                      detectionService.mode == .onDevice ? SPAIColor.warning : SPAIColor.critical)
-                .frame(width: 8, height: 8)
-            Text(detectionService.mode.rawValue.uppercased())
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.9))
+    private var roleIcon: String {
+        switch appModel.role {
+        case .technician: return "person.fill"
+        case .supervisor: return "checkmark.shield.fill"
+        case .trainee:    return "graduationcap.fill"
+        case .observer:   return "eye.fill"
         }
-        .padding(.horizontal, SPAISpacing.m)
-        .padding(.vertical, SPAISpacing.s)
-        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
     }
+
+    private var modeChip: some View {
+        let tint: Color
+        let label: String
+        switch detectionService.mode {
+        case .cloud:
+            tint = SPAIColor.safe
+            label = "Cloud AI"
+        case .onDevice:
+            tint = SPAIColor.warning
+            label = "On-Device"
+        case .offline:
+            tint = SPAIColor.critical
+            label = "Offline"
+        }
+        return HStack(spacing: 8) {
+            LiveDot(color: tint, size: 8, animating: detectionService.mode != .offline)
+                .id(detectionService.mode)
+            Text(label)
+                .font(.system(size: 13, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(tint)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(tint.opacity(0.12), in: Capsule())
+        .overlay { Capsule().strokeBorder(tint.opacity(0.3), lineWidth: 1) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Detection mode: \(label)")
+    }
+
+    // MARK: - Controls
 
     private var controlButtons: some View {
-        HStack(spacing: SPAISpacing.m) {
+        HStack(spacing: 10) {
             Button {
                 appModel.toggleVisibility("chat")
             } label: {
-                barButtonLabel("Ask SPAI", icon: "sparkles", tint: SPAIColor.primary)
+                Label("Ask SPAI", systemImage: "sparkles")
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spai(.tinted(SPAIColor.secondary)))
 
             Button {
                 if appModel.isSettingsWindowOpen {
@@ -129,10 +216,11 @@ struct StatusBarPanel: View {
                     appModel.isSettingsWindowOpen = true
                 }
             } label: {
-                barButtonLabel("Settings", icon: "gearshape.fill", tint: SPAIColor.secondary)
+                Image(systemName: "gearshape.fill")
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spaiIcon(tint: .white, size: 46))
+            .help("Settings")
+            .accessibilityLabel("Settings")
 
             Button {
                 Task {
@@ -141,89 +229,16 @@ struct StatusBarPanel: View {
                     openWindow(id: "home")
                 }
             } label: {
-                barButtonLabel("End Session", icon: "xmark.circle.fill", tint: SPAIColor.critical)
+                Label("End Session", systemImage: "xmark.circle.fill")
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spai(.tinted(SPAIColor.critical)))
         }
-    }
-
-    private func barButtonLabel(_ text: String, icon: String, tint: Color) -> some View {
-            HStack(spacing: 8) {
-                Image(systemName: icon).foregroundStyle(tint)
-                Text(text)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-            .font(.system(size: 14, weight: .semibold))
-            .padding(.horizontal, SPAISpacing.m)
-            .padding(.vertical, SPAISpacing.s + 2)
-            .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-        }
-
-    private var divider: some View {
-        Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 36)
     }
 
     private var formattedTime: String {
         let minutes = sessionSeconds / 60
         let seconds = sessionSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
-    }
-}
-
-struct SterileNodeMark: View {
-    var size: CGFloat = 38
-
-    private var gradient: LinearGradient {
-        LinearGradient(colors: [SPAIColor.primary, SPAIColor.secondary, SPAIColor.accent],
-                       startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-
-    var body: some View {
-        ZStack {
-            SPAIHexagon()
-                .stroke(gradient, style: StrokeStyle(lineWidth: size * 0.07, lineJoin: .round))
-                .frame(width: size * 0.84, height: size * 0.94)
-
-            Path { p in
-                p.move(to: CGPoint(x: size/2, y: size*0.32))
-                p.addLine(to: CGPoint(x: size/2, y: size*0.68))
-                p.move(to: CGPoint(x: size*0.32, y: size/2))
-                p.addLine(to: CGPoint(x: size*0.68, y: size/2))
-            }
-            .stroke(SPAIColor.primary, style: StrokeStyle(lineWidth: size*0.05, lineCap: .round))
-
-            Circle()
-                .stroke(SPAIColor.accent, lineWidth: size*0.05)
-                .frame(width: size*0.34, height: size*0.34)
-
-            Circle()
-                .fill(SPAIColor.accent)
-                .frame(width: size*0.13, height: size*0.13)
-        }
-        .frame(width: size, height: size)
-    }
-}
-
-struct SPAIHexagon: Shape {
-    func path(in rect: CGRect) -> Path {
-        let cx = rect.midX, cy = rect.midY
-        let rx = rect.width/2, ry = rect.height/2
-        let pts = [
-            CGPoint(x: cx,      y: cy - ry),
-            CGPoint(x: cx + rx, y: cy - ry*0.5),
-            CGPoint(x: cx + rx, y: cy + ry*0.5),
-            CGPoint(x: cx,      y: cy + ry),
-            CGPoint(x: cx - rx, y: cy + ry*0.5),
-            CGPoint(x: cx - rx, y: cy - ry*0.5)
-        ]
-        var p = Path()
-        p.move(to: pts[0])
-        pts.dropFirst().forEach { p.addLine(to: $0) }
-        p.closeSubpath()
-        return p
     }
 }
 

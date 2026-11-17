@@ -13,26 +13,12 @@ struct StatusPill: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-            Text(text)
-        }
-        .font(.caption)
-        .fontWeight(.semibold)
-        .foregroundStyle(.white)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .background(color.opacity(0.28))
-        .clipShape(Capsule())
-        .overlay {
-            Capsule()
-                .stroke(.white.opacity(0.12), lineWidth: 1)
-        }
+        SPAIChip(text: text, icon: systemImage, tint: color)
     }
 }
 
 #Preview {
-    StatusPill(text: "Prototype", systemImage: "sparkles", color: .blue)
+    StatusPill(text: "Prototype", systemImage: "sparkles", color: SPAIColor.secondary)
         .padding()
         .background(.black)
 }

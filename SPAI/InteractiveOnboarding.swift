@@ -168,10 +168,7 @@ struct InteractiveOnboardingView: View {
                     Button("Back") {
                         withAnimation { currentStepIndex -= 1 }
                     }
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .buttonStyle(.plain)
-                    .spaiHitTarget()
+                    .buttonStyle(.spai(.ghost, size: .small))
                 }
                 
                 Spacer()
@@ -179,9 +176,9 @@ struct InteractiveOnboardingView: View {
                 // Progress dots
                 HStack(spacing: 6) {
                     ForEach(0..<steps.count, id: \.self) { index in
-                        Circle()
-                            .fill(index == currentStepIndex ? SPAIColor.primary : .white.opacity(0.3))
-                            .frame(width: 6, height: 6)
+                        Capsule()
+                            .fill(index == currentStepIndex ? SPAIColor.primaryBright : Color.white.opacity(0.3))
+                            .frame(width: index == currentStepIndex ? 18 : 6, height: 6)
                     }
                 }
                 
@@ -194,28 +191,19 @@ struct InteractiveOnboardingView: View {
                         completeOnboarding()
                     }
                 }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, SPAISpacing.l)
-                .padding(.vertical, SPAISpacing.s)
-                .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                .buttonStyle(.plain)
-                .spaiHitTarget()
+                .buttonStyle(.spai(.primary, size: .small))
             }
         }
         .padding(SPAISpacing.l)
         .frame(maxWidth: 400)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SPAIRadius.large))
-        .overlay(
-            RoundedRectangle(cornerRadius: SPAIRadius.large)
-                .stroke(SPAIColor.primary.opacity(0.5), lineWidth: 2)
-        )
+        .spaiPanelBackground(opacity: 0.85)
+        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
     }
     
     private var arrow: some View {
         Image(systemName: "arrowtriangle.up.fill")
             .font(.system(size: 30))
-            .foregroundStyle(Color(white: 0.22))
+            .foregroundStyle(SPAIColor.primary.opacity(0.6))
             .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
     }
     

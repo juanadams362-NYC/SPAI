@@ -30,7 +30,7 @@ struct SPAIApp: App {
             .environment(continuityCamera)
         }
         .windowStyle(.plain)
-        .defaultSize(width: 800, height: 600)
+        .defaultSize(width: 1040, height: 680)
 
         WindowGroup(id: "settings") {
             SettingsView()
@@ -39,7 +39,7 @@ struct SPAIApp: App {
                 .environment(continuityCamera)
         }
         .windowStyle(.plain)
-        .defaultSize(width: 450, height: 700)
+        .defaultSize(width: 440, height: 760)
         .windowResizability(.contentSize)
 
         WindowGroup(id: "upload") {
@@ -49,7 +49,7 @@ struct SPAIApp: App {
                 .environment(continuityCamera)
         }
         .windowStyle(.plain)
-        .defaultSize(width: 520, height: 640)
+        .defaultSize(width: 520, height: 700)
         .windowResizability(.contentSize)
 
         ImmersiveSpace(id: appModel.immersiveSpaceID) {

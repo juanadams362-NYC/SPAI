@@ -21,10 +21,17 @@ struct SessionHistoryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             if let pair = comparePair {
-                comparisonHeader
+                backButton {
+                    comparePair = nil
+                    isComparing = false
+                    compareSelectionIDs.removeAll()
+                }
                 comparisonView(pair)
             } else if let record = selected {
-                detailHeader
+                backButton {
+                    selected = nil
+                    replayIndex = 0
+                }
                 if isObserver {
                     replayView(record)
                 } else {
@@ -35,7 +42,7 @@ struct SessionHistoryPanel: View {
             }
         }
         .padding(SPAISpacing.l)
-        .frame(width: comparePair != nil ? 520 : 400)
+        .frame(width: comparePair != nil ? 540 : 420)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
         .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.2), value: selected != nil)
@@ -44,52 +51,23 @@ struct SessionHistoryPanel: View {
         .accessibilityLabel("Session history. \(appModel.history.records.count) saved sessions.")
     }
 
-    private var detailHeader: some View {
+    private func backButton(action: @escaping () -> Void) -> some View {
         HStack {
-            Button {
-                selected = nil
-                replayIndex = 0
-            } label: {
+            Button(action: action) {
                 Label("Back", systemImage: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spai(.ghost, size: .small))
             .accessibilityLabel("Back to session list")
             Spacer()
         }
     }
 
-    private var comparisonHeader: some View {
-        HStack {
-            Button {
-                comparePair = nil
-                isComparing = false
-                compareSelectionIDs.removeAll()
-            } label: {
-                Label("Back", systemImage: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
-            .accessibilityLabel("Back to session list")
-            Spacer()
-        }
-    }
+    // MARK: - List
 
     private var listView: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            HStack {
-                Text("SESSION HISTORY")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.85))
-                Spacer()
-                Text("\(appModel.history.records.count) saved")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+            PanelHeader("Session History", icon: "clock.arrow.circlepath", tint: SPAIColor.accent) {
+                SPAIChip(text: "\(appModel.history.records.count) saved", tint: Color.white.opacity(0.75))
             }
 
             if isSupervisor {
@@ -97,8 +75,8 @@ struct SessionHistoryPanel: View {
             }
 
             if isObserver {
-                Text("Pick a session to step through what happened.")
-                    .font(.system(size: 13))
+                Label("Pick a session to step through what happened.", systemImage: "play.rectangle.fill")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(SPAIColor.accent)
             }
 
@@ -107,10 +85,19 @@ struct SessionHistoryPanel: View {
             }
 
             if appModel.history.records.isEmpty {
-                Text("No sessions yet. Complete a workflow to save one.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .padding(.vertical, SPAISpacing.l)
+                VStack(spacing: 10) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 30, weight: .light))
+                        .foregroundStyle(SPAIColor.textTertiary)
+                    Text("No sessions yet")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(SPAIColor.textSecondary)
+                    Text("Complete a workflow to save one.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(SPAIColor.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, SPAISpacing.l)
             } else {
                 ScrollView {
                     VStack(spacing: SPAISpacing.s) {
@@ -119,6 +106,7 @@ struct SessionHistoryPanel: View {
                         }
                     }
                 }
+                .scrollIndicators(.hidden)
                 .frame(maxHeight: 300)
 
                 if isComparing {
@@ -135,18 +123,16 @@ struct SessionHistoryPanel: View {
                 compareSelectionIDs.removeAll()
             } label: {
                 Label(isComparing ? "Cancel Compare" : "Compare Sessions",
-                      systemImage: "square.split.2x1")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isComparing ? SPAIColor.warning : SPAIColor.accent)
+                      systemImage: isComparing ? "xmark" : "square.split.2x1")
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spai(isComparing ? .tinted(SPAIColor.warning) : .tinted(SPAIColor.accent), size: .small))
             .accessibilityLabel(isComparing ? "Cancel comparing sessions" : "Compare two sessions")
             Spacer()
             if isComparing {
                 Text("\(compareSelectionIDs.count)/2 selected")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(SPAIColor.textTertiary)
             }
         }
     }
@@ -161,16 +147,9 @@ struct SessionHistoryPanel: View {
             guard records.count == 2 else { return }
             comparePair = ComparisonPair(a: records[0], b: records[1])
         } label: {
-            Text("Compare Selected")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, SPAISpacing.s + 2)
-                .background(ready ? SPAIColor.primary : SPAIColor.neutralMid.opacity(0.3),
-                            in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            Label("Compare Selected", systemImage: "square.split.2x1.fill")
         }
-        .buttonStyle(.plain)
-        .spaiHitTarget()
+        .buttonStyle(.spai(.primary, fullWidth: true))
         .disabled(!ready)
         .accessibilityLabel(ready ? "Compare selected sessions" : "Select two sessions to compare")
     }
@@ -190,77 +169,92 @@ struct SessionHistoryPanel: View {
         let rate = Int(appModel.history.passRate * 100)
         let passed = appModel.history.records.filter { $0.passed }.count
         let total = appModel.history.records.count
+        let rateColor = rate >= 80 ? SPAIColor.safe : SPAIColor.warning
 
-        return HStack(spacing: SPAISpacing.xl) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("PASS RATE")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+        return HStack(spacing: SPAISpacing.l) {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.08), lineWidth: 7)
+                Circle()
+                    .trim(from: 0, to: total == 0 ? 0 : CGFloat(appModel.history.passRate))
+                    .stroke(rateColor, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .shadow(color: rateColor.opacity(0.5), radius: 4)
                 Text(total == 0 ? "—" : "\(rate)%")
-                    .font(.system(size: 26, weight: .bold, design: .monospaced))
-                    .foregroundStyle(rate >= 80 ? SPAIColor.safe : SPAIColor.warning)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(total == 0 ? SPAIColor.textTertiary : rateColor)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("SESSIONS")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+            .frame(width: 68, height: 68)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Pass rate")
+                    .spaiEyebrow()
                 Text("\(passed) of \(total) passed")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(SPAIColor.textPrimary)
+                Text(rate >= 80 ? "On target" : "Below the 80% target")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(total == 0 ? SPAIColor.textTertiary : rateColor)
             }
             Spacer()
         }
         .padding(SPAISpacing.m)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+        .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
+                .strokeBorder(SPAIColor.hairline, lineWidth: 1)
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Pass rate \(total == 0 ? "not available" : "\(rate) percent"). \(passed) of \(total) sessions passed.")
     }
+
+    // MARK: - Replay (observer)
 
     private func replayView(_ record: SessionRecord) -> some View {
         let events = record.events.reversed().map { $0 }   // oldest first for replay
         let safeIndex = min(replayIndex, max(events.count - 1, 0))
 
         return VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            HStack {
-                Text("REPLAY · \(record.dateText)")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(.white.opacity(0.8))
-                Spacer()
+            PanelHeader("Replay", icon: "play.rectangle.fill", tint: SPAIColor.accent) {
                 Text(events.isEmpty ? "—" : "\(safeIndex + 1) of \(events.count)")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
                     .foregroundStyle(SPAIColor.accent)
             }
+
+            Text(record.dateText)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(SPAIColor.textTertiary)
 
             if events.isEmpty {
                 Text("No events recorded in this session.")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(SPAIColor.textSecondary)
             } else {
+                ConfidenceBar(value: Double(safeIndex + 1) / Double(events.count), color: SPAIColor.accent)
+
                 Text(events[safeIndex])
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SPAIColor.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(SPAISpacing.m)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(eventTint(events[safeIndex]).opacity(0.18),
-                                in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                    .background(eventTint(events[safeIndex]).opacity(0.16),
+                                in: RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous)
+                            .strokeBorder(eventTint(events[safeIndex]).opacity(0.4), lineWidth: 1)
+                    }
                     .accessibilityLabel("Event \(safeIndex + 1) of \(events.count). \(events[safeIndex])")
 
-                HStack(spacing: SPAISpacing.m) {
+                HStack(spacing: SPAISpacing.s) {
                     Button {
                         replayIndex = max(0, safeIndex - 1)
                     } label: {
                         Label("Previous", systemImage: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, SPAISpacing.m)
-                            .padding(.vertical, SPAISpacing.s)
-                            .background(SPAIColor.neutralMid.opacity(0.5),
-                                        in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
-                    .buttonStyle(.plain)
-                    .spaiHitTarget()
+                    .buttonStyle(.spai(.glass))
                     .disabled(safeIndex == 0)
                     .accessibilityLabel("Previous event")
 
@@ -268,24 +262,14 @@ struct SessionHistoryPanel: View {
                         replayIndex = min(events.count - 1, safeIndex + 1)
                     } label: {
                         Label("Next", systemImage: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, SPAISpacing.m)
-                            .padding(.vertical, SPAISpacing.s)
-                            .background(SPAIColor.primary,
-                                        in: RoundedRectangle(cornerRadius: SPAIRadius.small))
                     }
-                    .buttonStyle(.plain)
-                    .spaiHitTarget()
+                    .buttonStyle(.spai(.primary))
                     .disabled(safeIndex >= events.count - 1)
                     .accessibilityLabel("Next event")
 
                     Spacer()
 
-                    Label(record.passed ? "Passed" : "Failed",
-                          systemImage: record.passed ? "checkmark.seal.fill" : "xmark.seal.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(record.passed ? SPAIColor.safe : SPAIColor.critical)
+                    resultChip(record.passed)
                 }
             }
         }
@@ -299,8 +283,17 @@ struct SessionHistoryPanel: View {
         return SPAIColor.neutralMid
     }
 
+    private func resultChip(_ passed: Bool) -> some View {
+        SPAIChip(text: passed ? "Passed" : "Failed",
+                 icon: passed ? "checkmark.seal.fill" : "xmark.seal.fill",
+                 tint: passed ? SPAIColor.safe : SPAIColor.critical)
+    }
+
+    // MARK: - Row
+
     private func row(_ record: SessionRecord) -> some View {
         let isSelected = compareSelectionIDs.contains(record.id)
+        let tint = record.passed ? SPAIColor.safe : SPAIColor.critical
         return Button {
             if isComparing {
                 toggleCompareSelection(record)
@@ -312,45 +305,51 @@ struct SessionHistoryPanel: View {
             HStack(spacing: SPAISpacing.m) {
                 if isComparing {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(isSelected ? SPAIColor.accent : .white.opacity(0.4))
+                        .font(.system(size: 18))
+                        .foregroundStyle(isSelected ? SPAIColor.accent : Color.white.opacity(0.4))
                 }
                 Image(systemName: record.passed ? "checkmark.seal.fill" : "xmark.seal.fill")
-                    .foregroundStyle(record.passed ? SPAIColor.safe : SPAIColor.critical)
-                VStack(alignment: .leading, spacing: 2) {
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 36, height: 36)
+                    .background(tint.opacity(0.14), in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
                     Text(record.dateText)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(SPAIColor.textPrimary)
                     Text("\(record.passed ? "Passed" : "Failed") · \(record.contaminationCount) events · \(record.durationText) · \(record.role)")
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(SPAIColor.textTertiary)
+                        .lineLimit(1)
                 }
                 Spacer()
                 if !isComparing {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(SPAIColor.textTertiary)
                 }
             }
-            .padding(SPAISpacing.m)
-            .background(isSelected ? SPAIColor.accent.opacity(0.18) : .white.opacity(0.06),
-                        in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+            .padding(12)
+            .background(isSelected ? SPAIColor.accent.opacity(0.16) : SPAIColor.surface,
+                        in: RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous)
+                    .strokeBorder(isSelected ? SPAIColor.accent.opacity(0.5) : SPAIColor.hairline, lineWidth: 1)
+            }
         }
         .buttonStyle(.plain)
         .spaiHitTarget()
         .accessibilityLabel("\(record.dateText). \(record.passed ? "Passed" : "Failed"). \(record.contaminationCount) contamination events. Duration \(record.durationText). Run as \(record.role). \(isComparing ? (isSelected ? "Selected for comparison." : "Tap to select for comparison.") : (isObserver ? "Opens replay." : "Opens report."))")
     }
 
+    // MARK: - Comparison
+
     private func comparisonView(_ pair: ComparisonPair) -> some View {
         VStack(alignment: .leading, spacing: SPAISpacing.l) {
-            Text("SESSION COMPARISON")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.85))
+            PanelHeader("Session Comparison", icon: "square.split.2x1.fill", tint: SPAIColor.accent)
 
-            HStack(alignment: .top, spacing: SPAISpacing.l) {
+            HStack(alignment: .top, spacing: SPAISpacing.m) {
                 comparisonColumn(pair.a)
-                Rectangle().fill(.white.opacity(0.15)).frame(width: 1)
                 comparisonColumn(pair.b)
             }
         }
@@ -362,30 +361,36 @@ struct SessionHistoryPanel: View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             Text(record.dateText)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(SPAIColor.textTertiary)
 
-            Label(record.passed ? "Passed" : "Failed",
-                  systemImage: record.passed ? "checkmark.seal.fill" : "xmark.seal.fill")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(record.passed ? SPAIColor.safe : SPAIColor.critical)
+            resultChip(record.passed)
 
             comparisonStat("Contamination", "\(record.contaminationCount)")
             comparisonStat("Duration", record.durationText)
             comparisonStat("Role", record.role)
         }
+        .padding(SPAISpacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
+                .strokeBorder(SPAIColor.hairline, lineWidth: 1)
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(record.dateText). \(record.passed ? "Passed" : "Failed"). \(record.contaminationCount) contamination events. Duration \(record.durationText). Run as \(record.role).")
     }
 
     private func comparisonStat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.6))
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.9)
+                .textCase(.uppercase)
+                .foregroundStyle(SPAIColor.textTertiary)
             Text(value)
-                .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(SPAIColor.textPrimary)
         }
     }
 }
@@ -402,61 +407,57 @@ private struct ComparisonPair: Equatable {
 struct SavedReportView: View {
     let record: SessionRecord
 
+    private var tint: Color { record.passed ? SPAIColor.safe : SPAIColor.critical }
+
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.l) {
             HStack(spacing: SPAISpacing.m) {
                 Image(systemName: record.passed ? "checkmark.seal.fill" : "xmark.seal.fill")
-                    .font(.system(size: 30))
-                    .foregroundStyle(record.passed ? SPAIColor.safe : SPAIColor.critical)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.passed ? "SESSION PASSED" : "SESSION FAILED")
-                        .font(.system(size: 18, weight: .bold, design: .monospaced))
-                        .foregroundStyle(record.passed ? SPAIColor.safe : SPAIColor.critical)
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 58, height: 58)
+                    .background(tint.opacity(0.14), in: Circle())
+                    .shadow(color: tint.opacity(0.4), radius: 10)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(record.passed ? "Session passed" : "Session failed")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(SPAIColor.textPrimary)
                     Text(record.dateText)
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(SPAIColor.textSecondary)
                     Text("Run as \(record.role)")
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(SPAIColor.textTertiary)
                 }
             }
 
-            HStack(spacing: SPAISpacing.xl) {
-                stat("Contamination", "\(record.contaminationCount)")
-                stat("Duration", record.durationText)
+            HStack(spacing: 10) {
+                MetricTile(label: "Contamination", value: "\(record.contaminationCount)",
+                           icon: "exclamationmark.triangle.fill", tint: tint)
+                MetricTile(label: "Duration", value: record.durationText,
+                           icon: "clock.fill", tint: SPAIColor.accent)
             }
 
-            Divider().overlay(.white.opacity(0.3))
-
-            Text("EVENT HISTORY")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.7))
+            Text("Event history")
+                .spaiEyebrow()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     ForEach(record.events, id: \.self) { event in
                         Text(event)
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.85))
+                            .foregroundStyle(SPAIColor.textSecondary)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollIndicators(.hidden)
             .frame(maxHeight: 200)
+            .padding(12)
+            .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous))
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Saved report. Session \(record.passed ? "passed" : "failed"). \(record.contaminationCount) contamination events. Duration \(record.durationText). Run as \(record.role).")
-    }
-
-    private func stat(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.75))
-            Text(value)
-                .font(.system(size: 21, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white)
-        }
     }
 }
 

@@ -42,25 +42,23 @@ struct WristMenuPanel: View {
 
     @ViewBuilder
     private var panelContent: some View {
-        VStack(spacing: SPAISpacing.s + 4) {
-            HStack(spacing: SPAISpacing.s) {
-                quickButton(label: "Reset", systemImage: "arrow.counterclockwise", tint: SPAIColor.primary) {
-                    appModel.resetWorkflow()
-                }
-                quickButton(label: "History", systemImage: "clock.arrow.circlepath", tint: SPAIColor.accent) {
-                    appModel.toggleVisibility("history")
-                }
-                quickButton(label: "Chat", systemImage: "bubble.left.and.bubble.right.fill", tint: SPAIColor.safe) {
-                    appModel.toggleVisibility("chat")
-                }
-                quickButton(label: "Settings", systemImage: "gearshape.fill", tint: .white) {
-                    openWindow(id: "settings")
-                }
+        HStack(spacing: 10) {
+            quickButton(label: "Reset", systemImage: "arrow.counterclockwise", tint: SPAIColor.primary) {
+                appModel.resetWorkflow()
+            }
+            quickButton(label: "History", systemImage: "clock.arrow.circlepath", tint: SPAIColor.accent) {
+                appModel.toggleVisibility("history")
+            }
+            quickButton(label: "Ask SPAI", systemImage: "sparkles", tint: SPAIColor.secondary) {
+                appModel.toggleVisibility("chat")
+            }
+            quickButton(label: "Settings", systemImage: "gearshape.fill", tint: .white) {
+                openWindow(id: "settings")
             }
         }
-        .padding(SPAISpacing.s)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .padding(8)
+        .spaiPanelBackground(opacity: appModel.panelOpacity, cornerRadius: 34)
+        .ledBorder(cornerRadius: 34, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Wrist quick actions")
     }
@@ -68,17 +66,8 @@ struct WristMenuPanel: View {
     private func quickButton(label: String, systemImage: String, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 30, height: 30)
-                .background(tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                .overlay {
-                    RoundedRectangle(cornerRadius: SPAIRadius.small)
-                        .stroke(tint.opacity(0.5), lineWidth: 1)
-                }
         }
-        .buttonStyle(.plain)
-        .spaiHitTarget()
+        .buttonStyle(.spaiIcon(tint: tint, size: 44))
         .help(label)
         .accessibilityLabel(label)
     }
@@ -87,6 +76,7 @@ struct WristMenuPanel: View {
 // MARK: - Preview
 #Preview("Wrist Menu Panel") {
     WristMenuPanel(isHandVisibleProvider: { true })
+        .environment(AppModel())
         .padding(40)
         .background(.black)
 }

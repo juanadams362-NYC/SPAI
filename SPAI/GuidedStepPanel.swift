@@ -47,30 +47,27 @@ struct GuidedStepPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
-            HStack {
-                Text("GUIDED · \(appModel.currentStep.title.uppercased())")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.8))
-                Spacer()
+            PanelHeader("Guided · \(appModel.currentStep.title)", icon: appModel.currentStep.icon, tint: SPAIColor.primary) {
                 Text("Step \(guidedIndex + 1) of \(script.count)")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(SPAIColor.accent)
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(SPAIColor.primaryBright)
             }
 
+            stepMeter
+
             Text(step.instruction)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white)
+                .font(.system(size: 18, weight: .medium))
+                .lineSpacing(3)
+                .foregroundStyle(SPAIColor.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
+                .id(guidedIndex)
+                .transition(AnyTransition.opacity.combined(with: AnyTransition.offset(y: 8)))
 
             HStack(spacing: SPAISpacing.s) {
-                Image(systemName: verificationIcon)
-                    .foregroundStyle(satisfied ? SPAIColor.safe : SPAIColor.warning)
-                Text(verificationText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.85))
+                verificationChip
 
-                Spacer()
+                Spacer(minLength: 8)
 
                 Button {
                     if isLast {
@@ -80,25 +77,18 @@ struct GuidedStepPanel: View {
                     }
                 } label: {
                     Label(isLast ? "Finish Station" : "Next Step",
-                          systemImage: isLast ? "checkmark.seal" : "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, SPAISpacing.m)
-                        .padding(.vertical, SPAISpacing.s)
-                        .background(satisfied ? SPAIColor.primary : SPAIColor.neutralMid.opacity(0.4),
-                                    in: RoundedRectangle(cornerRadius: SPAIRadius.small))
+                          systemImage: isLast ? "checkmark.seal.fill" : "arrow.right")
                 }
-                .buttonStyle(.plain)
-                .spaiHitTarget()
+                .buttonStyle(.spai(.primary))
                 .disabled(!satisfied)
                 .accessibilityLabel(isLast ? "Finish station" : "Next step")
                 .accessibilityHint(satisfied ? "Ready" : "Waiting for detection to confirm this step")
             }
         }
         .padding(SPAISpacing.l)
-        .frame(width: 380)
+        .frame(width: 400)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .ledBorder(appModel.isHalted ? .critical : .normal, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
         .animation(.easeInOut(duration: 0.25), value: appModel.guidedStepIndex)
         .onChange(of: detectionService.resultRevision) { _, _ in
             recordVerificationSample()
@@ -192,6 +182,62 @@ struct GuidedStepPanel: View {
         } else {
             appModel.advanceGuidedStep()
         }
+    }
+
+    // MARK: - Visual pieces
+
+    /// One segment per instruction in this station's script.
+    private var stepMeter: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<script.count, id: \.self) { index in
+                Capsule()
+                    .fill(index <= guidedIndex
+                          ? AnyShapeStyle(SPAIGradient.brand)
+                          : AnyShapeStyle(Color.white.opacity(0.14)))
+                    .frame(height: 5)
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: guidedIndex)
+        .accessibilityHidden(true)
+    }
+
+    private var verificationTint: Color {
+        if step.condition == .manual { return SPAIColor.accent }
+        if satisfied { return SPAIColor.safe }
+        return Color.white.opacity(0.72)
+    }
+
+    private var verificationChip: some View {
+        HStack(spacing: 8) {
+            if isManualStep && voiceConfirm.isListening {
+                Image(systemName: "waveform")
+                    .font(.system(size: 13, weight: .bold))
+                    .symbolEffect(.variableColor.iterative)
+            } else {
+                Image(systemName: verificationIcon)
+                    .font(.system(size: 13, weight: .bold))
+            }
+            Text(verificationText)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            if step.condition != .manual {
+                HStack(spacing: 3) {
+                    ForEach(0..<requiredVerifiedSamples, id: \.self) { index in
+                        Capsule()
+                            .fill(index < consecutiveVerifiedSamples ? SPAIColor.safe : Color.white.opacity(0.2))
+                            .frame(width: 10, height: 5)
+                    }
+                }
+            }
+        }
+        .foregroundStyle(verificationTint)
+        .padding(.horizontal, 12)
+        .frame(height: 36)
+        .background(verificationTint.opacity(0.12), in: Capsule())
+        .overlay { Capsule().strokeBorder(verificationTint.opacity(0.3), lineWidth: 1) }
+        .animation(.easeInOut(duration: 0.2), value: consecutiveVerifiedSamples)
+        .animation(.easeInOut(duration: 0.2), value: satisfied)
     }
 
     private var verificationIcon: String {

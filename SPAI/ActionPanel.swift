@@ -20,14 +20,14 @@ struct ActionPanel: View {
     @State private var expandedID: UUID?
 
     var body: some View {
-        VStack(spacing: SPAISpacing.s + 4) {
+        VStack(spacing: 10) {
             ForEach(actions) { action in
                 actionButton(action)
             }
         }
-        .padding(SPAISpacing.s + 4)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .padding(10)
+        .spaiPanelBackground(opacity: appModel.panelOpacity, cornerRadius: 36)
+        .ledBorder(cornerRadius: 36, lineWidth: 1.5)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Quick actions")
     }
@@ -37,14 +37,20 @@ struct ActionPanel: View {
 
         return HStack(spacing: SPAISpacing.s) {
             if isExpanded {
-                Text(action.label)
-                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, SPAISpacing.m)
-                    .padding(.vertical, SPAISpacing.s)
-                    .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                    .accessibilityHidden(true)
+                HStack(spacing: 6) {
+                    Text(action.label)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(SPAIColor.textPrimary)
+                    Text("· tap again")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(SPAIColor.textTertiary)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 40)
+                .background(action.tint.opacity(0.2), in: Capsule())
+                .overlay { Capsule().strokeBorder(action.tint.opacity(0.45), lineWidth: 1) }
+                .transition(AnyTransition.move(edge: .trailing).combined(with: AnyTransition.opacity))
+                .accessibilityHidden(true)
             }
 
             Button {
@@ -52,21 +58,12 @@ struct ActionPanel: View {
                     action.action()
                     withAnimation(.easeOut(duration: 0.2)) { expandedID = nil }
                 } else {
-                    withAnimation(.easeOut(duration: 0.2)) { expandedID = action.id }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { expandedID = action.id }
                 }
             } label: {
                 Image(systemName: action.icon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(action.tint)
-                    .frame(width: 52, height: 52)
-                    .background(action.tint.opacity(0.22), in: RoundedRectangle(cornerRadius: SPAIRadius.medium))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SPAIRadius.medium)
-                            .stroke(action.tint.opacity(0.5), lineWidth: 1)
-                    }
             }
-            .buttonStyle(.plain)
-            .spaiHitTarget()
+            .buttonStyle(.spaiIcon(tint: action.tint, size: 52, filled: isExpanded))
             // Icon-only buttons read as nothing to VoiceOver, and this one
             // needs two taps, so say what each tap does.
             .accessibilityLabel(action.label)
@@ -81,6 +78,7 @@ struct ActionPanel: View {
         QuickAction(label: "Compliance", icon: "checkmark.shield.fill", tint: SPAIColor.safe, action: {}),
         QuickAction(label: "Event Log", icon: "waveform.path.ecg", tint: SPAIColor.accent, action: {})
     ])
+    .environment(AppModel())
     .padding(60)
     .background(.black)
 }

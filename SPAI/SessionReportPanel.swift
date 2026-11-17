@@ -9,7 +9,10 @@ import SwiftUI
 struct SessionReportPanel: View {
     @Environment(AppModel.self) private var appModel
 
+    @State private var celebrate = false
+
     private var passed: Bool { appModel.contaminationCount == 0 }
+    private var tint: Color { passed ? SPAIColor.safe : SPAIColor.critical }
 
     private var duration: String {
         let seconds = Int(Date().timeIntervalSince(appModel.sessionStart))
@@ -17,83 +20,98 @@ struct SessionReportPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SPAISpacing.l) {
-            HStack(spacing: SPAISpacing.m) {
-                Image(systemName: passed ? "checkmark.seal.fill" : "xmark.seal.fill")
-                    .font(.system(size: 34))
-                    .foregroundStyle(passed ? SPAIColor.safe : SPAIColor.critical)
+        VStack(spacing: SPAISpacing.l) {
+            hero
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(passed ? "SESSION PASSED" : "SESSION FAILED")
-                        .font(.system(size: 18, weight: .bold, design: .monospaced))
-                        .foregroundStyle(passed ? SPAIColor.safe : SPAIColor.critical)
-                    Text("Compliance report")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
+            HStack(spacing: 10) {
+                MetricTile(label: "Stations",
+                           value: "\(SterileStep.allCases.count)/\(SterileStep.allCases.count)",
+                           icon: "checklist", tint: SPAIColor.primary)
+                MetricTile(label: "Contamination",
+                           value: "\(appModel.contaminationCount)",
+                           icon: "exclamationmark.triangle.fill",
+                           tint: passed ? SPAIColor.safe : SPAIColor.critical,
+                           valueColor: passed ? SPAIColor.textPrimary : SPAIColor.critical)
+                MetricTile(label: "Time", value: duration, icon: "clock.fill", tint: SPAIColor.accent)
             }
-
-            Divider().overlay(.white.opacity(0.2))
-
-            reportRow(icon: "checklist", label: "Steps completed",
-                      value: "\(SterileStep.allCases.count) of \(SterileStep.allCases.count)")
-            reportRow(icon: "exclamationmark.triangle.fill", label: "Contamination events",
-                      value: "\(appModel.contaminationCount)",
-                      valueColor: passed ? .white : SPAIColor.critical)
-            reportRow(icon: "clock.fill", label: "Session time", value: duration)
-
-            Divider().overlay(.white.opacity(0.2))
 
             VStack(alignment: .leading, spacing: SPAISpacing.s) {
-                Text("EVENT HISTORY")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.5))
+                Text("Event history")
+                    .spaiEyebrow()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 6) {
                         ForEach(appModel.eventLog) { event in
-                            Text("\(event.timestamp)  \(event.message)")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.7))
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Circle()
+                                    .fill(event.kind.color)
+                                    .frame(width: 6, height: 6)
+                                Text(event.timestamp)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .monospacedDigit()
+                                    .foregroundStyle(SPAIColor.textTertiary)
+                                Text(event.message)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(SPAIColor.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .scrollIndicators(.hidden)
                 .frame(maxHeight: 130)
+                .padding(12)
+                .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.small, style: .continuous))
             }
 
-            HStack {
-                Spacer()
-                Button {
-                    appModel.resetWorkflow()
-                } label: {
-                    Label("New Session", systemImage: "arrow.clockwise")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, SPAISpacing.l)
-                        .padding(.vertical, SPAISpacing.s + 2)
-                        .background(SPAIColor.primary, in: RoundedRectangle(cornerRadius: SPAIRadius.small))
-                }
-                .buttonStyle(.plain)
-                .spaiHitTarget()
+            Button {
+                appModel.resetWorkflow()
+            } label: {
+                Label("New Session", systemImage: "arrow.clockwise")
             }
+            .buttonStyle(.spai(.primary, fullWidth: true))
         }
         .padding(SPAISpacing.l)
-        .frame(width: 420)
+        .frame(width: 440)
         .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .ledBorder(passed ? .normal : .warning, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .onAppear { celebrate = true }
+        .onChange(of: appModel.sessionComplete) { _, complete in
+            celebrate = complete
+        }
     }
 
-    private func reportRow(icon: String, label: String, value: String, valueColor: Color = .white) -> some View {
-        HStack {
-            Label(label, systemImage: icon)
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.7))
-            Spacer()
-            Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundStyle(valueColor)
+    private var hero: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [tint.opacity(0.45), tint.opacity(0)],
+                                         center: .center, startRadius: 0, endRadius: 70))
+                    .frame(width: 140, height: 140)
+                    .scaleEffect(celebrate ? 1 : 0.6)
+                    .opacity(celebrate ? 1 : 0)
+                Image(systemName: passed ? "checkmark.seal.fill" : "xmark.seal.fill")
+                    .font(.system(size: 60, weight: .semibold))
+                    .foregroundStyle(passed ? AnyShapeStyle(SPAIGradient.success) : AnyShapeStyle(SPAIGradient.danger))
+                    .symbolEffect(.bounce, value: celebrate)
+                    .shadow(color: tint.opacity(0.6), radius: 14)
+            }
+            .frame(height: 120)
+            .animation(.spring(response: 0.6, dampingFraction: 0.7), value: celebrate)
+
+            Text(passed ? "Session passed" : "Session failed")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(SPAIColor.textPrimary)
+            Text(passed
+                 ? "All five stations completed with zero contamination events."
+                 : "Completed with \(appModel.contaminationCount) contamination event\(appModel.contaminationCount == 1 ? "" : "s"). Review the history below.")
+                .font(.system(size: 14))
+                .foregroundStyle(SPAIColor.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
