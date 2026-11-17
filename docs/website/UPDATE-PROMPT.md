@@ -1,7 +1,7 @@
 # Prompt: update spai-vision.pages.dev to match the current app
 
 Paste everything below the line into the session that edits the website.
-Fill in the three `[YOU FILL IN]` items first.
+Fill in the two `[YOU FILL IN]` items first.
 
 ---
 
@@ -32,7 +32,7 @@ Update my website, spai-vision.pages.dev, so it describes SPAI as it works today
 
 ### Gloves + hands model
 
-- Keep its 93.6 mAP50 score. The site calls it "v2" on most pages and "v3" on the Try page. The correct label is **[YOU FILL IN: v2 or v3]**; use it everywhere.
+- The app ships the **v3** glove + hands model: **94.8 mAP50** on its validation set (50 epochs). The 93.6 on the site is the older v2 model. Use "v3 · 94.8" everywhere, including the Try page; if the Try page's in-browser demo still runs v2, say so there.
 
 ### For students (in the headset)
 

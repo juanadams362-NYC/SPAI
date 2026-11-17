@@ -57,8 +57,8 @@ depends on the headset camera entitlement or on perfect Wi-Fi.
 ## Questions you'll get, and honest answers
 
 - **"How accurate is it?"** Instrument naming: 89% on held-out tray photos,
-  72% on handheld-style images. Glove check: 93.6 mAP50 on its validation
-  set. Real-world accuracy in your lab is what the pilot measures.
+  72% on handheld-style images. Glove check: 94.8 mAP50 on its validation
+  set (v3). Real-world accuracy in your lab is what the pilot measures.
 - **"What about student privacy?"** Video stays on the headset. We store
   names, runs and scores, separate per school, deletable any time. Ask
   SPAI sends questions (no images, no names) to Google Gemini.
