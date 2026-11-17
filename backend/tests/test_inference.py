@@ -50,8 +50,14 @@ def test_non_overlapping_boxes_never_conflict():
     assert resolve_overlaps([]) == []
 
 
+def test_tie_goes_to_glove():
+    # Same confidence, same place: the frame is not treated as a bare hand.
+    out = resolve_overlaps([det("hand", 0.6, [0, 0, 100, 100]), det("glove", 0.6, [2, 2, 100, 100])])
+    assert names(out) == [("glove", 0.6)]
+
+
 def test_detector_configuration():
     assert Detector.arbitrate_overlaps is True
-    tray = TrayDetector()
-    assert tray.agnostic_nms is True and tray.arbitrate_overlaps is False
+    # Named instruments can genuinely overlap on a tray, so they are never merged.
+    assert TrayDetector.arbitrate_overlaps is False
     assert "overlap_arbitration" in Detector().status()

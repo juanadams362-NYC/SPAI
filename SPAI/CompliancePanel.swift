@@ -45,8 +45,7 @@ struct CompliancePanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 360)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel()
     }
 
     private var complianceHeadline: some View {

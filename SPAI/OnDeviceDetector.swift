@@ -33,8 +33,8 @@ final class OnDeviceDetector {
     var isAvailable: Bool { ppeModel != nil }
     var hasInstruments: Bool { instrumentModel != nil }
 
-    /// PPE detection — gloves and hands. Returns candidates from 0.2 so DetectionService can
-    /// arbitrate duplicate glove/hand labels before applying its 0.5 reporting threshold.
+    /// PPE detection — gloves and hands. Returns candidates from 0.2 so DetectionService
+    /// can resolve duplicate glove/hand labels before its 0.5 reporting threshold.
     func detect(image: UIImage) async -> [BackendDetection] {
         guard let ppeModel else { return [] }
         return await run(ppeModel, on: image, minConfidence: 0.2) { label in
@@ -42,9 +42,25 @@ final class OnDeviceDetector {
         }
     }
 
+    /// Instrument detection. Each hit comes back under its catalog display
+    /// name with its catalog key, matching what the backend's instrument
+    /// endpoints return, so the rest of the app treats both sources alike.
     func detectInstruments(image: UIImage) async -> [BackendDetection] {
         guard let instrumentModel else { return [] }
-        return await run(instrumentModel, on: image, minConfidence: 0.5) { _ in 0 }
+        let raw = await run(instrumentModel, on: image, minConfidence: 0.5) { label in
+            let key = InstrumentCatalog.key(for: label)
+            return InstrumentCatalog.all.firstIndex { $0.key == key } ?? 0
+        }
+        return raw.map { detection in
+            BackendDetection(
+                classId: detection.classId,
+                className: InstrumentCatalog.displayName(for: detection.className),
+                confidence: detection.confidence,
+                box: detection.box,
+                key: InstrumentCatalog.key(for: detection.className),
+                category: InstrumentCatalog.genericLabel
+            )
+        }
     }
 
     private func run(

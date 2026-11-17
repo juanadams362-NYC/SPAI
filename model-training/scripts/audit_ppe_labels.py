@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""audit_labels.py — find (and optionally fix) the label problems behind glove/hand confusion.
+"""audit_ppe_labels.py — find (and optionally fix) the label problems behind glove/hand confusion.
 
 Why this exists
 ---------------
@@ -21,9 +21,9 @@ What it does
 
 Usage
 -----
-    python audit_labels.py datasets/merged
-    python audit_labels.py datasets/merged --fix --out datasets/merged_clean
-    python audit_labels.py datasets/merged --model ../../backend/model/best.pt --conf 0.5
+    python audit_ppe_labels.py ../datasets/merged
+    python audit_ppe_labels.py ../datasets/merged --fix --out ../datasets/merged_clean
+    python audit_ppe_labels.py ../datasets/merged --model ../../backend/model/best.pt --conf 0.5
 
 The dataset must use the standard YOLO layout: images/{train,val,test} + labels/{...}.
 """

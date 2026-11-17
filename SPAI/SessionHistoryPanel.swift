@@ -43,8 +43,7 @@ struct SessionHistoryPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: comparePair != nil ? 540 : 420)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.history)
         .animation(.easeInOut(duration: 0.2), value: selected != nil)
         .animation(.easeInOut(duration: 0.2), value: comparePair != nil)
         .accessibilityElement(children: .contain)
@@ -130,7 +129,7 @@ struct SessionHistoryPanel: View {
             Spacer()
             if isComparing {
                 Text("\(compareSelectionIDs.count)/2 selected")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(SPAIFont.caption.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(SPAIColor.textTertiary)
             }
@@ -194,7 +193,7 @@ struct SessionHistoryPanel: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(SPAIColor.textPrimary)
                 Text(rate >= 80 ? "On target" : "Below the 80% target")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(SPAIFont.caption.weight(.medium))
                     .foregroundStyle(total == 0 ? SPAIColor.textTertiary : rateColor)
             }
             Spacer()
@@ -218,7 +217,7 @@ struct SessionHistoryPanel: View {
         return VStack(alignment: .leading, spacing: SPAISpacing.m) {
             PanelHeader("Replay", icon: "play.rectangle.fill", tint: SPAIColor.accent) {
                 Text(events.isEmpty ? "—" : "\(safeIndex + 1) of \(events.count)")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(SPAIFont.caption.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(SPAIColor.accent)
             }
@@ -318,7 +317,7 @@ struct SessionHistoryPanel: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(SPAIColor.textPrimary)
                     Text("\(record.passed ? "Passed" : "Failed") · \(record.contaminationCount) events · \(record.durationText) · \(record.role)")
-                        .font(.system(size: 12))
+                        .font(SPAIFont.caption)
                         .foregroundStyle(SPAIColor.textTertiary)
                         .lineLimit(1)
                 }
@@ -360,7 +359,7 @@ struct SessionHistoryPanel: View {
     private func comparisonColumn(_ record: SessionRecord) -> some View {
         VStack(alignment: .leading, spacing: SPAISpacing.m) {
             Text(record.dateText)
-                .font(.system(size: 12, weight: .semibold))
+                .font(SPAIFont.caption.weight(.semibold))
                 .foregroundStyle(SPAIColor.textTertiary)
 
             resultChip(record.passed)
@@ -383,9 +382,7 @@ struct SessionHistoryPanel: View {
     private func comparisonStat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(0.9)
-                .textCase(.uppercase)
+                .font(SPAIFont.caption.weight(.semibold))
                 .foregroundStyle(SPAIColor.textTertiary)
             Text(value)
                 .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -426,13 +423,13 @@ struct SavedReportView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(SPAIColor.textSecondary)
                     Text("Run as \(record.role)")
-                        .font(.system(size: 12))
+                        .font(SPAIFont.caption)
                         .foregroundStyle(SPAIColor.textTertiary)
                 }
             }
 
             HStack(spacing: 10) {
-                MetricTile(label: "Contamination", value: "\(record.contaminationCount)",
+                MetricTile(label: "Alerts", value: "\(record.contaminationCount)",
                            icon: "exclamationmark.triangle.fill", tint: tint)
                 MetricTile(label: "Duration", value: record.durationText,
                            icon: "clock.fill", tint: SPAIColor.accent)
@@ -445,7 +442,7 @@ struct SavedReportView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     ForEach(record.events, id: \.self) { event in
                         Text(event)
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(SPAIFont.mono)
                             .foregroundStyle(SPAIColor.textSecondary)
                     }
                 }

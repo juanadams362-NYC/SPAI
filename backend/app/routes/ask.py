@@ -5,10 +5,11 @@ grounded answer. All prompt building lives in ask_spai.py, all provider
 stuff lives in llm_client.py, this file is just HTTP.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
+from app import protocol, security
 from app.ask_spai import ask_spai, STATION_SCRIPTS
 from app.llm_client import LLMError
 from app.logging_config import get_logger
@@ -25,7 +26,7 @@ class AskRequest(BaseModel):
 
 
 @router.post("/ask")
-async def ask(req: AskRequest) -> dict:
+async def ask(req: AskRequest, device: dict = Depends(security.current_device)) -> dict:
     # Bad station name is the caller's fault -> 400, not 500.
     if req.station not in STATION_SCRIPTS:
         raise HTTPException(
@@ -35,8 +36,9 @@ async def ask(req: AskRequest) -> dict:
 
     try:
         # requests is blocking, so run it in a worker thread same as inference.
+        steps = protocol.steps_for(protocol.for_org(device["org_id"]), req.station)
         answer = await run_in_threadpool(
-            ask_spai, req.station, req.step_index, req.detection_summary, req.question
+            ask_spai, req.station, req.step_index, req.detection_summary, req.question, steps
         )
     except LLMError as e:
         logger.error("LLM call failed: %s", e)

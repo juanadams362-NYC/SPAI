@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSEnterpriseMCAMUsageDescription</key>
+	<string>SPAI uses the headset camera to check gloves and recognise instruments while you work. Video stays on the headset.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>Allow local networking</key>

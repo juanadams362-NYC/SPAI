@@ -1,83 +1,119 @@
 import SwiftUI
-import simd
 
 #if os(visionOS)
-/// A floating quick-action menu that follows the user's wrist on device, with a simulator fallback.
-/// World placement (tracking the live wrist pose vs. a fixed fallback position) is owned by
-/// ImmersiveView, which repositions this attachment's RealityKit entity every frame — this view
-/// only decides whether it should be visible right now.
+/// Quick actions on the right wrist.
+///
+/// Turn the back of your right wrist toward you, like checking a watch, and
+/// this rises above it. Where it sits and when it shows are owned by
+/// `HandTrackingService`; this view is only what's drawn.
+///
+/// Every button carries a text label. The first version was four unlabelled
+/// 14pt glyphs, which nobody could decode at a glance — and a wrist menu is
+/// only ever looked at in glances.
 struct WristMenuPanel: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
-    let isHandVisibleProvider: () -> Bool
+    /// Fixed size in points, so the hand tracker knows exactly how much room
+    /// to leave between the menu and the arm.
+    static let size = CGSize(width: 212, height: 176)
 
-    @State private var lastVisibleAt: Date = .distantPast
-    private let visibilityHoldSeconds: TimeInterval = 0.3
+    private let columns = [GridItem(.fixed(88), spacing: SPAISpacing.s),
+                           GridItem(.fixed(88), spacing: SPAISpacing.s)]
 
     var body: some View {
-        panelContent
-            .opacity(shouldShowPanel ? 1 : 0)
-            .animation(.easeInOut(duration: 0.2), value: shouldShowPanel)
-    }
-
-    // MARK: - Derived State
-
-    private var isSimulator: Bool {
-        #if targetEnvironment(simulator)
-        return true
-        #else
-        return false
-        #endif
-    }
-
-    private var shouldShowPanel: Bool {
-        if isSimulator { return true }
-        let visible = isHandVisibleProvider()
-        if visible { lastVisibleAt = Date() }
-        return visible || Date().timeIntervalSince(lastVisibleAt) < visibilityHoldSeconds
-    }
-
-    // MARK: - Panel Content
-
-    @ViewBuilder
-    private var panelContent: some View {
-        HStack(spacing: 10) {
-            quickButton(label: "Reset", systemImage: "arrow.counterclockwise", tint: SPAIColor.primary) {
-                appModel.resetWorkflow()
+        LazyVGrid(columns: columns, spacing: SPAISpacing.s) {
+            quickButton("Ask SPAI", icon: "sparkles", tint: SPAIColor.secondary,
+                        isOn: appModel.isVisible(PanelID.chat)) {
+                appModel.toggleVisibility(PanelID.chat)
             }
-            quickButton(label: "History", systemImage: "clock.arrow.circlepath", tint: SPAIColor.accent) {
-                appModel.toggleVisibility("history")
+            quickButton("History", icon: "clock.arrow.circlepath", tint: SPAIColor.accent,
+                        isOn: appModel.isVisible(PanelID.history)) {
+                appModel.toggleVisibility(PanelID.history)
             }
-            quickButton(label: "Ask SPAI", systemImage: "sparkles", tint: SPAIColor.secondary) {
-                appModel.toggleVisibility("chat")
+            quickButton("Event Log", icon: "waveform.path.ecg", tint: SPAIColor.primary,
+                        isOn: appModel.isVisible(PanelID.eventLog)) {
+                appModel.toggleVisibility(PanelID.eventLog)
             }
-            quickButton(label: "Settings", systemImage: "gearshape.fill", tint: .white) {
-                openWindow(id: "settings")
+            quickButton("Settings", icon: "gearshape.fill", tint: .white,
+                        isOn: appModel.isSettingsWindowOpen) {
+                if appModel.isSettingsWindowOpen {
+                    dismissWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = false
+                } else {
+                    openWindow(id: "settings")
+                    appModel.isSettingsWindowOpen = true
+                }
             }
         }
-        .padding(8)
-        .spaiPanelBackground(opacity: appModel.panelOpacity, cornerRadius: 34)
-        .ledBorder(cornerRadius: 34, lineWidth: 1.5)
+        .padding(SPAISpacing.s + 4)
+        .frame(width: Self.size.width, height: Self.size.height)
+        .spaiWristBackground()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Wrist quick actions")
     }
 
-    private func quickButton(label: String, systemImage: String, tint: Color, action: @escaping () -> Void) -> some View {
+    private func quickButton(
+        _ label: String,
+        icon: String,
+        tint: Color,
+        isOn: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            Image(systemName: systemImage)
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(tint)
+                Text(label)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .frame(width: 88, height: 72)
+            .background(tint.opacity(isOn ? 0.34 : 0.14), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(tint.opacity(isOn ? 0.95 : 0.4), lineWidth: isOn ? 2 : 1)
+            }
+            .shadow(color: isOn ? tint.opacity(0.45) : .clear, radius: 8)
         }
-        .buttonStyle(.spaiIcon(tint: tint, size: 44))
-        .help(label)
+        .buttonStyle(.plain)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .hoverEffect(.highlight)
         .accessibilityLabel(label)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
 // MARK: - Preview
 #Preview("Wrist Menu Panel") {
-    WristMenuPanel(isHandVisibleProvider: { true })
+    WristMenuPanel()
         .environment(AppModel())
         .padding(40)
         .background(.black)
 }
 #endif
+
+extension View {
+    /// Background for the wrist menus.
+    ///
+    /// Deliberately near-opaque and ignores the panel-opacity setting: these
+    /// are read against a moving background of skin, sleeve, and bench, where
+    /// a translucent panel washes out.
+    func spaiWristBackground() -> some View {
+        self
+            .background(SPAIColor.ink.opacity(0.94),
+                        in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(colors: [SPAIColor.primaryBright.opacity(0.6), Color.white.opacity(0.2), SPAIColor.secondary.opacity(0.5)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        lineWidth: 1.5
+                    )
+            }
+    }
+}

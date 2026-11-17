@@ -14,9 +14,21 @@ The goal of SPAI is to help sterile processing students, technicians, and instru
 - Sterile prep step guidance
 - AI detection alerts
 - PPE and glove detection
-- Surgical tool detection
+- Instrument identification — hold one up and SPAI names it and says what to check
+- Pip, an in-room guide that hops onto the panel you need to look at
+- Focus layout — three panels by default, everything else on request
+- Watch-style wrist menus (left: stations, right: quick actions)
 - Mock live-feed demo mode
 - Future Core ML integration for on-device inference
+
+## For a pilot
+
+- Students sign in on the headset; assessed runs are scored and sent to the instructor
+- Instructor dashboard in a browser: roster, results, score trends, run reports, CSV export
+- Each institution can edit the station scripts, count sheet and scoring
+- Camera frames stay on the headset by default; a plain-language privacy statement is built in
+
+See [docs/pilot-guide.md](docs/pilot-guide.md).
 
 ## Tech Stack
 

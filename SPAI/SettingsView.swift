@@ -9,105 +9,32 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
 
     @AppStorage("backendURL") private var backendURL =  "http://127.0.0.1:8000"
-    @AppStorage("confidenceThreshold") private var confidenceThreshold = 0.25
     @AppStorage("streamingFPS") private var streamingFPS = 5.0
     @AppStorage("alwaysShowOnboarding") private var alwaysShowOnboarding = false
     @AppStorage("speakSteps") private var speakSteps = false
+    @AppStorage("detectOnDevice") private var detectOnDevice = true
+    @AppStorage("useHeadsetCamera") private var useHeadsetCamera = false
+    @AppStorage("voiceCommands") private var voiceCommands = true
+    @State private var connectionStatus: String?
+    @State private var school = SchoolConnection.shared
+    @State private var confirmDisconnect = false
 
-    @State private var pushStatus: String?
-    @State private var pushSucceeded = false
-    @State private var isPushing = false
     private let client = BackendClient()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                header
 
-            section("Detection", icon: "viewfinder", tint: SPAIColor.secondary) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Backend URL")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(SPAIColor.textSecondary)
-                    TextField("http://127.0.0.1:8000", text: $backendURL)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 14, design: .monospaced))
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .accessibilityLabel("Backend URL")
-                }
-
-                sliderRow("Confidence threshold", value: String(format: "%.2f", confidenceThreshold), tint: SPAIColor.secondary) {
-                    Slider(value: $confidenceThreshold, in: 0.05...0.95, step: 0.05)
-                        .tint(SPAIColor.secondary)
-                        .accessibilityLabel("Confidence threshold")
-                }
-
-                sliderRow("Streaming FPS", value: "\(Int(streamingFPS))", tint: SPAIColor.accent) {
-                    Slider(value: $streamingFPS, in: 1...30, step: 1)
-                        .tint(SPAIColor.accent)
-                        .accessibilityLabel("Streaming frames per second")
-                }
-
-                HStack(spacing: 12) {
-                    Button {
-                        Task { await pushThreshold() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if isPushing {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Image(systemName: "arrow.up.circle.fill")
-                            }
-                            Text("Apply to backend")
-                        }
-                    }
-                    .buttonStyle(.spai(.primary))
-                    .disabled(isPushing)
-                    .accessibilityLabel("Apply confidence threshold to backend")
-
-                    if let pushStatus {
-                        SPAIChip(text: pushStatus,
-                                 icon: pushSucceeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
-                                 tint: pushSucceeded ? SPAIColor.safe : SPAIColor.warning)
-                            .transition(AnyTransition.opacity.combined(with: AnyTransition.scale(scale: 0.9)))
-                    }
-                }
-                .animation(.snappy, value: pushStatus)
+                workspaceSection.settingsCard()
+                guidanceSection.settingsCard()
+                detectionSection.settingsCard()
             }
-
-            section("Workspace", icon: "rectangle.3.group", tint: SPAIColor.primary) {
-                sliderRow("Panel opacity", value: "\(Int(appModel.panelOpacity * 100))%", tint: SPAIColor.primary) {
-                    Slider(
-                        value: Binding(
-                            get: { appModel.panelOpacity },
-                            set: { appModel.panelOpacity = $0 }
-                        ),
-                        in: 0.5...1.0,
-                        step: 0.05
-                    )
-                    .tint(SPAIColor.primary)
-                    .accessibilityLabel("Panel opacity")
-                }
-
-                toggleRow("Panels look at you", icon: "person.and.arrow.left.and.arrow.right",
-                          isOn: Binding(
-                            get: { appModel.panelsBillboard },
-                            set: { appModel.panelsBillboard = $0 }
-                          ))
-                    .accessibilityHint("When enabled, panels follow your gaze and rotate to face you")
-            }
-
-            section("Guidance & testing", icon: "speaker.wave.2.fill", tint: SPAIColor.accent) {
-                // Reads each guided step out loud as it comes up. Contamination
-                // alerts speak regardless of this setting.
-                toggleRow("Speak step instructions", icon: "speaker.wave.2.fill", isOn: $speakSteps)
-                    .accessibilityHint("Reads each guided step aloud when it appears")
-
-                toggleRow("Always show onboarding", icon: "rectangle.stack.fill", isOn: $alwaysShowOnboarding)
-            }
+            .padding(28)
         }
-        .padding(28)
+        .scrollIndicators(.hidden)
         .frame(width: 440)
+        .frame(maxHeight: 760)
         .spaiWindowBackground(cornerRadius: 36, aurora: false)
         // Closing via the system's own window controls should also clear
         // the tracked-open flag, or the next status bar tap tries to
@@ -128,92 +55,248 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Settings")
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(SPAIColor.textPrimary)
-                Text("Tune detection and your workspace")
-                    .font(.system(size: 13))
-                    .foregroundStyle(SPAIColor.textTertiary)
+                    .foregroundStyle(SPAIText.primary)
+                Text("Workspace, guidance, privacy and your school")
+                    .font(SPAIFont.caption)
+                    .foregroundStyle(SPAIText.tertiary)
             }
         }
     }
 
-    private func section<Content: View>(
-        _ title: String,
-        icon: String,
-        tint: Color,
+    // MARK: - Workspace
+
+    private var workspaceSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            sectionTitle("Workspace")
+
+            settingBlock(title: "Layout") {
+                Picker("Layout", selection: Binding(
+                    get: { appModel.layout },
+                    set: { appModel.layout = $0 }
+                )) {
+                    ForEach(PanelLayout.allCases) { layout in
+                        Text(layout.label).tag(layout)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Workspace layout")
+
+                Text(appModel.layout == .focus
+                     ? "Shows only what the current task needs. Open anything else from Panels."
+                     : "Opens the event log and test media alongside the essentials.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(SPAIText.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            settingBlock(title: "Panel opacity: \(Int(appModel.panelOpacity * 100))%") {
+                Slider(
+                    value: Binding(
+                        get: { appModel.panelOpacity },
+                        set: { appModel.panelOpacity = $0 }
+                    ),
+                    in: 0.5...1.0,
+                    step: 0.05
+                )
+                .tint(SPAIColor.secondary)
+                .accessibilityLabel("Panel opacity")
+            }
+
+            settingToggle("Panels turn to face you", isOn: Binding(
+                get: { appModel.panelsBillboard },
+                set: { appModel.panelsBillboard = $0 }
+            ), tint: SPAIColor.accent)
+            .accessibilityHint("When on, panels rotate to face you as you move")
+        }
+    }
+
+    // MARK: - Guidance
+
+    private var guidanceSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            sectionTitle("Guidance")
+
+            settingToggle("Show Pip, the guide", isOn: Binding(
+                get: { appModel.showCompanion },
+                set: { appModel.showCompanion = $0 }
+            ), tint: SPAIColor.accent)
+            .accessibilityHint("Pip hops to the panel that needs your attention")
+
+            settingToggle("Say instrument names aloud", isOn: Binding(
+                get: { appModel.announceInstruments },
+                set: { appModel.announceInstruments = $0 }
+            ), tint: SPAIColor.accent)
+            .accessibilityHint("Hold up an instrument and SPAI tells you what it is")
+
+            // Reads each guided step out loud as it comes up. Contamination
+            // alerts speak regardless of this setting.
+            settingToggle("Speak step instructions", isOn: $speakSteps, tint: SPAIColor.primary)
+                .accessibilityHint("Reads each guided step aloud when it appears")
+
+            settingToggle("Voice commands", isOn: $voiceCommands, tint: SPAIColor.primary)
+                .accessibilityHint("Say next, repeat, why, or what is this during a step")
+
+            Button {
+                appModel.requestTour()
+            } label: {
+                Label("Replay the tour", systemImage: "figure.walk")
+            }
+            .buttonStyle(.spai(.tinted(SPAIColor.primary)))
+            .disabled(appModel.immersiveSpaceState != .open || !appModel.showCompanion)
+            .accessibilityHint("Pip walks you around the workspace again")
+
+            settingToggle("Always show onboarding (testing)", isOn: $alwaysShowOnboarding, tint: SPAIColor.primary)
+        }
+    }
+
+    // MARK: - Detection
+
+    private var detectionSection: some View {
+        VStack(alignment: .leading, spacing: SPAISpacing.m) {
+            sectionTitle("Privacy")
+
+            settingToggle("Keep camera frames on this headset", isOn: $detectOnDevice, tint: SPAIColor.safe)
+            Text(detectOnDevice
+                 ? "Checks run on the headset. Video is never sent to the server; only the record of each run is."
+                 : "Frames are sent to your SPAI server for checking and discarded there. They are never stored.")
+                .font(.system(size: 13))
+                .foregroundStyle(SPAIText.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            settingToggle("Use the headset's camera", isOn: $useHeadsetCamera, tint: SPAIColor.safe)
+                .accessibilityHint("Takes effect next time the workspace opens.")
+            Text("Needs Apple's enterprise main-camera entitlement and license file in this build. Otherwise use an iPhone camera or test media.")
+                .font(.system(size: 13))
+                .foregroundStyle(SPAIText.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            sectionDivider
+            sectionTitle("Before a session")
+            SystemCheckView()
+
+            sectionDivider
+            sectionTitle("School")
+
+            if school.isPaired {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(school.schoolName ?? "Connected")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("This headset: \(school.headsetName ?? "Headset") · \(backendURL)")
+                        .font(SPAIFont.mono)
+                        .foregroundStyle(SPAIText.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Button {
+                    Task { await testConnection() }
+                } label: {
+                    Label("Test connection", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .buttonStyle(.spai(.tinted(SPAIColor.accent)))
+
+                // Two presses: disconnecting means an admin has to pair the
+                // headset again before students can sign in.
+                Button {
+                    if confirmDisconnect {
+                        Task { await disconnect() }
+                    } else {
+                        confirmDisconnect = true
+                    }
+                } label: {
+                    Label(confirmDisconnect ? "Press again to disconnect" : "Disconnect this headset",
+                          systemImage: "link.badge.plus")
+                }
+                .buttonStyle(.spai(confirmDisconnect ? .danger : .tinted(SPAIColor.critical)))
+            } else {
+                Text("Not connected. Connect from the home screen with a code from your school's instructor dashboard.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let connectionStatus {
+                Text(connectionStatus)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            sectionDivider
+            sectionTitle("Detection")
+
+            settingBlock(title: "Streaming FPS: \(Int(streamingFPS))") {
+                Slider(value: $streamingFPS, in: 1...30, step: 1)
+                    .tint(SPAIColor.accent)
+                    .accessibilityLabel("Streaming frames per second")
+            }
+
+        }
+    }
+
+    // MARK: - Pieces
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .spaiEyebrow(SPAIColor.primaryBright)
+    }
+
+    private var sectionDivider: some View {
+        SPAIDivider()
+            .padding(.vertical, 2)
+    }
+
+    private func settingToggle(_ title: String, isOn: Binding<Bool>, tint: Color) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title)
+                .font(.system(size: 15))
+                .foregroundStyle(SPAIText.primary)
+        }
+        .tint(tint)
+    }
+
+    private func settingBlock<Content: View>(
+        title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(tint)
-                Text(title)
-                    .spaiEyebrow()
-            }
-            VStack(alignment: .leading, spacing: 16) {
-                content()
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
-                .strokeBorder(SPAIColor.hairline, lineWidth: 1)
+        VStack(alignment: .leading, spacing: SPAISpacing.s) {
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(SPAIText.primary)
+            content()
         }
     }
 
-    private func sliderRow<Control: View>(
-        _ title: String,
-        value: String,
-        tint: Color,
-        @ViewBuilder control: () -> Control
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(SPAIColor.textPrimary)
-                Spacer()
-                Text(value)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(tint)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(tint.opacity(0.14), in: Capsule())
-                    .contentTransition(.numericText())
-            }
-            control()
+    private func testConnection() async {
+        connectionStatus = "Checking…"
+        switch await client.connection() {
+        case .connected:   connectionStatus = "Connected to \(school.schoolName ?? "your school")."
+        case .unpaired:    connectionStatus = "This headset was disconnected from the dashboard. Connect it again from the home screen."
+        case .unreachable: connectionStatus = "The server didn't answer. Check this headset is online."
+        case .outdated:    connectionStatus = "The server is an older version without schools and sign-in."
         }
     }
 
-    private func toggleRow(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SPAIColor.textSecondary)
-                    .frame(width: 22)
-                Text(title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(SPAIColor.textPrimary)
-            }
-        }
-        .tint(SPAIColor.primary)
+    private func disconnect() async {
+        await client.unpair()
+        SchoolConnection.shared.forget()
+        RosterCache.clear()
+        confirmDisconnect = false
+        connectionStatus = "Disconnected."
     }
+}
 
-    private func pushThreshold() async {
-        isPushing = true
-        defer { isPushing = false }
-        do {
-            let updated = try await client.updateConfidenceThreshold(confidenceThreshold)
-            pushSucceeded = true
-            pushStatus = "Backend now at \(String(format: "%.2f", updated.confidenceThreshold))"
-        } catch {
-            pushSucceeded = false
-            pushStatus = "Failed to reach backend"
-        }
+private extension View {
+    /// One group of settings on a quiet card.
+    func settingsCard() -> some View {
+        self
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SPAIColor.surface, in: RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: SPAIRadius.medium, style: .continuous)
+                    .strokeBorder(SPAIColor.hairline, lineWidth: 1)
+            }
     }
 }
 

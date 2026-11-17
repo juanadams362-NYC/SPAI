@@ -81,19 +81,19 @@ struct OnboardingView: View {
             pageLayout(
                 eyebrow: "Your workspace",
                 title: "Panels around you",
-                message: "Your workspace floats in a comfortable arc, so everything is one glance away.",
+                message: "Your workspace opens with just three panels. Pip, your guide, will hop onto each one to show you around.",
                 points: [
-                    OnboardingPoint(icon: "rectangle.3.group", title: "Status bar · top",
-                                    detail: "Session time, role, station and detection mode"),
+                    OnboardingPoint(icon: "checklist", title: "Workflow · centre",
+                                    detail: "Your five stations and the Start Step button"),
                     OnboardingPoint(icon: "viewfinder", title: "Detection · left",
-                                    detail: "Live PPE check, contamination risk and environment"),
-                    OnboardingPoint(icon: "waveform.path.ecg", title: "Event log · right",
-                                    detail: "A real-time feed of workflow events and alerts"),
-                    OnboardingPoint(icon: "checklist", title: "Workflow · bottom",
-                                    detail: "All five stations and where you are")
+                                    detail: "Whether your gloves are on, and what instrument you're holding"),
+                    OnboardingPoint(icon: "rectangle.3.group", title: "Status bar · top",
+                                    detail: "Session time, your role, and the Panels menu"),
+                    OnboardingPoint(icon: "square.grid.2x2.fill", title: "Everything else · Panels menu",
+                                    detail: "Event log, history, Ask SPAI, and test media stay closed until you open them")
                 ]
             ) {
-                PanelArcDiagram()
+                FocusLayoutDiagram()
             }
         case 2:
             pageLayout(
@@ -105,8 +105,8 @@ struct OnboardingView: View {
                                     detail: "Tells gloved hands from bare hands in real time"),
                     OnboardingPoint(icon: "exclamationmark.triangle.fill", title: "Contamination risk",
                                     detail: "Bare skin during a sterile step halts the workflow"),
-                    OnboardingPoint(icon: "tray.full.fill", title: "Instrument detection",
-                                    detail: "Confirms trays are loaded before you move on"),
+                    OnboardingPoint(icon: "tray.full.fill", title: "Instrument identification",
+                                    detail: "Hold up an instrument and SPAI names it and tells you what to check"),
                     OnboardingPoint(icon: "clock.arrow.circlepath", title: "Auto-advance",
                                     detail: "Moves on after 3 consecutive confirmations")
                 ]
@@ -117,7 +117,7 @@ struct OnboardingView: View {
             pageLayout(
                 eyebrow: "Guided workflow",
                 title: "Five stations,\nguided.",
-                message: "Tap Start Step and SPAI speaks each instruction, then watches for completion. For manual steps, just say \"done\".",
+                message: "Tap Start Step and SPAI speaks each instruction, then watches for completion. Say \"next\", \"repeat\", \"why\" or \"what is this\" any time.",
                 points: []
             ) {
                 StationTimeline()
@@ -126,7 +126,7 @@ struct OnboardingView: View {
             pageLayout(
                 eyebrow: "Test anywhere",
                 title: "Try it without a tray",
-                message: "In the Test Detection panel you can:",
+                message: "Open Test Media from the Panels menu to:",
                 points: [
                     OnboardingPoint(icon: "photo.badge.plus", title: "Upload test media",
                                     detail: "Run detection on images or videos from your library"),
@@ -265,66 +265,76 @@ private struct OnboardingPoint {
 
 // MARK: - Page visuals
 
-/// A miniature of the immersive layout. The side panels are really rotated in 3D, so on
-/// device they angle toward you like the real arc.
-private struct PanelArcDiagram: View {
-    @State private var glow = false
+/// The focus layout: three panels, with Pip hopping from one to the next and the panel
+/// it lands on lighting up while the others fade back — the same thing the in-room tour
+/// does. The detection panel is really rotated in 3D, so on device it angles toward you.
+private struct FocusLayoutDiagram: View {
+    @State private var stop = 0
+
+    /// Where Pip perches: on the top edge of workflow, detection, then the status bar.
+    private let perches: [CGPoint] = [CGPoint(x: 40, y: 8), CGPoint(x: -118, y: -68), CGPoint(x: 0, y: -158)]
 
     var body: some View {
         ZStack {
             Ellipse()
                 .strokeBorder(SPAIColor.primary.opacity(0.25), lineWidth: 1.5)
                 .frame(width: 330, height: 96)
-                .offset(y: 132)
+                .offset(y: 150)
 
-            block("Status bar", icon: "rectangle.3.group", width: 250, height: 34)
-                .offset(y: -150)
+            block("Status bar", icon: "rectangle.3.group", width: 250, height: 34, lit: stop == 2, trailing: "Panels")
+                .offset(y: -130)
 
-            block("Detection", icon: "viewfinder", width: 104, height: 128)
-                .rotation3DEffect(.degrees(28), axis: (x: 0, y: 1, z: 0))
-                .offset(x: -122, y: -32)
+            block("Detection", icon: "viewfinder", width: 112, height: 132, lit: stop == 1)
+                .rotation3DEffect(.degrees(26), axis: (x: 0, y: 1, z: 0))
+                .offset(x: -118, y: 10)
 
-            block("Event log", icon: "waveform.path.ecg", width: 104, height: 128)
-                .rotation3DEffect(.degrees(-28), axis: (x: 0, y: 1, z: 0))
-                .offset(x: 122, y: -32)
+            block("Workflow", icon: "checklist", width: 200, height: 120, lit: stop == 0)
+                .offset(x: 40, y: 80)
 
-            block("Guided", icon: "text.bubble.fill", width: 112, height: 70, tint: SPAIColor.secondary)
-                .offset(x: 30, y: 54)
-
-            block("Workflow", icon: "checklist", width: 220, height: 40)
-                .offset(y: 118)
+            PipOrb()
+                .offset(x: perches[stop].x, y: perches[stop].y)
 
             VStack(spacing: 4) {
                 Circle()
                     .fill(SPAIGradient.brand)
                     .frame(width: 14, height: 14)
-                    .shadow(color: SPAIColor.primaryBright.opacity(glow ? 0.9 : 0.3), radius: glow ? 10 : 4)
                 Text("YOU")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .tracking(1.2)
                     .foregroundStyle(SPAIColor.textTertiary)
             }
-            .offset(y: 170)
+            .offset(y: 172)
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                glow = true
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1.8))
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.62)) {
+                    stop = (stop + 1) % perches.count
+                }
             }
         }
         .accessibilityHidden(true)
     }
 
     private func block(_ title: String, icon: String, width: CGFloat, height: CGFloat,
-                       tint: Color = SPAIColor.primary) -> some View {
+                       lit: Bool, trailing: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
+                if let trailing {
+                    Spacer(minLength: 4)
+                    Text(trailing + " ▾")
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(SPAIColor.primary.opacity(0.2), in: Capsule())
+                }
             }
-            .foregroundStyle(tint)
+            .foregroundStyle(SPAIColor.primaryBright)
             if height > 60 {
                 VStack(alignment: .leading, spacing: 5) {
                     Capsule().fill(Color.white.opacity(0.18)).frame(height: 5)
@@ -338,13 +348,31 @@ private struct PanelArcDiagram: View {
         .background(Color(hex: 0x0B1626).opacity(0.85), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(colors: [tint.opacity(0.7), SPAIColor.secondary.opacity(0.4)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: 1.2
-                )
+                .strokeBorder(lit ? SPAIColor.primaryBright : Color.white.opacity(0.16), lineWidth: lit ? 2 : 1)
         }
-        .shadow(color: tint.opacity(0.25), radius: 10)
+        .shadow(color: lit ? SPAIColor.primaryBright.opacity(0.55) : .clear, radius: 14)
+        .scaleEffect(lit ? 1.05 : 1)
+        .opacity(lit ? 1 : 0.55)
+    }
+}
+
+/// Pip, drawn flat: a small glowing orb.
+private struct PipOrb: View {
+    @State private var glow = false
+
+    var body: some View {
+        Circle()
+            .fill(
+                RadialGradient(colors: [Color.white, SPAIColor.primaryBright, SPAIColor.primary.opacity(0.4)],
+                               center: UnitPoint(x: 0.4, y: 0.35), startRadius: 0, endRadius: 14)
+            )
+            .frame(width: 24, height: 24)
+            .shadow(color: SPAIColor.primaryBright.opacity(glow ? 0.95 : 0.5), radius: glow ? 14 : 7)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                    glow = true
+                }
+            }
     }
 }
 
@@ -510,24 +538,6 @@ private struct TestLabVisual: View {
                 .foregroundStyle(SPAIColor.textSecondary)
                 .frame(width: 40, alignment: .trailing)
         }
-    }
-}
-
-/// Thin capsule meter for detection confidence.
-struct ConfidenceBar: View {
-    let value: Double
-    let color: Color
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.1))
-                Capsule()
-                    .fill(LinearGradient(colors: [color.opacity(0.6), color], startPoint: .leading, endPoint: .trailing))
-                    .frame(width: max(6, proxy.size.width * CGFloat(min(max(value, 0), 1))))
-            }
-        }
-        .frame(height: 6)
     }
 }
 

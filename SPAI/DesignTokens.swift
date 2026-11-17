@@ -58,8 +58,8 @@ enum SPAIColor {
 
     // Text on glass
     static let textPrimary   = Color.white
-    static let textSecondary = Color.white.opacity(0.74)
-    static let textTertiary  = Color.white.opacity(0.52)
+    static let textSecondary = SPAIText.secondary
+    static let textTertiary  = SPAIText.tertiary
 
     // Surfaces inside panels
     static let surface       = Color.white.opacity(0.06)
@@ -100,23 +100,41 @@ enum SPAIGradient {
 
 // MARK: - Type
 
+/// Type sizes. Panels float a metre or more away, so nothing a user is meant to read in
+/// the immersive space is set below 13pt, and secondary text is never dimmed below 0.7.
 enum SPAIFont {
+    /// Panel section label, e.g. "DETECTION" (used through `spaiEyebrow()`).
+    static let eyebrow = Font.system(size: 13, weight: .semibold)
+    /// The one thing a panel is telling you.
+    static let headline = Font.system(size: 20, weight: .semibold)
+    /// Spoken-length instructions.
+    static let instruction = Font.system(size: 19, weight: .medium)
+    static let body = Font.system(size: 16)
+    static let bodyStrong = Font.system(size: 16, weight: .semibold)
+    static let bodyMedium = Font.system(size: 16, weight: .medium)
+    static let label = Font.system(size: 15, weight: .medium)
+    static let callout = Font.system(size: 14)
+    static let calloutMedium = Font.system(size: 14, weight: .medium)
+    static let caption = Font.system(size: 13)
+    /// Numbers that change in place: timers, counts, percentages.
+    static let value = Font.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit()
+    static let button = Font.system(size: 15, weight: .semibold)
+    static let title = Font.system(size: 22, weight: .bold)
+    static let mono = Font.system(size: 13, weight: .medium, design: .monospaced)
+
     static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
         .system(size: size, weight: weight)
     }
-    /// Big numbers: risk %, timers, KPIs.
+    /// Big numbers: risk %, KPIs.
     static func metric(_ size: CGFloat) -> Font {
         .system(size: size, weight: .bold, design: .rounded)
     }
-    static let eyebrow   = Font.system(size: 12, weight: .semibold)
-    static let title     = Font.system(size: 22, weight: .bold)
-    static let headline  = Font.system(size: 17, weight: .semibold)
-    static let body      = Font.system(size: 16, weight: .regular)
-    static let bodyMedium = Font.system(size: 16, weight: .medium)
-    static let callout   = Font.system(size: 14, weight: .regular)
-    static let calloutMedium = Font.system(size: 14, weight: .medium)
-    static let caption   = Font.system(size: 12, weight: .medium)
-    static let mono      = Font.system(size: 12, weight: .medium, design: .monospaced)
+}
+
+enum SPAIText {
+    static let primary = Color.white
+    static let secondary = Color.white.opacity(0.78)
+    static let tertiary = Color.white.opacity(0.7)
 }
 
 // MARK: - Shape & space
@@ -204,12 +222,56 @@ extension View {
     }
 
     /// Small uppercase label that sits above a section or value.
-    func spaiEyebrow(_ color: Color = SPAIColor.textTertiary) -> some View {
+    func spaiEyebrow(_ color: Color = SPAIText.secondary) -> some View {
         self
             .font(SPAIFont.eyebrow)
             .tracking(1.3)
             .textCase(.uppercase)
             .foregroundStyle(color)
+    }
+
+    /// Standard chrome for a panel in the immersive space: glass, edge light, and the
+    /// guide's spotlight.
+    ///
+    /// - Parameters:
+    ///   - id: The panel's `PanelID`, so Pip can point at it. Pass nil for panels the
+    ///     guide never targets.
+    ///   - border: The panel's own alert state. Leave `.normal` unless the panel has
+    ///     something urgent to say.
+    func spaiPanel(_ id: String? = nil, border: BorderState = .normal) -> some View {
+        modifier(SPAIPanelChrome(id: id, border: border))
+    }
+}
+
+/// The shared look of every immersive panel, and the one place the guide's spotlight is
+/// drawn. When Pip points at a panel, that panel's edge lights up and it lifts slightly;
+/// during the tour every other panel fades back, so exactly one thing in the room is
+/// asking to be looked at.
+struct SPAIPanelChrome: ViewModifier {
+    @Environment(AppModel.self) private var appModel
+    let id: String?
+    let border: BorderState
+
+    private var isSpotlit: Bool {
+        guard let id else { return false }
+        return appModel.spotlightPanel == id
+    }
+
+    private var isDimmed: Bool {
+        appModel.isTourActive && appModel.spotlightPanel != nil && !isSpotlit
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .spaiPanelBackground(opacity: appModel.panelOpacity)
+            // A panel's own warning outranks the guide's highlight.
+            .ledBorder(border == .normal && isSpotlit ? .attention : border,
+                       cornerRadius: SPAIRadius.large,
+                       lineWidth: isSpotlit ? 3 : 1.5)
+            .scaleEffect(isSpotlit ? 1.04 : 1)
+            .opacity(isDimmed ? 0.3 : 1)
+            .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isSpotlit)
+            .animation(.easeInOut(duration: 0.35), value: isDimmed)
     }
 }
 
@@ -489,8 +551,8 @@ struct SPAIChip: View {
                     .font(.system(size: 11, weight: .bold))
             }
             Text(text)
-                .font(.system(size: 12, weight: .semibold))
-                .tracking(0.4)
+                .font(.system(size: 13, weight: .semibold))
+                .tracking(0.3)
                 .lineLimit(1)
         }
         .foregroundStyle(tint)
@@ -548,9 +610,7 @@ struct MetricTile: View {
                         .foregroundStyle(tint)
                 }
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(0.9)
-                    .textCase(.uppercase)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(SPAIColor.textTertiary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
@@ -616,6 +676,24 @@ struct TypingDots: View {
         }
         .onAppear { animate = true }
         .accessibilityHidden(true)
+    }
+}
+
+/// Thin capsule meter for detection confidence.
+struct ConfidenceBar: View {
+    let value: Double
+    let color: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.1))
+                Capsule()
+                    .fill(LinearGradient(colors: [color.opacity(0.6), color], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: max(6, proxy.size.width * CGFloat(min(max(value, 0), 1))))
+            }
+        }
+        .frame(height: 6)
     }
 }
 

@@ -143,53 +143,78 @@ final class DetectionServiceTests: XCTestCase {
         XCTAssertEqual(borderLevel(forRisk: 0.85, hasResult: false), "normal")
     }
 
-    // MARK: - PPE overlap arbitration (real model outputs on images-18.jpeg)
+    // MARK: - One hand, two boxes
 
-    private func ppe(_ className: String, _ confidence: Double, _ box: [Int]) -> BackendDetection {
-        BackendDetection(classId: className == "glove" ? 0 : 1, className: className, confidence: confidence, box: box)
-    }
+    /// Boxes measured from the real glove model on demo/test-media/bare-hand.jpg.
+    func testDoubleLabelledHandIsResolvedByConfidence() {
+        let frame = [
+            BackendDetection(classId: 1, className: "hand", confidence: 0.80, box: [135, 23, 224, 115]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.28, box: [135, 19, 224, 120]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.73, box: [12, 101, 178, 199]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.61, box: [16, 121, 187, 199]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.31, box: [68, 112, 177, 175])
+        ]
+        let hands = DetectionService.resolveHands(frame)
+        XCTAssertEqual(hands.bare, 1, "The clearly bare hand must count even though a glove is also in view")
+        XCTAssertGreaterThanOrEqual(hands.gloved, 1)
 
-    func testDuplicateHandOnGlovedHandIsRemoved() {
-        let out = DetectionService.resolvePPEOverlaps([
-            ppe("glove", 0.73, [12, 101, 178, 199]),
-            ppe("hand", 0.61, [16, 121, 187, 199])
-        ])
-        XCTAssertEqual(out.map(\.className), ["glove"])
-    }
-
-    func testGhostGloveOnBareHandIsRemoved() {
-        let out = DetectionService.resolvePPEOverlaps([
-            ppe("glove", 0.28, [135, 19, 224, 120]),
-            ppe("hand", 0.80, [135, 23, 224, 115])
-        ])
-        XCTAssertEqual(out.map(\.className), ["hand"])
-    }
-
-    func testFragmentInsideStrongerBoxIsRemoved() {
-        let out = DetectionService.resolvePPEOverlaps([
-            ppe("glove", 0.73, [12, 101, 178, 199]),
-            ppe("hand", 0.31, [68, 112, 177, 175])
-        ])
-        XCTAssertEqual(out.map(\.className), ["glove"])
-    }
-
-    func testTwoDifferentHandsAreBothKept() {
-        let out = DetectionService.resolvePPEOverlaps([
-            ppe("hand", 0.80, [135, 23, 224, 115]),
-            ppe("glove", 0.73, [12, 101, 178, 199])
-        ])
-        XCTAssertEqual(Set(out.map(\.className)), ["hand", "glove"])
-    }
-
-    func testGlovedFrameNowPassesPPE() {
-        // POV frame: before arbitration the duplicate "hand" made ppePassing false.
         let service = DetectionService()
-        service.detections = DetectionService.resolvePPEOverlaps([
-            ppe("glove", 0.90, [18, 17, 91, 123]),
-            ppe("hand", 0.74, [18, 16, 91, 122]),
-            ppe("glove", 0.67, [64, 115, 124, 174])
-        ])
+        service.detections = frame
         service.hasResult = true
-        XCTAssertTrue(service.ppePassing)
+        XCTAssertEqual(service.contaminationRisk, 0.85, accuracy: 0.001)
+        XCTAssertFalse(service.ppePassing)
+    }
+
+    /// Measured on docs/sprint-notes/week2-screenshots/pov_test_no_detections.jpg:
+    /// the same gloved hand labelled both ways.
+    func testSameHandLabelledBothWaysIsAGlove() {
+        let frame = [
+            BackendDetection(classId: 0, className: "glove", confidence: 0.90, box: [18, 17, 91, 123]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.74, box: [18, 16, 91, 122]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.67, box: [64, 115, 124, 174])
+        ]
+        let hands = DetectionService.resolveHands(frame)
+        XCTAssertEqual(hands.bare, 0)
+        XCTAssertEqual(hands.gloved, 2)
+    }
+
+    func testFaintBareHandDoesNotHaltTheWorkflow() {
+        let frame = [BackendDetection(classId: 1, className: "hand", confidence: 0.35, box: [0, 0, 50, 50])]
+        XCTAssertEqual(DetectionService.resolveHands(frame).bare, 0)
+    }
+
+    // MARK: - Box arbitration (what gets stored and drawn)
+
+    func testArbitrationKeepsOneBoxPerHand() {
+        let raw = [
+            BackendDetection(classId: 1, className: "hand", confidence: 0.80, box: [135, 23, 224, 115]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.28, box: [135, 19, 224, 120]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.73, box: [12, 101, 178, 199]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.61, box: [16, 121, 187, 199]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.31, box: [68, 112, 177, 175])
+        ]
+        let out = DetectionService.resolvePPEOverlaps(raw)
+        XCTAssertEqual(out.map(\.className).sorted(), ["glove", "hand"])
+        // The safety verdict is unchanged by cleaning the boxes.
+        let hands = DetectionService.resolveHands(out)
+        XCTAssertEqual(hands.bare, 1)
+        XCTAssertEqual(hands.gloved, 1)
+    }
+
+    func testHandFragmentInsideGloveBoxIsRemoved() {
+        // IoU 0.42 — under the 0.5 same-hand line — but most of it sits inside the glove box.
+        let out = DetectionService.resolvePPEOverlaps([
+            BackendDetection(classId: 0, className: "glove", confidence: 0.73, box: [12, 101, 178, 199]),
+            BackendDetection(classId: 1, className: "hand", confidence: 0.61, box: [68, 112, 177, 175])
+        ])
+        XCTAssertEqual(out.map(\.className), ["glove"])
+    }
+
+    func testArbitrationTieGoesToGlove() {
+        let out = DetectionService.resolvePPEOverlaps([
+            BackendDetection(classId: 1, className: "hand", confidence: 0.6, box: [0, 0, 100, 100]),
+            BackendDetection(classId: 0, className: "glove", confidence: 0.6, box: [2, 2, 100, 100])
+        ])
+        XCTAssertEqual(out.map(\.className), ["glove"])
     }
 }

@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
-"""train_v5.py — train a stronger SPAI detector and prove it beats the current one.
+"""train_ppe_v5.py — train a stronger glove/hand (PPE) detector and prove it beats the shipped one.
 
-What changes vs v3/v4 (which were YOLOv8n with default settings):
+What changes vs the shipped PPE model (v3: YOLOv8n, default settings):
   • Bigger backbone: YOLO11s (~9M params) instead of YOLOv8n (~3M). Still real-time on
     Vision Pro's Neural Engine and on the backend CPU.
-  • Augmentation tuned to the job:
-      PPE         — wider hue/saturation range so purple/blue/black nitrile reads as glove,
-                    head-tilt rotation, slight perspective, occasional upside-down hands.
-      Instruments — higher resolution (960) for thin instruments, vertical flips for
-                    top-down trays, stronger brightness range for OR lighting.
-  • Longer schedule with cosine LR and late mosaic shut-off.
-  • A built-in gate: the new model and the current model are evaluated on the SAME split,
-    and for PPE we also measure the glove/hand double-label rate that broke "PPE passing".
+  • Augmentation tuned to the job: a wider hue/saturation range so purple, blue, black and
+    white nitrile all read as "glove", head-tilt rotation, slight perspective, and
+    occasional upside-down hands for top-down views.
+  • Longer schedule with cosine LR and a late mosaic shut-off.
+  • A built-in gate: the new and shipped models are evaluated on the SAME split, including
+    the glove/hand double-label rate that made gloved users read as "PPE check failed".
 
-Typical Colab run (T4):
-    python train_v5.py --task ppe --data /content/merged_clean/data.yaml \
+Instruments have their own v5 pipeline (see ../v5_instruments.md).
+
+Typical Colab run (T4), after cleaning the labels with audit_ppe_labels.py:
+    python train_ppe_v5.py --data /content/merged_clean/data.yaml \
         --baseline ../../backend/model/best.pt --export
-
-    python train_v5.py --task instruments --data /content/ASTRA/data.yaml \
-        --baseline ../../backend/model/instruments_best.pt --export
 """
 
 from __future__ import annotations
@@ -35,11 +32,6 @@ PRESETS: dict[str, dict] = {
         hsv_h=0.03, hsv_s=0.75, hsv_v=0.45, degrees=15.0, translate=0.1, scale=0.5,
         shear=2.0, perspective=0.0005, flipud=0.1, fliplr=0.5, mosaic=1.0, mixup=0.1,
         close_mosaic=15, cos_lr=True,
-    ),
-    "instruments": dict(
-        model="yolo11s.pt", imgsz=960, epochs=150, patience=40, batch=8,
-        hsv_h=0.015, hsv_s=0.6, hsv_v=0.5, degrees=10.0, translate=0.1, scale=0.5,
-        flipud=0.5, fliplr=0.5, mosaic=1.0, mixup=0.05, close_mosaic=20, cos_lr=True,
     ),
 }
 
@@ -123,7 +115,7 @@ def print_comparison(new: dict, old: dict | None) -> bool:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", choices=PRESETS, required=True)
+    ap.add_argument("--task", choices=PRESETS, default="ppe")
     ap.add_argument("--data", required=True, help="YOLO data.yaml")
     ap.add_argument("--model", help="starting weights (default: preset, e.g. yolo11s.pt)")
     ap.add_argument("--epochs", type=int)
@@ -171,11 +163,11 @@ def main() -> int:
     (out_dir / "model_card.json").write_text(json.dumps(card, indent=2))
 
     if args.export:
-        target = "best.pt" if args.task == "ppe" else "instruments_best.pt"
+        target = "best.pt"
         shutil.copy2(best, out_dir / target)
         exported = YOLO(str(best)).export(format="coreml", nms=True, imgsz=hyp["imgsz"])
         package = Path(exported)
-        final = out_dir / ("best.mlpackage" if args.task == "ppe" else "instruments_best.mlpackage")
+        final = out_dir / "best.mlpackage"
         if final.exists():
             shutil.rmtree(final)
         shutil.move(str(package), final)

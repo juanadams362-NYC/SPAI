@@ -1,0 +1,28 @@
+# One-click deploy of the SPAI server on Render (render.com):
+#   New → Blueprint → pick this repository.
+# You'll be asked for the secret values marked sync: false.
+#
+# The persistent disk is what keeps student records across restarts and
+# deploys. Render charges for it (a few dollars a month at 1 GB); without
+# it, every restart would wipe the class.
+services:
+  - type: web
+    name: spai-server
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: standard            # 2 GB RAM: the two YOLO models need more than the starter plan's 512 MB
+    healthCheckPath: /health
+    disk:
+      name: spai-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: SPAI_DB
+        value: /data/spai.db
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SPAI_OPERATOR_KEY
+        generateValue: true
+      - key: SPAI_RETENTION_DAYS
+        sync: false

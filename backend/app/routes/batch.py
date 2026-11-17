@@ -2,7 +2,7 @@
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.concurrency import run_in_threadpool
 
-from app.inference.detector import detector
+from app.inference.detector import detector, InvalidImageError
 from app.logging_config import get_logger
 
 router = APIRouter()
@@ -47,7 +47,12 @@ async def detect_batch(images: list[UploadFile] = File(...)) -> dict:
             continue
 
         # Run the blocking inference off the event loop (same as single detect).
-        detection = await run_in_threadpool(detector.detect, image_bytes)
+        # One unreadable image shouldn't fail the whole batch.
+        try:
+            detection = await run_in_threadpool(detector.detect, image_bytes)
+        except InvalidImageError:
+            results.append({"index": index, "error": "Could not read that image."})
+            continue
         results.append({"index": index, **detection})
 
     logger.info("Batch detection complete: %d images processed", len(results))

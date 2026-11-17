@@ -29,10 +29,11 @@ struct WorkflowProgressPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             PanelHeader("Workflow", icon: "checklist", tint: SPAIColor.primary) {
-                Text("\(completedCount) of \(SterileStep.allCases.count) complete")
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(SPAIColor.textTertiary)
+                Text(appModel.sessionComplete
+                     ? "All \(SterileStep.allCases.count) complete"
+                     : "Station \(currentStepIndex + 1) of \(SterileStep.allCases.count)")
+                    .font(SPAIFont.value)
+                    .foregroundStyle(SPAIText.secondary)
                     .contentTransition(.numericText())
             }
 
@@ -48,9 +49,8 @@ struct WorkflowProgressPanel: View {
             controls
         }
         .padding(SPAISpacing.l)
-        .frame(width: 780)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(appModel.isHalted ? .critical : .normal, cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .frame(width: 760)
+        .spaiPanel(PanelID.workflow, border: appModel.isHalted ? .critical : .normal)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: currentStepIndex)
         .animation(.easeInOut(duration: 0.3), value: stepStarted)
         .animation(.easeInOut(duration: 0.3), value: appModel.isHalted)
@@ -83,12 +83,12 @@ struct WorkflowProgressPanel: View {
                     .foregroundStyle(SPAIColor.textSecondary)
                 Spacer()
                 Text(stepStarted ? "In progress: \(currentStep.title)" : "Ready: \(currentStep.title)")
-                    .font(.system(size: 13))
+                    .font(SPAIFont.caption)
                     .foregroundStyle(SPAIColor.textTertiary)
             }
         } else {
             HStack(spacing: 10) {
-                statusLabel(eyebrow: stepStarted ? "In progress" : "Ready to start",
+                statusLabel(eyebrow: stepStarted ? "In progress" : "Next up",
                             title: currentStep.title,
                             tint: stepStarted ? SPAIColor.primaryBright : SPAIColor.textTertiary,
                             icon: currentStep.icon)
@@ -231,11 +231,11 @@ struct WorkflowProgressPanel: View {
             .frame(width: nodeSize + 16, height: nodeSize + 16)
 
             Text(step.title)
-                .font(.system(size: 12, weight: isCurrent ? .bold : .medium))
+                .font(.system(size: 13, weight: isCurrent ? .bold : .medium))
                 .foregroundStyle(isCurrent ? SPAIColor.textPrimary : (isComplete ? SPAIColor.textSecondary : SPAIColor.textTertiary))
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-                .frame(width: 104)
+                .frame(width: 100)
                 .multilineTextAlignment(.center)
         }
         .accessibilityElement(children: .ignore)

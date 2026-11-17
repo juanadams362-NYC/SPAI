@@ -51,8 +51,7 @@ struct EventLogPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 360)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.eventLog)
         .animation(.snappy(duration: 0.35), value: events.count)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Event log. \(events.count) events. Most recent: \(events.first?.message ?? "none").")
@@ -62,10 +61,10 @@ struct EventLogPanel: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(event.message)
                 .font(.system(size: 15, weight: isNewest ? .semibold : .regular))
-                .foregroundStyle(isNewest ? SPAIColor.textPrimary : Color.white.opacity(0.86))
+                .foregroundStyle(isNewest ? SPAIText.primary : Color.white.opacity(0.88))
                 .fixedSize(horizontal: false, vertical: true)
             Text(event.timestamp)
-                .font(.system(size: 12, weight: .medium))
+                .font(SPAIFont.caption)
                 .monospacedDigit()
                 .foregroundStyle(SPAIColor.textTertiary)
         }

@@ -19,7 +19,7 @@ struct ChatPanel: View {
     private let client = BackendClient()
 
     @State private var messages: [ChatMessage] = [
-        ChatMessage(role: .spai, text: "Ask me anything about your current step.")
+        ChatMessage(role: .spai, text: "Ask me about your current step — or hold up an instrument and ask what it is.")
     ]
     @State private var voiceInput = VoiceInputManager()
     @State private var draft = ""
@@ -29,7 +29,7 @@ struct ChatPanel: View {
     private let suggestions = [
         "What PPE do I need here?",
         "What's my next step?",
-        "What mistakes should I avoid?"
+        "What is this instrument?"
     ]
 
     private var showsSuggestions: Bool {
@@ -44,8 +44,7 @@ struct ChatPanel: View {
         }
         .padding(SPAISpacing.l)
         .frame(width: 360, height: 480)
-        .spaiPanelBackground(opacity: appModel.panelOpacity)
-        .ledBorder(cornerRadius: SPAIRadius.large, lineWidth: 1.5)
+        .spaiPanel(PanelID.chat)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ask SPAI chat. \(messages.count) messages. Answers are grounded in \(currentStep?.title ?? "no step").")
     }
@@ -63,7 +62,7 @@ struct ChatPanel: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(SPAIColor.textPrimary)
                 Text("AI guidance for this station")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(SPAIFont.caption)
                     .foregroundStyle(SPAIColor.textTertiary)
             }
             Spacer(minLength: 6)
@@ -255,12 +254,12 @@ struct ChatPanel: View {
                         .symbolEffect(.variableColor.iterative)
                     Text("Listening…")
                 }
-                .font(.system(size: 12, weight: .semibold))
+                .font(SPAIFont.caption.weight(.semibold))
                 .foregroundStyle(SPAIColor.secondary)
                 .padding(.leading, 8)
             } else if let error = voiceInput.errorMessage {
                 Text(error)
-                    .font(.system(size: 12))
+                    .font(SPAIFont.caption)
                     .foregroundStyle(SPAIColor.warning)
                     .padding(.leading, 8)
             }
@@ -283,17 +282,21 @@ struct ChatPanel: View {
 
     private var detectionSummary: String {
         guard detectionService.hasResult else { return "" }
-        let detections = detectionService.detections
         var parts: [String] = []
-        let gloves = detections.contains { DetectionService.isGloveClass($0.className) }
-        let hands = detections.contains { DetectionService.isHandClass($0.className) }
-        parts.append(gloves ? "gloves detected" : "no gloves detected")
-        if hands { parts.append("bare hand visible") }
-        // On-device instrument labels are specific names ("Scalpel Handle 3"), so match by
-        // category rather than the literal string "instrument" the backend uses.
-        let instrumentHits = detections.filter { DetectionService.isInstrumentClass($0.className) }.count
+        let names = detectionService.detections.map(\.className)
+        parts.append(names.contains(where: DetectionService.isGloveClass) ? "gloves detected" : "no gloves detected")
+        if names.contains(where: DetectionService.isHandClass) { parts.append("bare hand visible") }
+
+        // Name what's being held, so "what is this?" and "what do I check on
+        // this?" can be answered. The backend matches the name against its
+        // instrument reference and hands the facts to the model.
+        if let instrument = detectionService.identifiedInstrument, instrument.certain {
+            let verb = instrument.held ? "holding" : "in view:"
+            parts.append("\(verb) \(instrument.name) (\(instrument.confidencePercent)% confident)")
+        }
+        let instrumentHits = detectionService.instrumentNames.count
         if instrumentHits > 0 {
-            parts.append("\(instrumentHits) instruments detected")
+            parts.append("\(instrumentHits) instrument\(instrumentHits == 1 ? "" : "s") detected")
         }
         if let tray = detectionService.trayState {
             parts.append("tray is \(tray)")
@@ -323,8 +326,10 @@ struct ChatPanel: View {
                     detectionSummary: detectionSummary
                 ))
                 messages.append(ChatMessage(role: .spai, text: response.answer))
+            } catch BackendError.unauthorized {
+                messages.append(ChatMessage(role: .error, text: "Ask SPAI needs this headset to be connected to your school. Connect it from the home screen."))
             } catch {
-                messages.append(ChatMessage(role: .error, text: "Couldn't reach SPAI. Check the backend connection and try again."))
+                messages.append(ChatMessage(role: .error, text: "Couldn't reach SPAI right now. Your steps and checks still work; try asking again in a moment."))
             }
             isWaiting = false
         }

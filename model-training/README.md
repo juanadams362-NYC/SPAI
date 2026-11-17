@@ -56,10 +56,12 @@ This is construction PPE, not medical. See [Dataset Notes](../docs/dataset-notes
 
 ## v5 — way better models
 
-Start here: [`v5/README.md`](v5/README.md). It documents the glove/hand double-labeling found in the
-shipped model, the fixes already in the app and backend, and a one-notebook retrain
-(`notebooks/spai_v5_training.ipynb`) with label auditing, YOLO11s, SPAI-tuned augmentation and a
-ship-only-if-better gate.
+- **Instruments:** [`v5_instruments.md`](v5_instruments.md). The model now names instruments
+  instead of calling every one "Adson Dressing Forceps".
+- **Gloves and hands:** [`v5_ppe.md`](v5_ppe.md). It covers the glove/hand double-labeling found
+  in the shipped model and the fixes already in the app and backend. It also has a one-notebook
+  retrain (`notebooks/spai_ppe_v5_training.ipynb`) with label auditing, YOLO11s, glove-tuned
+  augmentation and a ship-only-if-better gate.
 
 ## Roadmap
 
